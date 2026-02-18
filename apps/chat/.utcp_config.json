@@ -1,0 +1,14 @@
+{
+  "manual_call_templates": [
+    {
+      "name": "weather",
+      "call_template_type": "http",
+      "url": "https://api.weather.gov/openapi.json",
+      "http_method": "GET",
+      "auth_tools": null,
+      "headers": {
+        "User-Agent": "com.aprovan.apprentice"
+      }
+    }
+  ]
+}

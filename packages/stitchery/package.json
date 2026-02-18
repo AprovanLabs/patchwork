@@ -1,0 +1,40 @@
+{
+  "name": "@aprovan/stitchery",
+  "version": "0.1.0",
+  "description": "Backend services for LLM-generated artifacts",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "stitchery": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "^1.0.18",
+    "@ai-sdk/openai-compatible": "^2.0.26",
+    "@aprovan/patchwork-utcp": "workspace:^",
+    "ai": "^6.0.67",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.2"
+  },
+  "license": "MIT"
+}

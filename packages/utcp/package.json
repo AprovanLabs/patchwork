@@ -1,0 +1,38 @@
+{
+  "name": "@aprovan/patchwork-utcp",
+  "version": "0.1.0",
+  "description": "UTCP backend integration for Patchwork",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "check-types": "tsc --noEmit",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@utcp/http": "^1.1.1",
+    "@utcp/mcp": "^1.1.1",
+    "@utcp/sdk": "^1.1.0",
+    "@utcp/text": "^1.1.0"
+  },
+  "peerDependencies": {
+    "@aprovan/patchwork": "^0.1.0"
+  },
+  "devDependencies": {
+    "@aprovan/patchwork": "0.1.0",
+    "@types/node": "^22.10.5",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

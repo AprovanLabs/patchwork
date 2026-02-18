@@ -1,0 +1,190 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Tiptap Markdown Editor Styles */
+.markdown-editor .tiptap {
+  outline: none;
+}
+
+.markdown-editor .tiptap p {
+  margin: 0;
+}
+
+.markdown-editor .tiptap > * + * {
+  margin-top: 0.5em;
+}
+
+/* Placeholder styling */
+.markdown-editor .tiptap p.is-editor-empty:first-child::before {
+  color: hsl(var(--muted-foreground));
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Inline code */
+.markdown-editor .tiptap code {
+  background-color: hsl(var(--muted));
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875em;
+}
+
+/* Code blocks */
+.markdown-editor .tiptap pre {
+  background-color: hsl(var(--muted));
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875em;
+  overflow-x: auto;
+}
+
+.markdown-editor .tiptap pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* Blockquotes */
+.markdown-editor .tiptap blockquote {
+  border-left: 4px solid hsl(var(--muted-foreground) / 0.3);
+  padding-left: 1rem;
+  font-style: italic;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Lists */
+.markdown-editor .tiptap ul,
+.markdown-editor .tiptap ol {
+  padding-left: 1.5rem;
+  margin: 0.25em 0;
+}
+
+.markdown-editor .tiptap ul {
+  list-style-type: disc;
+}
+
+.markdown-editor .tiptap ol {
+  list-style-type: decimal;
+}
+
+.markdown-editor .tiptap li {
+  margin: 0.125em 0;
+}
+
+/* Headings - more subtle for chat input */
+.markdown-editor .tiptap h1,
+.markdown-editor .tiptap h2,
+.markdown-editor .tiptap h3 {
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-editor .tiptap h1 {
+  font-size: 1.25em;
+}
+
+.markdown-editor .tiptap h2 {
+  font-size: 1.125em;
+}
+
+.markdown-editor .tiptap h3 {
+  font-size: 1em;
+}
+
+/* Bold & Italic */
+.markdown-editor .tiptap strong {
+  font-weight: 600;
+}
+
+.markdown-editor .tiptap em {
+  font-style: italic;
+}
+
+/* Strikethrough */
+.markdown-editor .tiptap s {
+  text-decoration: line-through;
+}
+
+/* Code block wrapper with language input */
+.markdown-editor .code-block-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.markdown-editor .code-block-wrapper pre {
+  margin: 0;
+}
+
+.markdown-editor .code-block-wrapper .language-input-wrapper {
+  user-select: none;
+  pointer-events: auto;
+}
+
+.markdown-editor .code-block-wrapper .language-input {
+  background: transparent;
+  user-select: text !important;
+  pointer-events: auto !important;
+  cursor: text;
+  -webkit-user-select: text !important;
+}
