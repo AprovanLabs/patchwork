@@ -2,7 +2,6 @@
   "name": "@aprovan/patchwork",
   "version": "0.1.0",
   "description": "Platform for building generative UI experiences",
-  "private": true,
   "type": "module",
   "scripts": {
     "build": "turbo run build && ./scripts/sync-local.sh",

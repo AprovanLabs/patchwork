@@ -7,7 +7,7 @@
       "http_method": "GET",
       "auth_tools": null,
       "headers": {
-        "User-Agent": "com.aprovan.apprentice"
+        "User-Agent": "com.aprovan.patchwork"
       }
     }
   ]
