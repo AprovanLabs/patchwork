@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
-import { ChevronRight, ChevronDown, File, Folder } from 'lucide-react';
+import { useMemo, useState, useRef, useCallback } from 'react';
+import { ChevronRight, ChevronDown, File, Folder, Upload } from 'lucide-react';
 import type { VirtualFile } from '@aprovan/patchwork-compiler';
+import { isMediaFile } from './fileTypes';
 
 interface TreeNode {
   name: string;
@@ -47,11 +48,34 @@ interface TreeNodeComponentProps {
   node: TreeNode;
   activeFile: string;
   onSelect: (path: string) => void;
+  onReplaceFile?: (path: string, content: string, encoding: 'utf8' | 'base64') => void;
   depth?: number;
 }
 
-function TreeNodeComponent({ node, activeFile, onSelect, depth = 0 }: TreeNodeComponentProps) {
+function TreeNodeComponent({ node, activeFile, onSelect, onReplaceFile, depth = 0 }: TreeNodeComponentProps) {
   const [expanded, setExpanded] = useState(true);
+  const [isHovered, setIsHovered] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onReplaceFile) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1] ?? '';
+      onReplaceFile(node.path, base64, 'base64');
+    };
+    reader.readAsDataURL(file);
+
+    e.target.value = '';
+  }, [node.path, onReplaceFile]);
 
   if (!node.name) {
     return (
@@ -62,6 +86,7 @@ function TreeNodeComponent({ node, activeFile, onSelect, depth = 0 }: TreeNodeCo
             node={child}
             activeFile={activeFile}
             onSelect={onSelect}
+            onReplaceFile={onReplaceFile}
             depth={depth}
           />
         ))}
@@ -70,6 +95,8 @@ function TreeNodeComponent({ node, activeFile, onSelect, depth = 0 }: TreeNodeCo
   }
 
   const isActive = node.path === activeFile;
+  const isMedia = !node.isDir && isMediaFile(node.path);
+  const showUpload = isMedia && isHovered && onReplaceFile;
 
   if (node.isDir) {
     return (
@@ -95,6 +122,7 @@ function TreeNodeComponent({ node, activeFile, onSelect, depth = 0 }: TreeNodeCo
                 node={child}
                 activeFile={activeFile}
                 onSelect={onSelect}
+                onReplaceFile={onReplaceFile}
                 depth={depth + 1}
               />
             ))}
@@ -105,16 +133,40 @@ function TreeNodeComponent({ node, activeFile, onSelect, depth = 0 }: TreeNodeCo
   }
 
   return (
-    <button
-      onClick={() => onSelect(node.path)}
-      className={`flex items-center gap-1 w-full px-2 py-1 text-left text-sm hover:bg-muted/50 rounded ${
-        isActive ? 'bg-primary/10 text-primary' : ''
-      }`}
-      style={{ paddingLeft: `${depth * 12 + 20}px` }}
+    <div
+      className="relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      <File className="h-3 w-3 shrink-0 text-muted-foreground" />
-      <span className="truncate">{node.name}</span>
-    </button>
+      <button
+        onClick={() => onSelect(node.path)}
+        className={`flex items-center gap-1 w-full px-2 py-1 text-left text-sm hover:bg-muted/50 rounded ${
+          isActive ? 'bg-primary/10 text-primary' : ''
+        }`}
+        style={{ paddingLeft: `${depth * 12 + 20}px` }}
+      >
+        <File className="h-3 w-3 shrink-0 text-muted-foreground" />
+        <span className="truncate flex-1">{node.name}</span>
+        {showUpload && (
+          <span
+            onClick={handleUploadClick}
+            className="p-0.5 hover:bg-primary/20 rounded cursor-pointer"
+            title="Replace file"
+          >
+            <Upload className="h-3 w-3 text-primary" />
+          </span>
+        )}
+      </button>
+      {isMedia && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*,video/*"
+          onChange={handleFileChange}
+        />
+      )}
+    </div>
   );
 }
 
@@ -122,9 +174,10 @@ export interface FileTreeProps {
   files: VirtualFile[];
   activeFile: string;
   onSelectFile: (path: string) => void;
+  onReplaceFile?: (path: string, content: string, encoding: 'utf8' | 'base64') => void;
 }
 
-export function FileTree({ files, activeFile, onSelectFile }: FileTreeProps) {
+export function FileTree({ files, activeFile, onSelectFile, onReplaceFile }: FileTreeProps) {
   const tree = useMemo(() => buildTree(files), [files]);
 
   return (
@@ -137,6 +190,7 @@ export function FileTree({ files, activeFile, onSelectFile }: FileTreeProps) {
           node={tree}
           activeFile={activeFile}
           onSelect={onSelectFile}
+          onReplaceFile={onReplaceFile}
         />
       </div>
     </div>

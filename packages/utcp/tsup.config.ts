@@ -1,12 +1,12 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ['src/index.ts'],
-  format: ['esm'],
+  entry: ["src/index.ts"],
+  format: ["esm", "cjs"],
   dts: true,
   clean: true,
   sourcemap: true,
-  target: 'node20',
-  outDir: 'dist',
-  external: ['@aprovan/patchwork'],
+  target: "node20",
+  outDir: "dist",
+  external: ["@aprovan/patchwork"],
 });

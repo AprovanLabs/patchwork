@@ -2,7 +2,11 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "..",
+    "baseUrl": ".",
+    "paths": {
+      "@aprovan/patchwork": ["../patchwork/src/index.ts"]
+    }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "../patchwork/src/**/*"]
 }

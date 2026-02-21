@@ -10,7 +10,8 @@ import type {
 } from './types';
 
 export interface UseEditSessionOptions {
-  originalCode: string;
+  originalCode?: string;
+  originalProject?: VirtualProject;
   compile?: CompileFn;
   apiEndpoint?: string;
 }
@@ -25,11 +26,11 @@ function cloneProject(project: VirtualProject): VirtualProject {
 export function useEditSession(
   options: UseEditSessionOptions,
 ): EditSessionState & EditSessionActions {
-  const { originalCode, compile, apiEndpoint } = options;
+  const { originalCode, originalProject: providedProject, compile, apiEndpoint } = options;
 
   const originalProject = useMemo(
-    () => createSingleFileProject(originalCode),
-    [originalCode],
+    () => providedProject ?? createSingleFileProject(originalCode ?? ''),
+    [providedProject, originalCode],
   );
 
   const [project, setProject] = useState<VirtualProject>(originalProject);
@@ -142,6 +143,22 @@ export function useEditSession(
     [activeFile],
   );
 
+  const replaceFile = useCallback(
+    (path: string, content: string, encoding: 'utf8' | 'base64' = 'utf8') => {
+      setProject((prev) => {
+        const updated = cloneProject(prev);
+        const file = updated.files.get(path);
+        if (file) {
+          updated.files.set(path, { ...file, content, encoding });
+        } else {
+          updated.files.set(path, { path, content, encoding });
+        }
+        return updated;
+      });
+    },
+    [],
+  );
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -160,5 +177,6 @@ export function useEditSession(
     updateActiveFile,
     setActiveFile,
     clearError,
+    replaceFile,
   };
 }

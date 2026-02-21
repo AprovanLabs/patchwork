@@ -3,6 +3,7 @@ export interface VirtualFile {
   content: string;
   language?: string;
   note?: string;
+  encoding?: 'utf8' | 'base64';
 }
 
 export interface VirtualProject {

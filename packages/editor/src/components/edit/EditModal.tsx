@@ -16,9 +16,13 @@ import { MarkdownEditor } from '../MarkdownEditor';
 import { EditHistory } from './EditHistory';
 import { FileTree } from './FileTree';
 import { SaveConfirmDialog } from './SaveConfirmDialog';
+import { CodeBlockView } from './CodeBlockView';
+import { MediaPreview } from './MediaPreview';
 import { useEditSession, type UseEditSessionOptions } from './useEditSession';
 import { getActiveContent, getFiles } from './types';
+import { getFileType, isCompilable, getMimeType } from './fileTypes';
 import { Bobbin, serializeChangesToYAML, type Change } from '@aprovan/bobbin';
+import type { VirtualProject } from '@aprovan/patchwork-compiler';
 
 // Simple hash for React key to force re-render on code changes
 function hashCode(str: string): number {
@@ -31,8 +35,14 @@ function hashCode(str: string): number {
 
 export interface EditModalProps extends UseEditSessionOptions {
   isOpen: boolean;
+  initialState?: Partial<{
+    showTree: boolean;
+    showPreview: boolean;
+  }>;
+  hideFileTree?: boolean;
   onClose: (finalCode: string, editCount: number) => void;
   onSave?: (code: string) => Promise<void>;
+  onSaveProject?: (project: VirtualProject) => Promise<void>;
   renderPreview: (code: string) => ReactNode;
   renderLoading?: () => ReactNode;
   renderError?: (error: string) => ReactNode;
@@ -44,15 +54,20 @@ export function EditModal({
   isOpen,
   onClose,
   onSave,
+  onSaveProject,
   renderPreview,
   renderLoading,
   renderError,
   previewError,
   previewLoading,
+  initialState = {},
+  hideFileTree = false,
   ...sessionOptions
 }: EditModalProps) {
-  const [showPreview, setShowPreview] = useState(true);
-  const [showTree, setShowTree] = useState(false);
+  const [showPreview, setShowPreview] = useState(initialState?.showPreview ?? true);
+  const [showTree, setShowTree] = useState(
+    hideFileTree ? false : (initialState?.showTree ?? false)
+  );
   const [editInput, setEditInput] = useState('');
   const [bobbinChanges, setBobbinChanges] = useState<Change[]>([]);
   const [previewContainer, setPreviewContainer] = useState<HTMLDivElement | null>(null);
@@ -67,6 +82,10 @@ export function EditModal({
   currentCodeRef.current = code;
   const files = useMemo(() => getFiles(session.project), [session.project]);
   const hasChanges = code !== (session.originalProject.files.get(session.activeFile)?.content ?? '');
+
+  const fileType = useMemo(() => getFileType(session.activeFile), [session.activeFile]);
+  const isCompilableFile = isCompilable(session.activeFile);
+  const showPreviewToggle = isCompilableFile;
 
   const handleBobbinChanges = useCallback((changes: Change[]) => {
     setBobbinChanges(changes);
@@ -88,12 +107,14 @@ export function EditModal({
     setBobbinChanges([]);
   };
 
+  const hasSaveHandler = onSave || onSaveProject;
+
   const handleClose = useCallback(() => {
     const editCount = session.history.length;
     const finalCode = code;
-    const hasUnsavedChanges = editCount > 0 && finalCode !== sessionOptions.originalCode;
+    const hasUnsavedChanges = editCount > 0 && finalCode !== (session.originalProject.files.get(session.activeFile)?.content ?? '');
     
-    if (hasUnsavedChanges && onSave) {
+    if (hasUnsavedChanges && hasSaveHandler) {
       setPendingClose({ code: finalCode, count: editCount });
       setShowConfirm(true);
     } else {
@@ -101,14 +122,18 @@ export function EditModal({
       session.clearError();
       onClose(finalCode, editCount);
     }
-  }, [code, session, sessionOptions.originalCode, onSave, onClose]);
+  }, [code, session, hasSaveHandler, onClose]);
 
   const handleSaveAndClose = useCallback(async () => {
-    if (!pendingClose || !onSave) return;
+    if (!pendingClose || !hasSaveHandler) return;
     setIsSaving(true);
     setSaveError(null);
     try {
-      await onSave(pendingClose.code);
+      if (onSaveProject) {
+        await onSaveProject(session.project);
+      } else if (onSave) {
+        await onSave(pendingClose.code);
+      }
       setShowConfirm(false);
       setEditInput('');
       session.clearError();
@@ -119,7 +144,7 @@ export function EditModal({
     } finally {
       setIsSaving(false);
     }
-  }, [pendingClose, onSave, session, onClose]);
+  }, [pendingClose, onSave, onSaveProject, session, onClose]);
 
   const handleDiscard = useCallback(() => {
     if (!pendingClose) return;
@@ -137,17 +162,21 @@ export function EditModal({
   }, []);
 
   const handleDirectSave = useCallback(async () => {
-    if (!onSave || !currentCodeRef.current) return;
+    if (!hasSaveHandler) return;
     setIsSaving(true);
     setSaveError(null);
     try {
-      await onSave(currentCodeRef.current);
+      if (onSaveProject) {
+        await onSaveProject(session.project);
+      } else if (onSave && currentCodeRef.current) {
+        await onSave(currentCodeRef.current);
+      }
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Save failed');
     } finally {
       setIsSaving(false);
     }
-  }, [onSave]);
+  }, [onSave, onSaveProject, session.project]);
 
   if (!isOpen) return null;
 
@@ -173,21 +202,25 @@ export function EditModal({
                 <RotateCcw className="h-3 w-3" />
               </button>
             )}
-            <button
-              onClick={() => setShowTree(!showTree)}
-              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${showTree ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/20 text-primary'}`}
-              title={showTree ? 'Single file' : 'File tree'}
-            >
-              {showTree ? <FileCode className="h-3 w-3" /> : <FolderTree className="h-3 w-3" />}
-            </button>
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${showPreview ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/20 text-primary'}`}
-            >
-              {showPreview ? <Eye className="h-3 w-3" /> : <Code className="h-3 w-3" />}
-              {showPreview ? 'Preview' : 'Code'}
-            </button>
-            {onSave && (
+            {!hideFileTree && (
+              <button
+                onClick={() => setShowTree(!showTree)}
+                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${showTree ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/20 text-primary'}`}
+                title={showTree ? 'Single file' : 'File tree'}
+              >
+                {showTree ? <FileCode className="h-3 w-3" /> : <FolderTree className="h-3 w-3" />}
+              </button>
+            )}
+            {showPreviewToggle && (
+              <button
+                onClick={() => setShowPreview(!showPreview)}
+                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${showPreview ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/20 text-primary'}`}
+              >
+                {showPreview ? <Eye className="h-3 w-3" /> : <Code className="h-3 w-3" />}
+                {showPreview ? 'Preview' : 'Code'}
+              </button>
+            )}
+            {hasSaveHandler && (
               <button
                 onClick={handleDirectSave}
                 disabled={isSaving}
@@ -214,15 +247,16 @@ export function EditModal({
         </div>
 
         <div className="flex-1 min-h-0 border-b-2 overflow-hidden flex">
-          {showTree && (
+          {!hideFileTree && showTree && (
             <FileTree
               files={files}
               activeFile={session.activeFile}
               onSelectFile={session.setActiveFile}
+              onReplaceFile={session.replaceFile}
             />
           )}
           <div className="flex-1 overflow-auto">
-            {showPreview ? (
+            {fileType.category === 'compilable' && showPreview ? (
               <div className="bg-white h-full relative" ref={setPreviewContainer}>
                 {previewError && renderError ? (
                   renderError(previewError)
@@ -250,11 +284,28 @@ export function EditModal({
                   exclude={['.bobbin-pill', '[data-bobbin]']}
                 />}
               </div>
-            ) : (
+            ) : fileType.category === 'compilable' && !showPreview ? (
               <div className="p-4 bg-muted/10 h-full overflow-auto">
                 <pre className="text-xs whitespace-pre-wrap break-words m-0">
                   <code>{code}</code>
                 </pre>
+              </div>
+            ) : fileType.category === 'text' ? (
+              <CodeBlockView
+                content={code}
+                language={fileType.language}
+                editable
+                onChange={session.updateActiveFile}
+              />
+            ) : fileType.category === 'media' ? (
+              <MediaPreview
+                content={code}
+                mimeType={getMimeType(session.activeFile)}
+                fileName={session.activeFile.split('/').pop() ?? session.activeFile}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <p className="text-sm">Preview not available for this file type</p>
               </div>
             )}
           </div>

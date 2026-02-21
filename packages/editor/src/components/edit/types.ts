@@ -23,7 +23,10 @@ export interface EditSessionActions {
   updateActiveFile: (content: string) => void;
   setActiveFile: (path: string) => void;
   clearError: () => void;
+  replaceFile: (path: string, content: string, encoding?: 'utf8' | 'base64') => void;
 }
+
+export type FileEncoding = 'utf8' | 'base64';
 
 // Convenience getters
 export function getActiveContent(state: EditSessionState): string {

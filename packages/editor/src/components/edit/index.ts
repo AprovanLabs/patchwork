@@ -5,3 +5,6 @@ export * from './EditHistory';
 export * from './EditModal';
 export * from './FileTree';
 export * from './SaveConfirmDialog';
+export * from './fileTypes';
+export * from './CodeBlockView';
+export * from './MediaPreview';

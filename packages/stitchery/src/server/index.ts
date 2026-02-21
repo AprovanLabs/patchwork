@@ -1,13 +1,13 @@
-import { createServer, type Server } from 'node:http';
-import { createMCPClient } from '@ai-sdk/mcp';
-import { Experimental_StdioMCPTransport } from '@ai-sdk/mcp/mcp-stdio';
-import { createUtcpBackend } from '@aprovan/patchwork-utcp';
-import { jsonSchema, type Tool } from 'ai';
-import type { ServerConfig, McpServerConfig } from '../types.js';
-import { handleChat, handleEdit, type RouteContext } from './routes.js';
-import { handleLocalPackages } from './local-packages.js';
-import { handleVFS, type VFSContext } from './vfs-routes.js';
-import { ServiceRegistry, generateServicesPrompt } from './services.js';
+import { createServer, type Server } from "node:http";
+import { createMCPClient } from "@ai-sdk/mcp";
+import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
+import { createUtcpBackend } from "@aprovan/patchwork-utcp";
+import { jsonSchema, type Tool } from "ai";
+import type { ServerConfig, McpServerConfig } from "../types.js";
+import { handleChat, handleEdit, type RouteContext } from "./routes.js";
+import { handleLocalPackages } from "./local-packages.js";
+import { handleVFS, type VFSContext } from "./vfs-routes.js";
+import { ServiceRegistry, generateServicesPrompt } from "./services.js";
 
 export interface StitcheryServer {
   server: Server;
@@ -33,30 +33,30 @@ async function initMcpTools(
 }
 
 const searchServicesSchema = {
-  type: 'object',
+  type: "object",
   properties: {
     query: {
-      type: 'string',
+      type: "string",
       description:
         'Natural language description of what you want to do (e.g., "get weather forecast", "list github repos")',
     },
     namespace: {
-      type: 'string',
+      type: "string",
       description:
         'Filter results to a specific service namespace (e.g., "weather", "github")',
     },
     tool_name: {
-      type: 'string',
-      description: 'Get detailed info about a specific tool by name',
+      type: "string",
+      description: "Get detailed info about a specific tool by name",
     },
     limit: {
-      type: 'number',
-      description: 'Maximum number of results to return',
+      type: "number",
+      description: "Maximum number of results to return",
       default: 10,
     },
     include_interfaces: {
-      type: 'boolean',
-      description: 'Include TypeScript interface definitions in results',
+      type: "boolean",
+      description: "Include TypeScript interface definitions in results",
       default: true,
     },
   },
@@ -113,18 +113,18 @@ Returns matching services with their TypeScript interfaces. Use when:
   };
 }
 
-function parseBody<T>(req: import('node:http').IncomingMessage): Promise<T> {
+function parseBody<T>(req: import("node:http").IncomingMessage): Promise<T> {
   return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', (chunk) => (body += chunk));
-    req.on('end', () => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
       try {
         resolve(JSON.parse(body));
       } catch (err) {
         reject(err);
       }
     });
-    req.on('error', reject);
+    req.on("error", reject);
   });
 }
 
@@ -133,8 +133,8 @@ export async function createStitcheryServer(
 ): Promise<StitcheryServer> {
   const {
     port = 6434,
-    host = '127.0.0.1',
-    copilotProxyUrl = 'http://127.0.0.1:6433/v1',
+    host = "127.0.0.1",
+    copilotProxyUrl = "http://127.0.0.1:6433/v1",
     localPackages = {},
     mcpServers = [],
     utcp,
@@ -144,20 +144,20 @@ export async function createStitcheryServer(
   } = config;
 
   const log = verbose
-    ? (...args: unknown[]) => console.log('[stitchery]', ...args)
+    ? (...args: unknown[]) => console.log("[stitchery]", ...args)
     : () => {};
 
   // Create service registry
   const registry = new ServiceRegistry();
 
-  log('Initializing MCP tools...');
+  log("Initializing MCP tools...");
   await initMcpTools(mcpServers, registry);
   log(`Loaded ${registry.size} tools from ${mcpServers.length} MCP servers`);
 
   // Initialize UTCP backend if config provided
   if (utcp) {
-    log('Initializing UTCP backend...');
-    log('UTCP config:', JSON.stringify(utcp, null, 2));
+    log("Initializing UTCP backend...");
+    log("UTCP config:", JSON.stringify(utcp, null, 2));
     try {
       // Cast to unknown since createUtcpBackend uses UtcpClientConfigSerializer to validate
       const { backend, toolInfos } = await createUtcpBackend(
@@ -167,14 +167,14 @@ export async function createStitcheryServer(
       registry.registerBackend(backend, toolInfos);
       log(
         `Registered UTCP backend with ${toolInfos.length} tools:`,
-        toolInfos.map((t) => t.name).join(', '),
+        toolInfos.map((tool: { name: string }) => tool.name).join(", "),
       );
     } catch (err) {
-      console.error('[stitchery] Failed to initialize UTCP backend:', err);
+      console.error("[stitchery] Failed to initialize UTCP backend:", err);
     }
   }
 
-  log('Local packages:', localPackages);
+  log("Local packages:", localPackages);
 
   // Create internal tools (search_services, etc.)
   const internalTools = {
@@ -199,23 +199,23 @@ export async function createStitcheryServer(
     : null;
 
   const server = createServer(async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader(
-      'Access-Control-Allow-Methods',
-      'GET, POST, PUT, DELETE, HEAD, OPTIONS',
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, HEAD, OPTIONS",
     );
     res.setHeader(
-      'Access-Control-Allow-Headers',
-      'Content-Type, Authorization',
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization",
     );
 
-    if (req.method === 'OPTIONS') {
+    if (req.method === "OPTIONS") {
       res.writeHead(204);
       res.end();
       return;
     }
 
-    const url = req.url || '/';
+    const url = req.url || "/";
     log(`${req.method} ${url}`);
 
     try {
@@ -227,19 +227,19 @@ export async function createStitcheryServer(
         return;
       }
 
-      if (url === '/api/chat' && req.method === 'POST') {
+      if (url === "/api/chat" && req.method === "POST") {
         await handleChat(req, res, routeCtx);
         return;
       }
 
-      if (url === '/api/edit' && req.method === 'POST') {
+      if (url === "/api/edit" && req.method === "POST") {
         await handleEdit(req, res, routeCtx);
         return;
       }
 
       // Service proxy endpoint for widgets
       const proxyMatch = url.match(/^\/api\/proxy\/([^/]+)\/(.+)$/);
-      if (proxyMatch && req.method === 'POST') {
+      if (proxyMatch && req.method === "POST") {
         const [, namespace, procedure] = proxyMatch;
         try {
           const body = await parseBody<{ args?: unknown }>(req);
@@ -248,16 +248,16 @@ export async function createStitcheryServer(
             procedure!,
             body.args ?? {},
           );
-          res.setHeader('Content-Type', 'application/json');
+          res.setHeader("Content-Type", "application/json");
           res.writeHead(200);
           res.end(JSON.stringify(result));
         } catch (err) {
-          log('Proxy error:', err);
-          res.setHeader('Content-Type', 'application/json');
+          log("Proxy error:", err);
+          res.setHeader("Content-Type", "application/json");
           res.writeHead(500);
           res.end(
             JSON.stringify({
-              error: err instanceof Error ? err.message : 'Service call failed',
+              error: err instanceof Error ? err.message : "Service call failed",
             }),
           );
         }
@@ -265,7 +265,7 @@ export async function createStitcheryServer(
       }
 
       // Services search endpoint (POST with body for complex queries)
-      if (url === '/api/services/search' && req.method === 'POST') {
+      if (url === "/api/services/search" && req.method === "POST") {
         const body = await parseBody<{
           query?: string;
           namespace?: string;
@@ -274,7 +274,7 @@ export async function createStitcheryServer(
           include_interfaces?: boolean;
         }>(req);
 
-        res.setHeader('Content-Type', 'application/json');
+        res.setHeader("Content-Type", "application/json");
         res.writeHead(200);
 
         if (body.tool_name) {
@@ -311,8 +311,8 @@ export async function createStitcheryServer(
       }
 
       // Services metadata endpoint
-      if (url === '/api/services' && req.method === 'GET') {
-        res.setHeader('Content-Type', 'application/json');
+      if (url === "/api/services" && req.method === "GET") {
+        res.setHeader("Content-Type", "application/json");
         res.writeHead(200);
         res.end(
           JSON.stringify({
@@ -323,19 +323,19 @@ export async function createStitcheryServer(
         return;
       }
 
-      if (url === '/health' || url === '/') {
-        res.setHeader('Content-Type', 'application/json');
+      if (url === "/health" || url === "/") {
+        res.setHeader("Content-Type", "application/json");
         res.writeHead(200);
-        res.end(JSON.stringify({ status: 'ok', service: 'stitchery' }));
+        res.end(JSON.stringify({ status: "ok", service: "stitchery" }));
         return;
       }
 
       res.writeHead(404);
       res.end(`Not found: ${url}`);
     } catch (err) {
-      log('Error:', err);
+      log("Error:", err);
       res.writeHead(500);
-      res.end(err instanceof Error ? err.message : 'Internal server error');
+      res.end(err instanceof Error ? err.message : "Internal server error");
     }
   });
 
@@ -345,7 +345,7 @@ export async function createStitcheryServer(
 
     async start() {
       return new Promise((resolve, reject) => {
-        server.on('error', reject);
+        server.on("error", reject);
         server.listen(port, host, () => {
           log(`Server listening on http://${host}:${port}`);
           resolve({ port, host });

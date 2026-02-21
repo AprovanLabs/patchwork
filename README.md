@@ -13,3 +13,27 @@
 </a>
 
 Platform for building generative UI experiences
+
+## VS Code extension quickstart
+
+1. Install dependencies from the repo root:
+
+```sh
+pnpm install
+```
+
+2. Build the VS Code extension package:
+
+```sh
+pnpm -F @aprovan/patchwork-vscode build
+```
+
+3. Open the repo in VS Code and run the extension:
+
+- Open the Run and Debug panel.
+- Choose "Run Extension" (or "Extension"), then start debugging.
+
+4. (Optional) Configure Copilot proxy for AI edits:
+
+- Start the proxy: `npx @aprovan/copilot-proxy serve --port 3000`
+- In VS Code settings, set `patchwork.copilotProxyUrl` to `http://localhost:3000`

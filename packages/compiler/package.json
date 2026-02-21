@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Patchwork compiler - JSX→ESM compilation, image loading, DOM mounting",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
@@ -14,7 +14,8 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     }
   },
   "scripts": {

@@ -1,8 +1,8 @@
-import type { VirtualFile, VirtualProject } from './types.js';
+import type { VirtualFile, VirtualProject } from "./types.js";
 
 export function createProjectFromFiles(
   files: VirtualFile[],
-  id = crypto.randomUUID(),
+  id: string = crypto.randomUUID(),
 ): VirtualProject {
   const fileMap = new Map<string, VirtualFile>();
   for (const file of files) {
@@ -23,30 +23,30 @@ export function resolveEntry(files: Map<string, VirtualFile>): string {
   const firstTsx = paths.find((p) => /\.(tsx|jsx)$/.test(p));
   if (firstTsx) return firstTsx;
 
-  return paths[0] || 'main.tsx';
+  return paths[0] || "main.tsx";
 }
 
 export function detectMainFile(language?: string): string {
   switch (language) {
-    case 'tsx':
-    case 'typescript':
-      return 'main.tsx';
-    case 'jsx':
-    case 'javascript':
-      return 'main.jsx';
-    case 'ts':
-      return 'main.ts';
-    case 'js':
-      return 'main.js';
+    case "tsx":
+    case "typescript":
+      return "main.tsx";
+    case "jsx":
+    case "javascript":
+      return "main.jsx";
+    case "ts":
+      return "main.ts";
+    case "js":
+      return "main.js";
     default:
-      return 'main.tsx';
+      return "main.tsx";
   }
 }
 
 export function createSingleFileProject(
   content: string,
-  entry = 'main.tsx',
-  id = 'inline',
+  entry = "main.tsx",
+  id = "inline",
 ): VirtualProject {
   return {
     id,
