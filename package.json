@@ -1,6 +1,6 @@
 {
   "name": "@aprovan/patchwork",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Platform for building generative UI experiences",
   "type": "module",
   "scripts": {
