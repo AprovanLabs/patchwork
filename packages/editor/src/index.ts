@@ -12,6 +12,7 @@ export {
   EditModal,
   EditHistory,
   FileTree,
+  SaveConfirmDialog,
   useEditSession,
   sendEditRequest,
   type EditModalProps,
@@ -25,6 +26,7 @@ export {
   type CompileFn,
   type EditApiOptions,
   type FileTreeProps,
+  type SaveConfirmDialogProps,
   getActiveContent,
   getFiles,
 } from './components/edit';

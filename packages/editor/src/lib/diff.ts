@@ -155,7 +155,6 @@ export interface ParsedEditResponse {
 /**
  * Parse progress notes and diffs from an edit response.
  * 
- * New format uses tagged attributes on code fences:
  * ```diff note="Adding handler" path="@/components/Button.tsx"
  * <<<<<<< SEARCH
  * exact code
@@ -275,6 +274,8 @@ export function applyDiffs(
 }
 
 export function hasDiffBlocks(text: string): boolean {
+  // Reset lastIndex to avoid state issues from the global regex flag
+  DIFF_BLOCK_REGEX.lastIndex = 0;
   return DIFF_BLOCK_REGEX.test(text);
 }
 

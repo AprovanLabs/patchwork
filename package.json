@@ -4,7 +4,7 @@
   "description": "Platform for building generative UI experiences",
   "type": "module",
   "scripts": {
-    "build": "turbo run build && ./scripts/sync-local.sh",
+    "build": "turbo run build",
     "check-types": "turbo run check-types",
     "dev": "turbo run dev --parallel",
     "lint": "eslint \"**/*.ts?(x)\"",

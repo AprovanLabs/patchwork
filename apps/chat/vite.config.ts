@@ -1,23 +1,23 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
-const STITCHERY_URL = 'http://127.0.0.1:6434';
+const STITCHERY_URL = "http://127.0.0.1:6435";
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { '@': path.resolve(__dirname, './src') } },
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
   server: {
     proxy: {
-      '/api': {
+      "/api": {
         target: STITCHERY_URL,
         changeOrigin: true,
       },
-      '/_local-packages': {
+      "/_local-packages": {
         target: STITCHERY_URL,
         changeOrigin: true,
       },
-      '/vfs': {
+      "/vfs": {
         target: STITCHERY_URL,
         changeOrigin: true,
       },

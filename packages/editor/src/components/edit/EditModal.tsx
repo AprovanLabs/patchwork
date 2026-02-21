@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, type ReactNode } from 'react';
+import { useState, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import {
   Code,
   Eye,
@@ -10,10 +10,12 @@ import {
   Send,
   FolderTree,
   FileCode,
+  Save,
 } from 'lucide-react';
 import { MarkdownEditor } from '../MarkdownEditor';
 import { EditHistory } from './EditHistory';
 import { FileTree } from './FileTree';
+import { SaveConfirmDialog } from './SaveConfirmDialog';
 import { useEditSession, type UseEditSessionOptions } from './useEditSession';
 import { getActiveContent, getFiles } from './types';
 import { Bobbin, serializeChangesToYAML, type Change } from '@aprovan/bobbin';
@@ -30,6 +32,7 @@ function hashCode(str: string): number {
 export interface EditModalProps extends UseEditSessionOptions {
   isOpen: boolean;
   onClose: (finalCode: string, editCount: number) => void;
+  onSave?: (code: string) => Promise<void>;
   renderPreview: (code: string) => ReactNode;
   renderLoading?: () => ReactNode;
   renderError?: (error: string) => ReactNode;
@@ -40,6 +43,7 @@ export interface EditModalProps extends UseEditSessionOptions {
 export function EditModal({
   isOpen,
   onClose,
+  onSave,
   renderPreview,
   renderLoading,
   renderError,
@@ -52,9 +56,15 @@ export function EditModal({
   const [editInput, setEditInput] = useState('');
   const [bobbinChanges, setBobbinChanges] = useState<Change[]>([]);
   const [previewContainer, setPreviewContainer] = useState<HTMLDivElement | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [pendingClose, setPendingClose] = useState<{ code: string; count: number } | null>(null);
+  const currentCodeRef = useRef<string>('');
 
   const session = useEditSession(sessionOptions);
   const code = getActiveContent(session);
+  currentCodeRef.current = code;
   const files = useMemo(() => getFiles(session.project), [session.project]);
   const hasChanges = code !== (session.originalProject.files.get(session.activeFile)?.content ?? '');
 
@@ -78,17 +88,71 @@ export function EditModal({
     setBobbinChanges([]);
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     const editCount = session.history.length;
     const finalCode = code;
+    const hasUnsavedChanges = editCount > 0 && finalCode !== sessionOptions.originalCode;
+    
+    if (hasUnsavedChanges && onSave) {
+      setPendingClose({ code: finalCode, count: editCount });
+      setShowConfirm(true);
+    } else {
+      setEditInput('');
+      session.clearError();
+      onClose(finalCode, editCount);
+    }
+  }, [code, session, sessionOptions.originalCode, onSave, onClose]);
+
+  const handleSaveAndClose = useCallback(async () => {
+    if (!pendingClose || !onSave) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await onSave(pendingClose.code);
+      setShowConfirm(false);
+      setEditInput('');
+      session.clearError();
+      onClose(pendingClose.code, pendingClose.count);
+      setPendingClose(null);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [pendingClose, onSave, session, onClose]);
+
+  const handleDiscard = useCallback(() => {
+    if (!pendingClose) return;
+    setShowConfirm(false);
     setEditInput('');
     session.clearError();
-    onClose(finalCode, editCount);
-  };
+    onClose(pendingClose.code, pendingClose.count);
+    setPendingClose(null);
+  }, [pendingClose, session, onClose]);
+
+  const handleCancelClose = useCallback(() => {
+    setShowConfirm(false);
+    setPendingClose(null);
+    setSaveError(null);
+  }, []);
+
+  const handleDirectSave = useCallback(async () => {
+    if (!onSave || !currentCodeRef.current) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await onSave(currentCodeRef.current);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [onSave]);
 
   if (!isOpen) return null;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-8">
       <div className="flex flex-col bg-background rounded-lg shadow-xl w-full h-full max-w-6xl max-h-[90vh] overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 bg-background border-b-2">
@@ -123,6 +187,21 @@ export function EditModal({
               {showPreview ? <Eye className="h-3 w-3" /> : <Code className="h-3 w-3" />}
               {showPreview ? 'Preview' : 'Code'}
             </button>
+            {onSave && (
+              <button
+                onClick={handleDirectSave}
+                disabled={isSaving}
+                className="px-2 py-1 text-xs rounded flex items-center gap-1 hover:bg-primary/20 text-primary disabled:opacity-50"
+                title="Save changes"
+              >
+                {isSaving ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Save className="h-3 w-3" />
+                )}
+                Save
+              </button>
+            )}
             <button
               onClick={handleClose}
               className="px-2 py-1 text-xs rounded flex items-center gap-1 bg-primary text-primary-foreground hover:bg-primary/90"
@@ -189,10 +268,10 @@ export function EditModal({
           className="h-48"
         />
 
-        {session.error && (
+        {(session.error || saveError) && (
           <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm flex items-center gap-2 border-t-2 border-destructive">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            {session.error}
+            {session.error || saveError}
           </div>
         )}
 
@@ -232,5 +311,14 @@ export function EditModal({
         </div>
       </div>
     </div>
+    <SaveConfirmDialog
+      isOpen={showConfirm}
+      isSaving={isSaving}
+      error={saveError}
+      onSave={handleSaveAndClose}
+      onDiscard={handleDiscard}
+      onCancel={handleCancelClose}
+    />
+    </>
   );
 }
