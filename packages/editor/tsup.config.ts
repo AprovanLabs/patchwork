@@ -1,10 +1,15 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ['src/index.ts'],
-  format: ['esm'],
-  dts: true,
+  entry: ["src/index.ts"],
+  format: ["esm"],
+  dts: false,
   clean: true,
-  external: ['react', 'react-dom'],
+  external: [
+    "react",
+    "react-dom",
+    "@aprovan/bobbin",
+    "@aprovan/patchwork-compiler",
+  ],
   treeshake: true,
 });

@@ -1,11 +1,43 @@
-export type { VirtualFile, VirtualProject, StorageBackend } from './types.js';
+// Core types and utilities
+export type {
+  ChangeRecord,
+  ConflictRecord,
+  ConflictStrategy,
+  DirEntry,
+  FileStats,
+  FSProvider,
+  SyncEngine,
+  SyncEventCallback,
+  SyncEventType,
+  SyncResult,
+  SyncStatus,
+  WatchCallback,
+  WatchEventType,
+} from "./core/index.js";
+
+export {
+  basename,
+  createDirEntry,
+  createFileStats,
+  dirname,
+  join,
+  normalizePath,
+  VirtualFS,
+} from "./core/index.js";
+
+// Sync engine
+export { SyncEngineImpl, type SyncEngineConfig } from "./sync/index.js";
+
+// Backends
+export { MemoryBackend } from "./backends/memory.js";
+export { IndexedDBBackend } from "./backends/indexeddb.js";
+export { HttpBackend, type HttpBackendConfig } from "./backends/http.js";
+
+export type { VirtualFile, VirtualProject } from "./types.js";
 export {
   createProjectFromFiles,
   createSingleFileProject,
   resolveEntry,
   detectMainFile,
-} from './project.js';
-export { VFSStore } from './store.js';
-export { IndexedDBBackend } from './backends/indexeddb.js';
-export { LocalFSBackend, type LocalFSConfig } from './backends/local-fs.js';
-export { S3Backend, type S3Config } from './backends/s3.js';
+} from "./project.js";
+export { VFSStore, type VFSStoreOptions } from "./store.js";

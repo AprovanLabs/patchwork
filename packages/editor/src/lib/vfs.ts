@@ -1,13 +1,13 @@
-import { 
-  VFSStore, 
-  LocalFSBackend, 
+import {
+  VFSStore,
+  HttpBackend,
+  type ChangeRecord,
   type VirtualProject,
-  type VirtualFile 
 } from '@aprovan/patchwork-compiler';
 
 /**
  * VFS client for persisting virtual projects to the stitchery server.
- * Uses LocalFSBackend which makes HTTP requests to /vfs routes.
+ * Uses HttpBackend which makes HTTP requests to /vfs routes.
  */
 
 // VFS base URL - points to stitchery server's VFS routes
@@ -41,12 +41,15 @@ let storeInstance: VFSStore | null = null;
 
 /**
  * Get the VFS store instance (creates one if needed).
- * Store uses LocalFSBackend to persist to the stitchery server.
+ * Store uses HttpBackend to persist to the stitchery server.
  */
 export function getVFSStore(): VFSStore {
   if (!storeInstance) {
-    const backend = new LocalFSBackend({ baseUrl: VFS_BASE_URL });
-    storeInstance = new VFSStore(backend);
+    const provider = new HttpBackend({ baseUrl: VFS_BASE_URL });
+    storeInstance = new VFSStore(provider, {
+      sync: true,
+      conflictStrategy: 'local-wins',
+    });
   }
   return storeInstance;
 }
@@ -88,9 +91,24 @@ export async function listProjects(): Promise<string[]> {
 /**
  * Save a single file to the VFS.
  */
-export async function saveFile(file: VirtualFile): Promise<void> {
+export async function saveFile(path: string, content: string): Promise<void> {
   const store = getVFSStore();
-  await store.putFile(file);
+  await store.writeFile(path, content);
+}
+
+export async function loadFile(
+  path: string,
+  encoding?: 'utf8' | 'base64',
+): Promise<string> {
+  const store = getVFSStore();
+  return store.readFile(path, encoding);
+}
+
+export function subscribeToChanges(
+  callback: (record: ChangeRecord) => void,
+): () => void {
+  const store = getVFSStore();
+  return store.on('change', callback);
 }
 
 /**

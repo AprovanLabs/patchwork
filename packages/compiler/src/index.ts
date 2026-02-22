@@ -24,7 +24,7 @@
  */
 
 // Core compiler
-export { createCompiler } from './compiler.js';
+export { createCompiler } from "./compiler.js";
 
 // Schemas (Zod validation)
 export {
@@ -45,7 +45,7 @@ export {
   // Defaults
   DEFAULT_IMAGE_CONFIG,
   DEFAULT_CLI_IMAGE_CONFIG,
-} from './schemas.js';
+} from "./schemas.js";
 
 // Types
 export type {
@@ -72,7 +72,7 @@ export type {
   BridgeMessageType,
   ServiceCallPayload,
   ServiceResultPayload,
-} from './types.js';
+} from "./types.js";
 
 // Images
 export {
@@ -86,18 +86,18 @@ export {
   fetchPackageJson,
   setCdnBaseUrl,
   getCdnBaseUrl,
-} from './images/index.js';
+} from "./images/index.js";
 
 // Transforms
 export {
   cdnTransformPlugin,
   generateImportMap,
   vfsPlugin,
-} from './transforms/index.js';
+} from "./transforms/index.js";
 export type {
   CdnTransformOptions,
   VFSPluginOptions,
-} from './transforms/index.js';
+} from "./transforms/index.js";
 
 // VFS
 export {
@@ -107,16 +107,15 @@ export {
   resolveEntry,
   detectMainFile,
   IndexedDBBackend,
-  LocalFSBackend,
-  S3Backend,
-} from './vfs/index.js';
+  HttpBackend,
+} from "./vfs/index.js";
 export type {
   VirtualFile,
   VirtualProject,
-  StorageBackend,
-  LocalFSConfig,
-  S3Config,
-} from './vfs/index.js';
+  ChangeRecord,
+  HttpBackendConfig,
+  VFSStoreOptions,
+} from "./vfs/index.js";
 
 // Mount utilities
 export {
@@ -138,4 +137,4 @@ export {
   ParentBridge,
   createIframeServiceProxy,
   generateIframeBridgeScript,
-} from './mount/index.js';
+} from "./mount/index.js";

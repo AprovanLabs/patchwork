@@ -33,6 +33,7 @@ function hashCode(str: string): number {
   return hash;
 }
 
+
 export interface EditModalProps extends UseEditSessionOptions {
   isOpen: boolean;
   initialState?: Partial<{
@@ -285,11 +286,12 @@ export function EditModal({
                 />}
               </div>
             ) : fileType.category === 'compilable' && !showPreview ? (
-              <div className="p-4 bg-muted/10 h-full overflow-auto">
-                <pre className="text-xs whitespace-pre-wrap break-words m-0">
-                  <code>{code}</code>
-                </pre>
-              </div>
+              <CodeBlockView
+                content={code}
+                language={fileType.language}
+                editable
+                onChange={session.updateActiveFile}
+              />
             ) : fileType.category === 'text' ? (
               <CodeBlockView
                 content={code}

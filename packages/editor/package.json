@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc --declaration --emitDeclarationOnly --outDir dist --jsx react-jsx --lib ES2022,DOM --skipLibCheck src/index.ts",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit"
   },

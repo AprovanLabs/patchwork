@@ -3,7 +3,7 @@ import { Code, Eye, AlertCircle, Loader2, Pencil, RotateCcw, MessageSquare, Clou
 import type { Compiler, MountedWidget, Manifest } from '@aprovan/patchwork-compiler';
 import { createSingleFileProject } from '@aprovan/patchwork-compiler';
 import { EditModal, type CompileFn } from './edit';
-import { saveProject, getVFSConfig } from '../lib/vfs';
+import { saveProject, getVFSConfig, loadFile, subscribeToChanges } from '../lib/vfs';
 
 type SaveStatus = 'unsaved' | 'saving' | 'saved' | 'error';
 
@@ -96,6 +96,11 @@ export function CodePreview({ code: originalCode, compiler, services, filePath }
   const [currentCode, setCurrentCode] = useState(originalCode);
   const [editCount, setEditCount] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('unsaved');
+  const [lastSavedCode, setLastSavedCode] = useState(originalCode);
+  const [vfsPath, setVfsPath] = useState<string | null>(null);
+  const currentCodeRef = useRef(currentCode);
+  const lastSavedRef = useRef(lastSavedCode);
+  const isEditingRef = useRef(isEditing);
 
   // Stable project ID for this widget instance (fallback when not using paths)
   const fallbackId = useMemo(() => crypto.randomUUID(), []);
@@ -126,6 +131,58 @@ export function CodePreview({ code: originalCode, compiler, services, filePath }
     return 'main.tsx';
   }, [filePath]);
 
+  useEffect(() => {
+    currentCodeRef.current = currentCode;
+  }, [currentCode]);
+
+  useEffect(() => {
+    lastSavedRef.current = lastSavedCode;
+  }, [lastSavedCode]);
+
+  useEffect(() => {
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const projectId = await getProjectId();
+      const entryFile = getEntryFile();
+      if (!active) return;
+      setVfsPath(`${projectId}/${entryFile}`);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [getProjectId, getEntryFile]);
+
+  useEffect(() => {
+    if (!vfsPath) return;
+    const unsubscribe = subscribeToChanges(async (record) => {
+      if (record.path !== vfsPath) return;
+      if (record.type === 'delete') {
+        setSaveStatus('unsaved');
+        return;
+      }
+      if (isEditingRef.current) return;
+      try {
+        const remote = await loadFile(vfsPath);
+        if (currentCodeRef.current !== lastSavedRef.current) {
+          setSaveStatus('unsaved');
+          return;
+        }
+        if (remote !== currentCodeRef.current) {
+          setCurrentCode(remote);
+          setLastSavedCode(remote);
+          setSaveStatus('saved');
+        }
+      } catch {
+        setSaveStatus('error');
+      }
+    });
+    return () => unsubscribe();
+  }, [vfsPath]);
+
   // Manual save handler
   const handleSave = useCallback(async () => {
     setSaveStatus('saving');
@@ -134,6 +191,7 @@ export function CodePreview({ code: originalCode, compiler, services, filePath }
       const entryFile = getEntryFile();
       const project = createSingleFileProject(currentCode, entryFile, projectId);
       await saveProject(project);
+      setLastSavedCode(currentCode);
       setSaveStatus('saved');
     } catch (err) {
       console.warn('[VFS] Failed to save project:', err);
