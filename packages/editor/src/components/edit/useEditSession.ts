@@ -1,13 +1,13 @@
-import { useState, useCallback, useMemo } from 'react';
-import type { VirtualProject } from '@aprovan/patchwork-compiler';
-import { createSingleFileProject } from '@aprovan/patchwork-compiler';
-import { sendEditRequest } from './api';
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import type { VirtualProject } from "@aprovan/patchwork-compiler";
+import { createSingleFileProject } from "@aprovan/patchwork-compiler";
+import { sendEditRequest } from "./api";
 import type {
   EditHistoryEntry,
   EditSessionState,
   EditSessionActions,
   CompileFn,
-} from './types';
+} from "./types";
 
 export interface UseEditSessionOptions {
   originalCode?: string;
@@ -26,12 +26,27 @@ function cloneProject(project: VirtualProject): VirtualProject {
 export function useEditSession(
   options: UseEditSessionOptions,
 ): EditSessionState & EditSessionActions {
-  const { originalCode, originalProject: providedProject, compile, apiEndpoint } = options;
+  const {
+    originalCode,
+    originalProject: providedProject,
+    compile,
+    apiEndpoint,
+  } = options;
+
+  console.log(
+    "[useEditSession] providedProject:",
+    providedProject?.id,
+    "files:",
+    providedProject ? Array.from(providedProject.files.keys()) : "none",
+  );
 
   const originalProject = useMemo(
-    () => providedProject ?? createSingleFileProject(originalCode ?? ''),
+    () => providedProject ?? createSingleFileProject(originalCode ?? ""),
     [providedProject, originalCode],
   );
+
+  // Track the last project we synced from to detect reference changes
+  const lastSyncedProjectRef = useRef<VirtualProject>(originalProject);
 
   const [project, setProject] = useState<VirtualProject>(originalProject);
   const [activeFile, setActiveFile] = useState(originalProject.entry);
@@ -40,6 +55,18 @@ export function useEditSession(
   const [error, setError] = useState<string | null>(null);
   const [streamingNotes, setStreamingNotes] = useState<string[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+
+  // Sync state when the original project reference changes (new project or files loaded)
+  useEffect(() => {
+    if (originalProject !== lastSyncedProjectRef.current) {
+      lastSyncedProjectRef.current = originalProject;
+      setProject(originalProject);
+      setActiveFile(originalProject.entry);
+      setHistory([]);
+      setError(null);
+      setStreamingNotes([]);
+    }
+  }, [originalProject]);
 
   const performEdit = useCallback(
     async (
@@ -86,7 +113,7 @@ export function useEditSession(
   );
 
   const currentCode = useMemo(
-    () => project.files.get(activeFile)?.content ?? '',
+    () => project.files.get(activeFile)?.content ?? "",
     [project, activeFile],
   );
 
@@ -111,7 +138,7 @@ export function useEditSession(
         });
         setHistory((prev) => [...prev, ...result.entries]);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Edit failed');
+        setError(err instanceof Error ? err.message : "Edit failed");
       } finally {
         setIsApplying(false);
         setStreamingNotes([]);
@@ -144,7 +171,7 @@ export function useEditSession(
   );
 
   const replaceFile = useCallback(
-    (path: string, content: string, encoding: 'utf8' | 'base64' = 'utf8') => {
+    (path: string, content: string, encoding: "utf8" | "base64" = "utf8") => {
       setProject((prev) => {
         const updated = cloneProject(prev);
         const file = updated.files.get(path);

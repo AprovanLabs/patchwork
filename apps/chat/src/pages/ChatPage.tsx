@@ -68,6 +68,7 @@ function TextPart({ text, isUser }: { text: string; isUser: boolean }) {
               compiler={compiler}
               services={services}
               filePath={part.attributes?.path}
+              entrypoint="main.tsx"
             />
           );
         }

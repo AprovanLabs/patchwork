@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "hardcopy": {
+      "command": "npx",
+      "args": ["@aprovan/hardcopy", "mcp-serve"]
+    }
+  }
+}

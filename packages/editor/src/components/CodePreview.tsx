@@ -10,6 +10,8 @@ type SaveStatus = 'unsaved' | 'saving' | 'saved' | 'error';
 interface CodePreviewProps {
   code: string;
   compiler: Compiler | null;
+  /** Optional entrypoint file for the widget (default: "index.ts") */
+  entrypoint?: string;
   /** Available service namespaces for widget calls */
   services?: string[];
   /** Optional file path from code block attributes (e.g., "components/calculator.tsx") */
@@ -90,7 +92,7 @@ function useCodeCompiler(compiler: Compiler | null, code: string, enabled: boole
   return { containerRef, loading, error };
 }
 
-export function CodePreview({ code: originalCode, compiler, services, filePath }: CodePreviewProps) {
+export function CodePreview({ code: originalCode, compiler, services, filePath, entrypoint = 'index.ts' }: CodePreviewProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [currentCode, setCurrentCode] = useState(originalCode);
@@ -126,9 +128,9 @@ export function CodePreview({ code: originalCode, compiler, services, filePath }
   const getEntryFile = useCallback(() => {
     if (filePath) {
       const parts = filePath.split('/');
-      return parts[parts.length - 1] || 'main.tsx';
+      return parts[parts.length - 1] || entrypoint;
     }
-    return 'main.tsx';
+    return entrypoint;
   }, [filePath]);
 
   useEffect(() => {

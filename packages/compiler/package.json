@@ -1,6 +1,6 @@
 {
   "name": "@aprovan/patchwork-compiler",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Patchwork compiler - JSX→ESM compilation, image loading, DOM mounting",
   "type": "module",
   "main": "./dist/index.cjs",
