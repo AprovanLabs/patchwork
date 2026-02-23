@@ -72,6 +72,7 @@ export function EditModal({
   const [editInput, setEditInput] = useState('');
   const [bobbinChanges, setBobbinChanges] = useState<Change[]>([]);
   const [previewContainer, setPreviewContainer] = useState<HTMLDivElement | null>(null);
+  const [pillContainer, setPillContainer] = useState<HTMLDivElement | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -256,7 +257,7 @@ export function EditModal({
               onReplaceFile={session.replaceFile}
             />
           )}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto" ref={setPillContainer}>
             {fileType.category === 'compilable' && showPreview ? (
               <div className="bg-white h-full relative" ref={setPreviewContainer}>
                 {previewError && renderError ? (
@@ -278,7 +279,7 @@ export function EditModal({
                 )}
                 {!renderLoading && !renderError && !previewLoading && <Bobbin
                   container={previewContainer}
-                  pillContainer={previewContainer}
+                  pillContainer={pillContainer}
                   defaultActive={false}
                   showInspector
                   onChanges={handleBobbinChanges}

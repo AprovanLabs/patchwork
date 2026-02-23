@@ -14,10 +14,25 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isUrl(content: string): boolean {
+  // Check if content is a URL (absolute or relative path)
+  return content.startsWith('/') ||
+    content.startsWith('http://') ||
+    content.startsWith('https://') ||
+    content.startsWith('./') ||
+    content.startsWith('../');
+}
+
 function getDataUrl(content: string, mimeType: string): string {
+  // If already a data URL, return as-is
   if (content.startsWith('data:')) {
     return content;
   }
+  // If content is a URL path, return it directly (browser can fetch it)
+  if (isUrl(content)) {
+    return content;
+  }
+  // Otherwise, treat as raw base64 data and construct a data URL
   return `data:${mimeType};base64,${content}`;
 }
 
@@ -28,10 +43,13 @@ export function MediaPreview({ content, mimeType, fileName }: MediaPreviewProps)
   const dataUrl = getDataUrl(content, mimeType);
   const isImage = isImageFile(fileName);
   const isVideo = isVideoFile(fileName);
-  const contentSize = content.length;
-  const estimatedBytes = content.startsWith('data:')
-    ? Math.floor((content.split(',')[1]?.length ?? 0) * 0.75)
-    : Math.floor(content.length * 0.75);
+  // For URLs, we can't estimate file size from the string
+  const isUrlContent = isUrl(content);
+  const estimatedBytes = isUrlContent
+    ? null
+    : content.startsWith('data:')
+      ? Math.floor((content.split(',')[1]?.length ?? 0) * 0.75)
+      : Math.floor(content.length * 0.75);
 
   useEffect(() => {
     setDimensions(null);
@@ -97,7 +115,7 @@ export function MediaPreview({ content, mimeType, fileName }: MediaPreviewProps)
           {dimensions && (
             <span>{dimensions.width} × {dimensions.height} px</span>
           )}
-          <span>{formatFileSize(estimatedBytes)}</span>
+          {estimatedBytes !== null && <span>{formatFileSize(estimatedBytes)}</span>}
           <span className="text-muted-foreground/60">{mimeType}</span>
         </div>
       </div>

@@ -150,7 +150,7 @@ function TreeNodeComponent({ node, activeFile, onSelect, onReplaceFile, depth = 
         {showUpload && (
           <span
             onClick={handleUploadClick}
-            className="p-0.5 hover:bg-primary/20 rounded cursor-pointer"
+            className="p-1 hover:bg-primary/20 rounded cursor-pointer"
             title="Replace file"
           >
             <Upload className="h-3 w-3 text-primary" />

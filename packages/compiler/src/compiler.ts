@@ -1,4 +1,4 @@
-import * as esbuild from 'esbuild-wasm';
+import * as esbuild from "esbuild-wasm";
 import type {
   Compiler,
   CompilerOptions,
@@ -8,17 +8,17 @@ import type {
   MountedWidget,
   MountOptions,
   ServiceProxy,
-} from './types.js';
-import type { VirtualProject } from './vfs/types.js';
-import { createSingleFileProject } from './vfs/project.js';
-import { getImageRegistry } from './images/registry.js';
-import { setCdnBaseUrl as setImageCdnBaseUrl } from './images/loader.js';
-import { setCdnBaseUrl as setTransformCdnBaseUrl } from './transforms/cdn.js';
-import { cdnTransformPlugin } from './transforms/cdn.js';
-import { vfsPlugin } from './transforms/vfs.js';
-import { createHttpServiceProxy } from './mount/bridge.js';
-import { mountEmbedded, reloadEmbedded } from './mount/embedded.js';
-import { mountIframe, reloadIframe } from './mount/iframe.js';
+} from "./types.js";
+import type { VirtualProject } from "./vfs/types.js";
+import { createSingleFileProject } from "./vfs/project.js";
+import { getImageRegistry } from "./images/registry.js";
+import { setCdnBaseUrl as setImageCdnBaseUrl } from "./images/loader.js";
+import { setCdnBaseUrl as setTransformCdnBaseUrl } from "./transforms/cdn.js";
+import { cdnTransformPlugin } from "./transforms/cdn.js";
+import { vfsPlugin } from "./transforms/vfs.js";
+import { createHttpServiceProxy } from "./mount/bridge.js";
+import { mountEmbedded, reloadEmbedded } from "./mount/embedded.js";
+import { mountIframe, reloadIframe } from "./mount/iframe.js";
 
 // Track esbuild initialization
 let esbuildInitialized = false;
@@ -34,12 +34,12 @@ async function initEsbuild(): Promise<void> {
   esbuildInitPromise = (async () => {
     try {
       await esbuild.initialize({
-        wasmURL: 'https://unpkg.com/esbuild-wasm/esbuild.wasm',
+        wasmURL: "https://unpkg.com/esbuild-wasm/esbuild.wasm",
       });
       esbuildInitialized = true;
     } catch (error) {
-      // If already initialized, that's fine
-      if (error instanceof Error && error.message.includes('initialized')) {
+      // If already initialized (e.g., HMR or multiple compiler instances), that's fine
+      if (error instanceof Error && error.message.includes("initialize")) {
         esbuildInitialized = true;
       } else {
         throw error;
@@ -62,7 +62,7 @@ function hashContent(content: string): string {
   for (let i = 0; i < data.length; i++) {
     hash = ((hash << 5) - hash + (data[i] ?? 0)) | 0;
   }
-  return Math.abs(hash).toString(16).padStart(8, '0');
+  return Math.abs(hash).toString(16).padStart(8, "0");
 }
 
 /**
@@ -137,11 +137,11 @@ class PatchworkCompiler implements Compiler {
   ): Promise<CompiledWidget> {
     // Normalize input to VirtualProject (entry defined by project, defaults to main.tsx)
     const project =
-      typeof source === 'string' ? createSingleFileProject(source) : source;
+      typeof source === "string" ? createSingleFileProject(source) : source;
 
     // Infer loader from entry file extension
-    const entryExt = project.entry.split('.').pop();
-    const loader = entryExt === 'ts' || entryExt === 'tsx' ? 'tsx' : 'jsx';
+    const entryExt = project.entry.split(".").pop();
+    const loader = entryExt === "ts" || entryExt === "tsx" ? "tsx" : "jsx";
 
     // Get image from registry based on manifest
     const image = this.registry.get(manifest.image) || null;
@@ -150,9 +150,9 @@ class PatchworkCompiler implements Compiler {
     const esbuildConfig = image?.config.esbuild || {};
     const frameworkConfig = image?.config.framework || {};
 
-    const target = esbuildConfig.target || 'es2020';
-    const format = esbuildConfig.format || 'esm';
-    const jsx = esbuildConfig.jsx ?? 'automatic';
+    const target = esbuildConfig.target || "es2020";
+    const format = esbuildConfig.format || "esm";
+    const jsx = esbuildConfig.jsx ?? "automatic";
 
     // Collect all packages (image deps + manifest packages)
     const packages: Record<string, string> = {
@@ -184,7 +184,7 @@ class PatchworkCompiler implements Compiler {
       bundle: true,
       format,
       target,
-      platform: manifest.platform === 'cli' ? 'node' : 'browser',
+      platform: manifest.platform === "cli" ? "node" : "browser",
       jsx,
       ...(esbuildConfig.jsxFactory
         ? { jsxFactory: esbuildConfig.jsxFactory }
@@ -193,7 +193,7 @@ class PatchworkCompiler implements Compiler {
         ? { jsxFragment: esbuildConfig.jsxFragment }
         : {}),
       write: false,
-      sourcemap: 'inline',
+      sourcemap: "inline",
       plugins: [
         vfsPlugin(project, { aliases }),
         cdnTransformPlugin({
@@ -205,7 +205,7 @@ class PatchworkCompiler implements Compiler {
       ],
     });
 
-    const code = result.outputFiles?.[0]?.text || '';
+    const code = result.outputFiles?.[0]?.text || "";
     const hash = hashContent(code);
 
     return {
@@ -223,7 +223,7 @@ class PatchworkCompiler implements Compiler {
     options: MountOptions,
   ): Promise<MountedWidget> {
     const image = this.registry.get(widget.manifest.image) || null;
-    if (options.mode === 'iframe') {
+    if (options.mode === "iframe") {
       return mountIframe(widget, options, image, this.proxy);
     }
     return mountEmbedded(widget, options, image, this.proxy);
@@ -249,7 +249,7 @@ class PatchworkCompiler implements Compiler {
     const image = this.registry.get(widget.manifest.image) || null;
 
     // Reload based on mode
-    if (mounted.mode === 'iframe') {
+    if (mounted.mode === "iframe") {
       await reloadIframe(mounted, widget, image, this.proxy);
     } else {
       await reloadEmbedded(mounted, widget, image, this.proxy);
