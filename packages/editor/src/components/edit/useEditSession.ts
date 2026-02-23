@@ -12,6 +12,7 @@ import type {
 export interface UseEditSessionOptions {
   originalCode?: string;
   originalProject?: VirtualProject;
+  initialActiveFile?: string;
   compile?: CompileFn;
   apiEndpoint?: string;
 }
@@ -29,6 +30,7 @@ export function useEditSession(
   const {
     originalCode,
     originalProject: providedProject,
+    initialActiveFile,
     compile,
     apiEndpoint,
   } = options;
@@ -49,7 +51,11 @@ export function useEditSession(
   const lastSyncedProjectRef = useRef<VirtualProject>(originalProject);
 
   const [project, setProject] = useState<VirtualProject>(originalProject);
-  const [activeFile, setActiveFile] = useState(originalProject.entry);
+  const [activeFile, setActiveFile] = useState(
+    initialActiveFile && originalProject.files.has(initialActiveFile)
+      ? initialActiveFile
+      : originalProject.entry,
+  );
   const [history, setHistory] = useState<EditHistoryEntry[]>([]);
   const [isApplying, setIsApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,12 +67,16 @@ export function useEditSession(
     if (originalProject !== lastSyncedProjectRef.current) {
       lastSyncedProjectRef.current = originalProject;
       setProject(originalProject);
-      setActiveFile(originalProject.entry);
+      setActiveFile(
+        initialActiveFile && originalProject.files.has(initialActiveFile)
+          ? initialActiveFile
+          : originalProject.entry,
+      );
       setHistory([]);
       setError(null);
       setStreamingNotes([]);
     }
-  }, [originalProject]);
+  }, [originalProject, initialActiveFile]);
 
   const performEdit = useCallback(
     async (

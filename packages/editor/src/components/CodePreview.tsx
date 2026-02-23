@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Code, Eye, AlertCircle, Loader2, Pencil, RotateCcw, MessageSquare, Cloud, Check } from 'lucide-react';
-import type { Compiler, MountedWidget, Manifest } from '@aprovan/patchwork-compiler';
+import { Code, Eye, Pencil, RotateCcw, MessageSquare } from 'lucide-react';
+import type { Compiler, Manifest } from '@aprovan/patchwork-compiler';
 import { createSingleFileProject } from '@aprovan/patchwork-compiler';
-import { EditModal, type CompileFn } from './edit';
+import { EditModal, type CompileFn, CodeBlockView, MediaPreview, getFileType } from './edit';
+import { SaveStatusButton, type SaveStatus } from './SaveStatusButton';
+import { WidgetPreview } from './WidgetPreview';
+import { MarkdownPreview } from './MarkdownPreview';
 import { saveProject, getVFSConfig, loadFile, subscribeToChanges } from '../lib/vfs';
-
-type SaveStatus = 'unsaved' | 'saving' | 'saved' | 'error';
+import type { VirtualProject } from '@aprovan/patchwork-compiler';
 
 interface CodePreviewProps {
   code: string;
@@ -16,6 +18,14 @@ interface CodePreviewProps {
   services?: string[];
   /** Optional file path from code block attributes (e.g., "components/calculator.tsx") */
   filePath?: string;
+  /** Optional callback to open a shared edit session outside this component */
+  onOpenEditSession?: (session: {
+    projectId: string;
+    entryFile: string;
+    filePath?: string;
+    initialCode: string;
+    initialProject: VirtualProject;
+  }) => void;
 }
 
 function createManifest(services?: string[]): Manifest {
@@ -28,76 +38,19 @@ function createManifest(services?: string[]): Manifest {
   };
 }
 
-function useCodeCompiler(compiler: Compiler | null, code: string, enabled: boolean, services?: string[]) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mountedRef = useRef<MountedWidget | null>(null);
-
-  useEffect(() => {
-    if (!enabled || !compiler || !containerRef.current) return;
-
-    let cancelled = false;
-
-    async function compileAndMount() {
-      if (!containerRef.current || !compiler) return;
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        if (mountedRef.current) {
-          compiler.unmount(mountedRef.current);
-          mountedRef.current = null;
-        }
-
-        const widget = await compiler.compile(
-          code,
-          createManifest(services),
-          { typescript: true }
-        );
-
-        if (cancelled) {
-          return;
-        }
-
-        const mounted = await compiler.mount(widget, {
-          target: containerRef.current,
-          mode: 'embedded'
-        });
-
-        mountedRef.current = mounted;
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to render JSX');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    compileAndMount();
-
-    return () => {
-      cancelled = true;
-      if (mountedRef.current && compiler) {
-        compiler.unmount(mountedRef.current);
-        mountedRef.current = null;
-      }
-    };
-  }, [code, compiler, enabled, services]);
-
-  return { containerRef, loading, error };
-}
-
-export function CodePreview({ code: originalCode, compiler, services, filePath, entrypoint = 'index.ts' }: CodePreviewProps) {
+export function CodePreview({
+  code: originalCode,
+  compiler,
+  services,
+  filePath,
+  entrypoint = 'index.ts',
+  onOpenEditSession,
+}: CodePreviewProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [currentCode, setCurrentCode] = useState(originalCode);
   const [editCount, setEditCount] = useState(0);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('unsaved');
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [lastSavedCode, setLastSavedCode] = useState(originalCode);
   const [vfsPath, setVfsPath] = useState<string | null>(null);
   const currentCodeRef = useRef(currentCode);
@@ -144,6 +97,15 @@ export function CodePreview({ code: originalCode, compiler, services, filePath, 
   useEffect(() => {
     isEditingRef.current = isEditing;
   }, [isEditing]);
+
+  useEffect(() => {
+    if (saveStatus === 'saving') return;
+    if (currentCode === lastSavedCode) {
+      if (saveStatus !== 'saved') setSaveStatus('saved');
+      return;
+    }
+    if (saveStatus === 'saved') setSaveStatus('unsaved');
+  }, [currentCode, lastSavedCode, saveStatus]);
 
   useEffect(() => {
     let active = true;
@@ -201,15 +163,13 @@ export function CodePreview({ code: originalCode, compiler, services, filePath, 
     }
   }, [currentCode, getProjectId, getEntryFile]);
 
-  const { containerRef, loading, error } = useCodeCompiler(
-    compiler,
-    currentCode,
-    showPreview && !isEditing,
-    services
-  );
+  const previewPath = filePath ?? entrypoint;
+  const fileType = useMemo(() => getFileType(previewPath), [previewPath]);
+  const canRenderWidget = fileType.category === 'compilable';
 
   const compile: CompileFn = useCallback(
     async (code: string) => {
+      if (!canRenderWidget) return { success: true };
       if (!compiler) return { success: true };
 
       // Capture console.error outputs during compilation
@@ -238,7 +198,7 @@ export function CodePreview({ code: originalCode, compiler, services, filePath, 
         console.error = originalError;
       }
     },
-    [compiler, services]
+    [canRenderWidget, compiler, services]
   );
 
   const handleRevert = () => {
@@ -248,9 +208,65 @@ export function CodePreview({ code: originalCode, compiler, services, filePath, 
 
   const hasChanges = currentCode !== originalCode;
 
+  const previewBody = useMemo(() => {
+    if (canRenderWidget) {
+      return (
+        <WidgetPreview
+          code={currentCode}
+          compiler={compiler}
+          services={services}
+          enabled={showPreview && !isEditing}
+        />
+      );
+    }
+
+    if (fileType.category === 'media') {
+      return (
+        <MediaPreview
+          content={currentCode}
+          mimeType={fileType.mimeType}
+          fileName={previewPath}
+        />
+      );
+    }
+
+    if (fileType.language === 'markdown') {
+      return (
+        <div className="p-4 prose prose-sm dark:prose-invert max-w-none">
+          <MarkdownPreview value={currentCode} />
+        </div>
+      );
+    }
+
+    return (
+      <CodeBlockView
+        content={currentCode}
+        language={fileType.language}
+      />
+    );
+  }, [canRenderWidget, compiler, currentCode, fileType, isEditing, previewPath, services, showPreview]);
+
+  const handleOpenEditor = useCallback(async () => {
+    if (!onOpenEditSession) {
+      setIsEditing(true);
+      return;
+    }
+
+    const projectId = await getProjectId();
+    const entryFile = getEntryFile();
+    const initialProject = createSingleFileProject(currentCode, entryFile, projectId);
+    onOpenEditSession({
+      projectId,
+      entryFile,
+      filePath,
+      initialCode: currentCode,
+      initialProject,
+    });
+  }, [onOpenEditSession, getProjectId, getEntryFile, currentCode, filePath]);
+
   return (
     <>
-      <div className="my-3 border rounded-lg">
+      <div className="border rounded-lg overflow-hidden min-w-0">
         <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b rounded-t-lg">
           <Code className="h-4 w-4 text-muted-foreground" />
           {editCount > 0 && (
@@ -259,30 +275,6 @@ export function CodePreview({ code: originalCode, compiler, services, filePath, 
               {editCount} edit{editCount !== 1 ? 's' : ''}
             </span>
           )}
-          {/* Save status indicator */}
-            <button
-              onClick={handleSave}
-              disabled={saveStatus === 'saving'}
-              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
-                saveStatus === 'saved' 
-                  ? 'text-green-600' 
-                  : saveStatus === 'error' 
-                    ? 'text-destructive hover:bg-muted' 
-                    : 'text-muted-foreground hover:bg-muted'
-              }`}
-              title={saveStatus === 'saved' ? 'Saved to disk' : saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error' ? 'Save failed - click to retry' : 'Click to save'}
-            >
-              {saveStatus === 'saving' ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <span className="relative">
-                  <Cloud className="h-3 w-3" />
-                  {saveStatus === 'saved' && (
-                    <Check className="h-2 w-2 absolute -bottom-0.5 -right-0.5 stroke-[3]" />
-                  )}
-                </span>
-              )}
-            </button>
           <div className="ml-auto flex gap-1">
             {hasChanges && (
               <button
@@ -294,15 +286,21 @@ export function CodePreview({ code: originalCode, compiler, services, filePath, 
               </button>
             )}
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={() => void handleOpenEditor()}
               className="px-2 py-1 text-xs rounded flex items-center gap-1 hover:bg-muted"
               title="Edit component"
             >
               <Pencil className="h-3 w-3" />
             </button>
+            <SaveStatusButton
+              status={saveStatus}
+              onClick={handleSave}
+              disabled={saveStatus === 'saving'}
+              tone="muted"
+            />
             <button
               onClick={() => setShowPreview(!showPreview)}
-              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${showPreview ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/20 text-primary'}`}
+              className={`w-[5rem] px-2 py-1 text-xs rounded flex items-center gap-1 ${showPreview ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/20 text-primary'}`}
             >
               {showPreview ? <Eye className="h-3 w-3" /> : <Code className="h-3 w-3" />}
               {showPreview ? 'Preview' : 'Code'}
@@ -311,29 +309,15 @@ export function CodePreview({ code: originalCode, compiler, services, filePath, 
         </div>
 
         {showPreview ? (
-          <div className="bg-white">
-            {error ? (
-              <div className="p-3 text-sm text-destructive flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            ) : loading ? (
-              <div className="p-3 flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Rendering preview...</span>
-              </div>
-            ) : !compiler ? (
-              <div className="p-3 text-sm text-muted-foreground">
-                Compiler not initialized
-              </div>
-            ) : null}
-            <div ref={containerRef} />
+          <div className="bg-white overflow-y-auto overflow-x-hidden max-h-[60vh]">
+            {previewBody}
           </div>
         ) : (
-          <div className="p-3 bg-muted/30 overflow-auto max-h-96">
-            <pre className="text-xs whitespace-pre-wrap break-words m-0">
-              <code>{currentCode}</code>
-            </pre>
+          <div className="bg-muted/30 overflow-auto max-h-[60vh]">
+            <CodeBlockView
+              content={currentCode}
+              language={fileType.language}
+            />
           </div>
         )}
       </div>
@@ -354,6 +338,7 @@ export function CodePreview({ code: originalCode, compiler, services, filePath, 
                 const entryFile = getEntryFile();
                 const project = createSingleFileProject(finalCode, entryFile, projectId);
                 await saveProject(project);
+                setLastSavedCode(finalCode);
                 setSaveStatus('saved');
               } catch (err) {
                 console.warn('[VFS] Failed to save project:', err);
@@ -364,41 +349,14 @@ export function CodePreview({ code: originalCode, compiler, services, filePath, 
         }}
         originalCode={currentCode}
         compile={compile}
-        renderPreview={(code) => <ModalPreview code={code} compiler={compiler} services={services} />}
+        renderPreview={(code) => (
+          <WidgetPreview
+            code={code}
+            compiler={compiler}
+            services={services}
+          />
+        )}
       />
-    </>
-  );
-}
-
-function ModalPreview({
-  code,
-  compiler,
-  services,
-}: {
-  code: string;
-  compiler: Compiler | null;
-  services?: string[];
-}) {
-  const { containerRef, loading, error } = useCodeCompiler(compiler, code, true, services);
-
-  return (
-    <>
-      {error && (
-        <div className="text-sm text-destructive flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-      {loading && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Rendering preview...</span>
-        </div>
-      )}
-      {!compiler && !loading && !error && (
-        <div className="text-sm text-muted-foreground">Compiler not initialized</div>
-      )}
-      <div ref={containerRef} />
     </>
   );
 }

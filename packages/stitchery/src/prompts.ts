@@ -69,7 +69,8 @@ export function Card() {
 ### Requirements
 - DO think heavily about correctness of code and syntax
 - DO keep things simple and self-contained
-- ALWAYS include the \`path\` attribute specifying the file location. Be generic with the name and describe the general component's use
+- ALWAYS include the \`path\` attribute specifying the file location.
+- ALWAYS use generic component/path names that is not dependent on arguments (e.g. 'dinner.tsx' not 'spaghetti.tsx')
 - ALWAYS output the COMPLETE code block with opening \`\`\`tsx and closing \`\`\` markers
 - Use \`note\` attribute to describe what each code block does (optional but encouraged)
 - NEVER truncate or cut off code - finish the entire component before stopping

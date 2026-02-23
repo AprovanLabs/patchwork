@@ -9,6 +9,22 @@
       "headers": {
         "User-Agent": "com.aprovan.patchwork"
       }
+    },
+    {
+      "name": "hardcopy",
+      "call_template_type": "mcp",
+      "config": {
+        "mcpServers": {
+          "hardcopy": {
+            "transport": "stdio",
+            "command": "npx",
+            "args": [
+              "@aprovan/hardcopy",
+              "mcp-serve"
+            ]
+          }
+        }
+      }
     }
   ]
 }

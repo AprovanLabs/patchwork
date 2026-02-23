@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect, type ReactNode } from 'react';
 import {
   Code,
   Eye,
@@ -10,9 +10,10 @@ import {
   Send,
   FolderTree,
   FileCode,
-  Save,
 } from 'lucide-react';
 import { MarkdownEditor } from '../MarkdownEditor';
+import { MarkdownPreview } from '../MarkdownPreview';
+import { SaveStatusButton, type SaveStatus } from '../SaveStatusButton';
 import { EditHistory } from './EditHistory';
 import { FileTree } from './FileTree';
 import { SaveConfirmDialog } from './SaveConfirmDialog';
@@ -20,7 +21,7 @@ import { CodeBlockView } from './CodeBlockView';
 import { MediaPreview } from './MediaPreview';
 import { useEditSession, type UseEditSessionOptions } from './useEditSession';
 import { getActiveContent, getFiles } from './types';
-import { getFileType, isCompilable, getMimeType } from './fileTypes';
+import { getFileType, isCompilable, isMarkdownFile, getMimeType } from './fileTypes';
 import { Bobbin, serializeChangesToYAML, type Change } from '@aprovan/bobbin';
 import type { VirtualProject } from '@aprovan/patchwork-compiler';
 
@@ -36,6 +37,7 @@ function hashCode(str: string): number {
 
 export interface EditModalProps extends UseEditSessionOptions {
   isOpen: boolean;
+  initialTreePath?: string;
   initialState?: Partial<{
     showTree: boolean;
     showPreview: boolean;
@@ -61,6 +63,7 @@ export function EditModal({
   renderError,
   previewError,
   previewLoading,
+  initialTreePath,
   initialState = {},
   hideFileTree = false,
   ...sessionOptions
@@ -75,19 +78,33 @@ export function EditModal({
   const [pillContainer, setPillContainer] = useState<HTMLDivElement | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pendingClose, setPendingClose] = useState<{ code: string; count: number } | null>(null);
+  const [treePath, setTreePath] = useState(initialTreePath ?? '');
+  const wasOpenRef = useRef(false);
   const currentCodeRef = useRef<string>('');
 
   const session = useEditSession(sessionOptions);
   const code = getActiveContent(session);
+  const effectiveTreePath = treePath || session.activeFile;
   currentCodeRef.current = code;
   const files = useMemo(() => getFiles(session.project), [session.project]);
+  const projectSnapshot = useMemo(
+    () =>
+      Array.from(session.project.files.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([path, file]) => `${path}\u0000${file.content}`)
+        .join('\u0001'),
+    [session.project]
+  );
   const hasChanges = code !== (session.originalProject.files.get(session.activeFile)?.content ?? '');
 
   const fileType = useMemo(() => getFileType(session.activeFile), [session.activeFile]);
   const isCompilableFile = isCompilable(session.activeFile);
-  const showPreviewToggle = isCompilableFile;
+  const isMarkdown = isMarkdownFile(session.activeFile);
+  const showPreviewToggle = isCompilableFile || isMarkdown;
 
   const handleBobbinChanges = useCallback((changes: Change[]) => {
     setBobbinChanges(changes);
@@ -111,6 +128,28 @@ export function EditModal({
 
   const hasSaveHandler = onSave || onSaveProject;
 
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      setLastSavedSnapshot(projectSnapshot);
+      setSaveStatus('saved');
+      setSaveError(null);
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, projectSnapshot]);
+
+  useEffect(() => {
+    if (!hasSaveHandler) return;
+    if (projectSnapshot === lastSavedSnapshot) {
+      if (saveStatus !== 'saving' && saveStatus !== 'saved') {
+        setSaveStatus('saved');
+      }
+      return;
+    }
+    if (saveStatus === 'saved' || saveStatus === 'error') {
+      setSaveStatus('unsaved');
+    }
+  }, [projectSnapshot, lastSavedSnapshot, saveStatus, hasSaveHandler]);
+
   const handleClose = useCallback(() => {
     const editCount = session.history.length;
     const finalCode = code;
@@ -129,6 +168,7 @@ export function EditModal({
   const handleSaveAndClose = useCallback(async () => {
     if (!pendingClose || !hasSaveHandler) return;
     setIsSaving(true);
+    setSaveStatus('saving');
     setSaveError(null);
     try {
       if (onSaveProject) {
@@ -136,6 +176,8 @@ export function EditModal({
       } else if (onSave) {
         await onSave(pendingClose.code);
       }
+      setLastSavedSnapshot(projectSnapshot);
+      setSaveStatus('saved');
       setShowConfirm(false);
       setEditInput('');
       session.clearError();
@@ -143,10 +185,11 @@ export function EditModal({
       setPendingClose(null);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Save failed');
+      setSaveStatus('error');
     } finally {
       setIsSaving(false);
     }
-  }, [pendingClose, onSave, onSaveProject, session, onClose]);
+  }, [pendingClose, onSave, onSaveProject, session, onClose, projectSnapshot, hasSaveHandler]);
 
   const handleDiscard = useCallback(() => {
     if (!pendingClose) return;
@@ -166,6 +209,7 @@ export function EditModal({
   const handleDirectSave = useCallback(async () => {
     if (!hasSaveHandler) return;
     setIsSaving(true);
+    setSaveStatus('saving');
     setSaveError(null);
     try {
       if (onSaveProject) {
@@ -173,12 +217,15 @@ export function EditModal({
       } else if (onSave && currentCodeRef.current) {
         await onSave(currentCodeRef.current);
       }
+      setLastSavedSnapshot(projectSnapshot);
+      setSaveStatus('saved');
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Save failed');
+      setSaveStatus('error');
     } finally {
       setIsSaving(false);
     }
-  }, [onSave, onSaveProject, session.project]);
+  }, [onSave, onSaveProject, session.project, hasSaveHandler, projectSnapshot]);
 
   if (!isOpen) return null;
 
@@ -213,28 +260,21 @@ export function EditModal({
                 {showTree ? <FileCode className="h-3 w-3" /> : <FolderTree className="h-3 w-3" />}
               </button>
             )}
+            {hasSaveHandler && (
+              <SaveStatusButton
+                status={saveStatus}
+                onClick={handleDirectSave}
+                disabled={isSaving}
+                tone="primary"
+              />
+            )}
             {showPreviewToggle && (
               <button
                 onClick={() => setShowPreview(!showPreview)}
-                className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${showPreview ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/20 text-primary'}`}
+                className={`w-[5rem] px-2 py-1 text-xs rounded flex items-center gap-1 ${showPreview ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/20 text-primary'}`}
               >
                 {showPreview ? <Eye className="h-3 w-3" /> : <Code className="h-3 w-3" />}
                 {showPreview ? 'Preview' : 'Code'}
-              </button>
-            )}
-            {hasSaveHandler && (
-              <button
-                onClick={handleDirectSave}
-                disabled={isSaving}
-                className="px-2 py-1 text-xs rounded flex items-center gap-1 hover:bg-primary/20 text-primary disabled:opacity-50"
-                title="Save changes"
-              >
-                {isSaving ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Save className="h-3 w-3" />
-                )}
-                Save
               </button>
             )}
             <button
@@ -253,7 +293,12 @@ export function EditModal({
             <FileTree
               files={files}
               activeFile={session.activeFile}
-              onSelectFile={session.setActiveFile}
+              activePath={effectiveTreePath}
+              onSelectFile={(path) => {
+                setTreePath(path);
+                session.setActiveFile(path);
+              }}
+              onSelectDirectory={(path) => setTreePath(path)}
               onReplaceFile={session.replaceFile}
             />
           )}
@@ -293,6 +338,14 @@ export function EditModal({
                 editable
                 onChange={session.updateActiveFile}
               />
+            ) : isMarkdown && showPreview ? (
+              <div className="p-4 prose prose-sm dark:prose-invert max-w-none h-full overflow-auto">
+                <MarkdownPreview
+                  value={code}
+                  editable
+                  onChange={session.updateActiveFile}
+                />
+              </div>
             ) : fileType.category === 'text' ? (
               <CodeBlockView
                 content={code}
@@ -306,10 +359,14 @@ export function EditModal({
                 mimeType={getMimeType(session.activeFile)}
                 fileName={session.activeFile.split('/').pop() ?? session.activeFile}
               />
+            // Default to code view for unknown types
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <p className="text-sm">Preview not available for this file type</p>
-              </div>
+              <CodeBlockView
+                content={code}
+                language={fileType.language}
+                editable
+                onChange={session.updateActiveFile}
+              />
             )}
           </div>
         </div>

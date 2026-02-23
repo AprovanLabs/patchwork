@@ -115,6 +115,8 @@ export type {
   ChangeRecord,
   HttpBackendConfig,
   VFSStoreOptions,
+  WatchCallback,
+  WatchEventType,
 } from "./vfs/index.js";
 
 // Mount utilities

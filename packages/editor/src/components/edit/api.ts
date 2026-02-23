@@ -27,7 +27,12 @@ export async function sendEditRequest(
   const text = await streamResponse(response, onProgress);
 
   if (!hasDiffBlocks(text)) {
-    throw new Error('No valid diffs in response');
+    // No diffs — return the original code unchanged with the response as summary
+    return {
+      newCode: request.code,
+      summary: text.trim(),
+      progressNotes: [],
+    };
   }
 
   const parsed = parseEditResponse(text);

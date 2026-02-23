@@ -2,10 +2,12 @@
 export {
   CodeBlockExtension,
   CodePreview,
+  WidgetPreview,
   MarkdownEditor,
+  MarkdownPreview,
   ServicesInspector,
   type ServiceInfo,
-} from './components';
+} from "./components";
 
 // Edit components
 export {
@@ -40,11 +42,13 @@ export {
   isCompilable,
   isMediaFile,
   isTextFile,
+  isMarkdownFile,
+  isPreviewable,
   isImageFile,
   isVideoFile,
   getLanguageFromExt,
   getMimeType,
-} from './components/edit';
+} from "./components/edit";
 
 // Lib utilities
 export {
@@ -58,7 +62,7 @@ export {
   type CodePart,
   type ParsedPart,
   type ExtractOptions,
-  
+
   // Diff utilities
   parseCodeBlockAttributes,
   parseCodeBlocks,
@@ -74,7 +78,7 @@ export {
   type CodeBlock,
   type DiffBlock,
   type ParsedEditResponse,
-  
+
   // VFS utilities
   getVFSConfig,
   getVFSStore,
@@ -83,7 +87,7 @@ export {
   listProjects,
   saveFile,
   isVFSAvailable,
-  
+
   // General utilities
   cn,
-} from './lib';
+} from "./lib";

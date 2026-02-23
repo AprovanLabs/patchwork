@@ -104,6 +104,14 @@ export function isTextFile(path: string): boolean {
   return TEXT_EXTENSIONS.includes(getExtension(path));
 }
 
+export function isMarkdownFile(path: string): boolean {
+  return getExtension(path) === '.md';
+}
+
+export function isPreviewable(path: string): boolean {
+  return isCompilable(path) || isMarkdownFile(path);
+}
+
 export function getLanguageFromExt(path: string): string | null {
   const ext = getExtension(path);
   return EXTENSION_TO_LANGUAGE[ext] ?? null;

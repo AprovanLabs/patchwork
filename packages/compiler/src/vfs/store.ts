@@ -9,6 +9,7 @@ import type {
   SyncEventType,
   SyncResult,
   SyncStatus,
+  WatchCallback,
 } from "./core/types.js";
 import { join } from "./core/utils.js";
 import { VirtualFS } from "./core/virtual-fs.js";
@@ -161,6 +162,13 @@ export class VFSStore {
         ),
       ),
     );
+  }
+
+  watch(path: string, callback: WatchCallback): () => void {
+    if (this.provider.watch) {
+      return this.provider.watch(this.remotePath(path), callback);
+    }
+    return () => {};
   }
 
   async sync(): Promise<SyncResult> {

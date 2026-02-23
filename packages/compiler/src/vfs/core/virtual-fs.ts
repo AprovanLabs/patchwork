@@ -7,6 +7,7 @@ import type {
   WatchEventType,
 } from "./types.js";
 import { MemoryBackend } from "../backends/memory.js";
+import { dirname } from "./utils.js";
 
 type ChangeListener = (record: ChangeRecord) => void;
 
@@ -28,12 +29,14 @@ export class VirtualFS implements FSProvider {
   }
 
   async writeFile(path: string, content: string): Promise<void> {
+    await this.ensureParentDir(path);
     const existed = await this.backend.exists(path);
     await this.backend.writeFile(path, content);
     this.recordChange(path, existed ? "update" : "create");
   }
 
   async applyRemoteFile(path: string, content: string): Promise<void> {
+    await this.ensureParentDir(path);
     await this.backend.writeFile(path, content);
   }
 
@@ -116,5 +119,11 @@ export class VirtualFS implements FSProvider {
     for (const listener of this.listeners) {
       listener(record);
     }
+  }
+
+  private async ensureParentDir(path: string): Promise<void> {
+    const dir = dirname(path);
+    if (!dir) return;
+    await this.backend.mkdir(dir, { recursive: true });
   }
 }
