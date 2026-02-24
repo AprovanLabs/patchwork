@@ -2,6 +2,7 @@
 import path from "path";
 import fs from "fs";
 import { Command } from "commander";
+import { getAvailablePort } from "@aprovan/copilot-proxy";
 import { createStitcheryServer } from "./server/index.js";
 
 const program = new Command();
@@ -14,13 +15,14 @@ program
 program
   .command("serve")
   .description("Start the stitchery server")
-  .option("-p, --port <port>", "Port to listen on", "6434")
+  .option("-p, --port <port>", "Port to listen on (auto-finds available if in use)", "6434")
   .option("-h, --host <host>", "Host to bind to", "127.0.0.1")
   .option(
     "--copilot-proxy-url <url>",
     "Copilot proxy URL",
     "http://127.0.0.1:6433/v1",
   )
+  .option("--strict", "Fail if the specified port is in use", false)
   .option(
     "--mcp <servers...>",
     "MCP server commands (format: name:command:arg1,arg2)",
@@ -39,6 +41,12 @@ program
   .action(async (options) => {
     if (options.verbose) {
       console.log("[stitchery] CLI options:", JSON.stringify(options, null, 2));
+    }
+
+    // Auto-find available port unless --strict
+    let port = parseInt(options.port, 10);
+    if (!options.strict) {
+      port = await getAvailablePort(port);
     }
 
     const mcpServers = (options.mcp ?? []).map((spec: string) => {
@@ -88,7 +96,7 @@ program
     }
 
     const server = await createStitcheryServer({
-      port: parseInt(options.port, 10),
+      port,
       host: options.host,
       copilotProxyUrl: options.copilotProxyUrl,
       mcpServers,
@@ -99,8 +107,8 @@ program
       verbose: options.verbose,
     });
 
-    const { port, host } = await server.start();
-    console.log(`Stitchery server running at http://${host}:${port}`);
+    const addr = await server.start();
+    console.log(`Stitchery server running at http://${addr.host}:${addr.port}`);
 
     process.on("SIGINT", async () => {
       console.log("\nShutting down...");

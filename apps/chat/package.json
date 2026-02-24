@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n proxy,stitchery,vite -c green,magenta,blue \"pnpm dev:proxy\" \"pnpm dev:stitchery\" \"sleep 2 && vite\"",
+    "dev": "tsx scripts/start-dev.ts",
     "dev:client": "vite",
     "dev:proxy": "pnpm exec copilot-proxy serve",
-    "dev:stitchery": "node ../../packages/stitchery/dist/cli.js serve -p 6435 --utcp-config .utcp_config.json --local-package @aprovan/patchwork-image-shadcn:../../packages/images/shadcn -v --vfs-dir ./workspace --vfs-use-paths",
+    "dev:stitchery": "node ../../packages/stitchery/dist/cli.js serve --utcp-config .utcp_config.json --local-package @aprovan/patchwork-image-shadcn:../../packages/images/shadcn -v --vfs-dir ./workspace --vfs-use-paths",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
@@ -38,7 +38,7 @@
     "tiptap-markdown": "^0.9.0"
   },
   "devDependencies": {
-    "@aprovan/copilot-proxy": "0.1.0",
+    "@aprovan/copilot-proxy": "link:../../../copilot-proxy",
     "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^22.19.7",
     "@types/react": "^18.3.27",

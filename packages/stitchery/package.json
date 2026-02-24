@@ -29,6 +29,7 @@
   "dependencies": {
     "@ai-sdk/mcp": "^1.0.18",
     "@ai-sdk/openai-compatible": "^2.0.26",
+    "@aprovan/copilot-proxy": "link:../../../copilot-proxy",
     "@aprovan/patchwork-utcp": "workspace:^",
     "ai": "^6.0.67",
     "commander": "^12.1.0"
