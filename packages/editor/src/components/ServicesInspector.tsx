@@ -133,7 +133,7 @@ export function ServicesInspector({
 
       <DialogComponent open={open} onOpenChange={setOpen}>
         <DialogHeaderComponent>
-          <h2 className="text-lg font-semibold">Available Services</h2>
+          <h2 className="text-lg font-semibold">Services</h2>
           <DialogCloseComponent onClose={() => setOpen(false)} />
         </DialogHeaderComponent>
         <DialogContentComponent className="space-y-3 max-h-96 overflow-auto">

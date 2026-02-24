@@ -1,5 +1,5 @@
-import { applyDiffs, hasDiffBlocks, parseEditResponse } from '../../lib/diff';
-import type { EditRequest, EditResponse } from './types';
+import { applyDiffs, hasDiffBlocks, parseEditResponse } from "../../lib/diff";
+import type { EditRequest, EditResponse } from "./types";
 
 export interface EditApiOptions {
   endpoint?: string;
@@ -12,16 +12,16 @@ export async function sendEditRequest(
   request: EditRequest,
   options: EditApiOptions = {},
 ): Promise<EditResponse> {
-  const { endpoint = '/api/edit', onProgress, sanitize = true } = options;
+  const { endpoint = "/api/edit", onProgress, sanitize = true } = options;
 
   const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
   });
 
   if (!response.ok) {
-    throw new Error('Edit request failed');
+    throw new Error("Edit request failed");
   }
 
   const text = await streamResponse(response, onProgress);
@@ -42,7 +42,7 @@ export async function sendEditRequest(
     // Provide detailed context about failed diffs for better error feedback
     const failedDetails = result.failed
       .map((f, i) => `[${i + 1}] "${f}"`)
-      .join('\n');
+      .join("\n");
     throw new Error(
       `Failed to apply ${parsed.diffs.length} diff(s). None of the SEARCH blocks matched the code.\n\nFailed searches:\n${failedDetails}\n\nThis usually means the code has changed or the SEARCH text doesn't match exactly.`,
     );
@@ -71,7 +71,7 @@ async function streamResponse(
   }
 
   const decoder = new TextDecoder();
-  let fullText = '';
+  let fullText = "";
   const emittedNotes = new Set<string>();
 
   let done = false;

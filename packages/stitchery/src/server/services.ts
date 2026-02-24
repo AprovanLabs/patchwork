@@ -8,7 +8,7 @@
  * Provides unified interface for calling services and exposing metadata.
  */
 
-import { jsonSchema, type Tool } from 'ai';
+import { jsonSchema, type Tool } from "ai";
 
 /**
  * Service backend interface - abstracts service call mechanisms
@@ -70,7 +70,7 @@ export class ServiceRegistry {
       this.tools.set(name, tool);
 
       // Parse namespace and procedure from the full name using '.' separator
-      const dotIndex = name.indexOf('.');
+      const dotIndex = name.indexOf(".");
       const ns = dotIndex > 0 ? name.substring(0, dotIndex) : name;
       const procedure = dotIndex > 0 ? name.substring(dotIndex + 1) : name;
 
@@ -103,7 +103,7 @@ export class ServiceRegistry {
         const tool: Tool = {
           description: info.description,
           inputSchema: jsonSchema(
-            info.parameters ?? { type: 'object', properties: {} },
+            info.parameters ?? { type: "object", properties: {} },
           ),
           execute: async (args: unknown) => {
             return backend.call(info.namespace, info.procedure, [args]);
@@ -127,25 +127,25 @@ export class ServiceRegistry {
 
     const params = Object.entries(props)
       .map(([key, val]) => {
-        const optional = !required.includes(key) ? '?' : '';
+        const optional = !required.includes(key) ? "?" : "";
         const type =
-          val.type === 'number'
-            ? 'number'
-            : val.type === 'boolean'
-            ? 'boolean'
-            : val.type === 'array'
-            ? 'unknown[]'
-            : val.type === 'object'
-            ? 'Record<string, unknown>'
-            : 'string';
-        const comment = val.description ? ` // ${val.description}` : '';
+          val.type === "number"
+            ? "number"
+            : val.type === "boolean"
+            ? "boolean"
+            : val.type === "array"
+            ? "unknown[]"
+            : val.type === "object"
+            ? "Record<string, unknown>"
+            : "string";
+        const comment = val.description ? ` // ${val.description}` : "";
         return `  ${key}${optional}: ${type};${comment}`;
       })
-      .join('\n');
+      .join("\n");
 
     return `interface ${name.replace(
       /[^a-zA-Z0-9]/g,
-      '_',
+      "_",
     )}Args {\n${params}\n}`;
   }
 
@@ -154,7 +154,7 @@ export class ServiceRegistry {
    * OpenAI-compatible APIs require tool names to match ^[a-zA-Z0-9_-]+$
    */
   private toLLMToolName(internalName: string): string {
-    return internalName.replace(/\./g, '_');
+    return internalName.replace(/\./g, "_");
   }
 
   /**
@@ -169,11 +169,11 @@ export class ServiceRegistry {
       }
     }
     // Fallback: convert first underscore to dot
-    const underscoreIndex = llmName.indexOf('_');
+    const underscoreIndex = llmName.indexOf("_");
     if (underscoreIndex > 0) {
       return (
         llmName.substring(0, underscoreIndex) +
-        '.' +
+        "." +
         llmName.substring(underscoreIndex + 1)
       );
     }
@@ -231,7 +231,7 @@ export class ServiceRegistry {
         .map((info) => {
           const searchText = `${info.name} ${info.namespace} ${
             info.procedure
-          } ${info.description ?? ''}`.toLowerCase();
+          } ${info.description ?? ""}`.toLowerCase();
           const matchCount = keywords.filter((kw) =>
             searchText.includes(kw),
           ).length;
@@ -304,7 +304,7 @@ export class ServiceRegistry {
           this.tools.keys(),
         )
           .slice(0, 10)
-          .join(', ')}`,
+          .join(", ")}`,
       );
     }
 
@@ -342,7 +342,7 @@ export class ServiceRegistry {
  */
 export function generateServicesPrompt(registry: ServiceRegistry): string {
   const namespaces = registry.getNamespaces();
-  if (namespaces.length === 0) return '';
+  if (namespaces.length === 0) return "";
 
   const services = registry.getServiceInfo();
   const byNamespace = new Map<string, ServiceToolInfo[]>();
@@ -353,7 +353,7 @@ export function generateServicesPrompt(registry: ServiceRegistry): string {
     byNamespace.set(service.namespace, existing);
   }
 
-  let prompt = `## Available Services\n\nThe following services are available for generated widgets to call:\n\n`;
+  let prompt = `## Services\n\nThe following services are available for generated widgets to call:\n\n`;
 
   for (const [ns, tools] of byNamespace) {
     prompt += `### \`${ns}\`\n`;
@@ -362,16 +362,16 @@ export function generateServicesPrompt(registry: ServiceRegistry): string {
       if (tool.description) {
         prompt += `: ${tool.description}`;
       }
-      prompt += '\n';
+      prompt += "\n";
     }
-    prompt += '\n';
+    prompt += "\n";
   }
 
   prompt += `**Usage in widgets:**
 \`\`\`tsx
 // Services are available as global namespaces
-const result = await ${namespaces[0] ?? 'service'}.${
-    byNamespace.get(namespaces[0] ?? '')?.[0]?.procedure ?? 'example'
+const result = await ${namespaces[0] ?? "service"}.${
+    byNamespace.get(namespaces[0] ?? "")?.[0]?.procedure ?? "example"
   }({ /* args */ });
 \`\`\`
 
