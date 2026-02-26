@@ -148,6 +148,12 @@ export interface CompilerOptions {
   cdnBaseUrl?: string;
   /** Base URL for widget imports (default: same as cdnBaseUrl). Used for transforming imports in widget code. */
   widgetCdnBaseUrl?: string;
+  /**
+   * URL overrides for bundled assets/packages.
+   * Keys are asset identifiers (e.g., 'esbuild-wasm/esbuild.wasm'), values are local URLs.
+   * Use this to bundle assets locally for offline support or improved performance.
+   */
+  urlOverrides?: Record<string, string>;
 }
 
 // Compiler interface

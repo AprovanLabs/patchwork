@@ -6,10 +6,10 @@
  */
 
 import { spawn } from "node:child_process";
-import { allocatePorts, PROJECT_BASES, SERVICE_OFFSETS } from "@aprovan/copilot-proxy";
+import { allocatePorts } from "@aprovan/devtools";
 
 const PROJECT = process.env.PROJECT ?? "patchwork";
-const BASE_PORT = PROJECT_BASES[PROJECT as keyof typeof PROJECT_BASES] ?? 3500;
+const BASE_PORT = process.env.PORT ? parseInt(process.env.PORT) : 3700;
 
 async function main() {
   console.log(`\n🧵 Starting ${PROJECT} dev services...\n`);
@@ -17,7 +17,6 @@ async function main() {
   const { base, ports } = await allocatePorts({
     base: BASE_PORT,
     count: 3,
-    increment: 10,
   });
 
   const [clientPort, stitcheryPort, proxyPort] = ports;
@@ -38,28 +37,38 @@ async function main() {
   };
 
   // Start proxy first
-  const proxy = spawn("pnpm", ["exec", "copilot-proxy", "serve", "-p", String(proxyPort), "--strict"], {
-    stdio: "inherit",
-    env,
-  });
+  const proxy = spawn(
+    "pnpm",
+    ["exec", "copilot-proxy", "serve", "-p", String(proxyPort)],
+    {
+      stdio: "inherit",
+      env,
+    },
+  );
 
   // Give proxy a moment to start
   await new Promise((resolve) => setTimeout(resolve, 500));
 
   // Start stitchery
   const stitcheryArgs = [
-    "node", "../../packages/stitchery/dist/cli.js", "serve",
-    "-p", String(stitcheryPort),
-    "--strict",
-    "--copilot-proxy-url", `http://127.0.0.1:${proxyPort}/v1`,
-    "--utcp-config", ".utcp_config.json",
-    "--local-package", "@aprovan/patchwork-image-shadcn:../../packages/images/shadcn",
+    "node",
+    "../../packages/stitchery/dist/cli.js",
+    "serve",
+    "-p",
+    String(stitcheryPort),
+    "--copilot-proxy-url",
+    `http://127.0.0.1:${proxyPort}/v1`,
+    "--utcp-config",
+    ".utcp_config.json",
+    "--local-package",
+    "@aprovan/patchwork-image-shadcn:../../packages/images/shadcn",
     "-v",
-    "--vfs-dir", "./workspace",
+    "--vfs-dir",
+    "./workspace",
     "--vfs-use-paths",
   ];
 
-  const stitchery = spawn(stitcheryArgs[0], stitcheryArgs.slice(1), {
+  const stitchery = spawn(stitcheryArgs[0]!, stitcheryArgs.slice(1), {
     stdio: "inherit",
     env,
   });

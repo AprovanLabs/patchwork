@@ -24,17 +24,22 @@ import { mountIframe, reloadIframe } from "./mount/iframe.js";
 let esbuildInitialized = false;
 let esbuildInitPromise: Promise<void> | null = null;
 
+const DEFAULT_ESBUILD_WASM_URL = "https://unpkg.com/esbuild-wasm/esbuild.wasm";
+
 /**
  * Initialize esbuild-wasm (must be called before using esbuild)
+ * @param urlOverrides - Optional URL overrides for bundled assets
  */
-async function initEsbuild(): Promise<void> {
+async function initEsbuild(urlOverrides?: Record<string, string>): Promise<void> {
   if (esbuildInitialized) return;
   if (esbuildInitPromise) return esbuildInitPromise;
+
+  const wasmUrl = urlOverrides?.["esbuild-wasm/esbuild.wasm"] || DEFAULT_ESBUILD_WASM_URL;
 
   esbuildInitPromise = (async () => {
     try {
       await esbuild.initialize({
-        wasmURL: "https://unpkg.com/esbuild-wasm/esbuild.wasm",
+        wasmURL: wasmUrl,
       });
       esbuildInitialized = true;
     } catch (error) {
@@ -72,7 +77,7 @@ export async function createCompiler(
   options: CompilerOptions,
 ): Promise<Compiler> {
   // Initialize esbuild-wasm
-  await initEsbuild();
+  await initEsbuild(options.urlOverrides);
 
   const { image: imageSpec, proxyUrl, cdnBaseUrl, widgetCdnBaseUrl } = options;
 

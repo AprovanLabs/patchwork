@@ -2,7 +2,7 @@
 import path from "path";
 import fs from "fs";
 import { Command } from "commander";
-import { getAvailablePort } from "@aprovan/copilot-proxy";
+import { getAvailablePort } from "@aprovan/devtools";
 import { createStitcheryServer } from "./server/index.js";
 
 const program = new Command();
@@ -15,7 +15,11 @@ program
 program
   .command("serve")
   .description("Start the stitchery server")
-  .option("-p, --port <port>", "Port to listen on (auto-finds available if in use)", "6434")
+  .option(
+    "-p, --port <port>",
+    "Port to listen on (auto-finds available if in use)",
+    "6434",
+  )
   .option("-h, --host <host>", "Host to bind to", "127.0.0.1")
   .option(
     "--copilot-proxy-url <url>",

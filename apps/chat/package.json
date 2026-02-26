@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.69",
+    "@aprovan/devtools": "^0.1.0",
     "@aprovan/bobbin": "workspace:*",
     "@aprovan/patchwork-compiler": "workspace:*",
     "@aprovan/patchwork-editor": "workspace:*",
