@@ -58,14 +58,17 @@ async function main() {
     String(stitcheryPort),
     "--copilot-proxy-url",
     `http://127.0.0.1:${proxyPort}/v1`,
-    "--utcp-config",
-    ".utcp_config.json",
     "--local-package",
     "@aprovan/patchwork-image-shadcn:../../packages/images/shadcn",
     "-v",
     "--vfs-dir",
     "./workspace",
     "--vfs-use-paths",
+    "--data-dir",
+    "./data",
+    "--skills-dir",
+    "../../skills",
+    "--enable-events",
   ];
 
   const stitchery = spawn(stitcheryArgs[0]!, stitcheryArgs.slice(1), {

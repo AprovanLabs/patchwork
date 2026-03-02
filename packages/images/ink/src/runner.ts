@@ -28,7 +28,7 @@ export function getGlobals(): GlobalInjection[] {
 }
 
 export interface RunnerOptions {
-  /** Service proxy for UTCP calls */
+  /** Service proxy for backend calls */
   proxy?: {
     call(
       namespace: string,

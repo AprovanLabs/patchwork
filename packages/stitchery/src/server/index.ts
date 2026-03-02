@@ -1,7 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { createMCPClient } from "@ai-sdk/mcp";
 import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
-import { createUtcpBackend } from "@aprovan/patchwork-utcp";
 import { jsonSchema, type Tool } from "ai";
 import type { ServerConfig, McpServerConfig } from "../types.js";
 import { handleChat, handleEdit, type RouteContext } from "./routes.js";
@@ -144,7 +143,6 @@ export async function createStitcheryServer(
     copilotProxyUrl = "http://127.0.0.1:6433/v1",
     localPackages = {},
     mcpServers = [],
-    utcp,
     vfsDir,
     vfsUsePaths = false,
     dataDir,
@@ -183,26 +181,6 @@ export async function createStitcheryServer(
   log("Initializing MCP tools...");
   await initMcpTools(mcpServers, registry);
   log(`Loaded ${registry.size} tools from ${mcpServers.length} MCP servers`);
-
-  // Initialize UTCP backend if config provided
-  if (utcp) {
-    log("Initializing UTCP backend...");
-    log("UTCP config:", JSON.stringify(utcp, null, 2));
-    try {
-      // Cast to unknown since createUtcpBackend uses UtcpClientConfigSerializer to validate
-      const { backend, toolInfos } = await createUtcpBackend(
-        utcp as unknown as Parameters<typeof createUtcpBackend>[0],
-        utcp.cwd,
-      );
-      registry.registerBackend(backend, toolInfos);
-      log(
-        `Registered UTCP backend with ${toolInfos.length} tools:`,
-        toolInfos.map((tool: { name: string }) => tool.name).join(", "),
-      );
-    } catch (err) {
-      console.error("[stitchery] Failed to initialize UTCP backend:", err);
-    }
-  }
 
   log("Local packages:", localPackages);
 

@@ -9,7 +9,7 @@ export interface ServiceDefinition {
 }
 
 export interface ServiceSource {
-  type: "utcp" | "mcp" | "http" | "grpc" | "local";
+  type: "mcp" | "http" | "local";
   config: Record<string, unknown>;
 }
 

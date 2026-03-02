@@ -1,25 +1,28 @@
 /**
  * Unified Context - Wires event bus, entity graph, services, skills, and orchestrator
  *
- * Integrates @patchwork/events, @patchwork/graph, @patchwork/skills, and @patchwork/orchestrator
- * with the existing Stitchery server for event-driven chat.
+ * Integrates @aprovan/apprentice with @patchwork/skills for event-driven chat.
  */
 
 import type {
   EventBus,
   Envelope,
-  EventFilter,
-  QueryOptions,
-} from "@patchwork/events";
-import type { EntityGraph, Entity } from "@patchwork/graph";
+  EntityGraph,
+  Entity,
+  Orchestrator,
+  SkillResolver,
+  ToolExecutor,
+} from "@aprovan/apprentice";
+import type { ServiceRegistry } from "@patchwork/services";
 import type { SkillRegistry, SkillDefinition } from "@patchwork/skills";
-import type { Orchestrator } from "@patchwork/orchestrator";
 
 export interface UnifiedContext {
   eventBus: EventBus;
   entityStore: EntityGraph;
   skillRegistry: SkillRegistry;
+  serviceRegistry: ServiceRegistry;
   orchestrator: Orchestrator;
+  close(): void;
 }
 
 export interface UnifiedContextConfig {
@@ -28,31 +31,32 @@ export interface UnifiedContextConfig {
   enableOrchestrator?: boolean;
 }
 
+interface ConfigurableOrchestrator extends Orchestrator {
+  setSkillResolver(resolver: SkillResolver): void;
+  setToolExecutor(executor: ToolExecutor): void;
+}
+
 export async function createUnifiedContext(
   config: UnifiedContextConfig
 ): Promise<UnifiedContext> {
-  const { EventStore } = await import("@patchwork/events");
-  const { EntityStore } = await import("@patchwork/graph");
+  const { createApprentice } = await import("@aprovan/apprentice");
   const { PersistentSkillRegistry, scanSkills } = await import(
     "@patchwork/skills"
   );
-  const { Orchestrator: OrchestratorImpl } = await import(
-    "@patchwork/orchestrator"
-  );
+  const { PersistentServiceRegistry } = await import("@patchwork/services");
 
   const dbPath = `${config.dataDir}/patchwork.db`;
 
-  const eventBus = new EventStore({ dbPath });
+  const apprentice = createApprentice({ dbPath });
 
-  const entityStore = new EntityStore({
-    dbPath,
-    eventBus,
-    autoExtractLinks: true,
+  const serviceRegistry = new PersistentServiceRegistry({
+    dbPath: `${config.dataDir}/services.db`,
+    eventBus: apprentice.eventBus,
   });
 
   const skillRegistry = new PersistentSkillRegistry({
-    entityStore,
-    eventBus,
+    entityGraph: apprentice.entityGraph,
+    eventBus: apprentice.eventBus,
   });
 
   if (config.skillsDir) {
@@ -62,20 +66,46 @@ export async function createUnifiedContext(
     }
   }
 
-  const orchestrator = new OrchestratorImpl({
-    eventBus,
-    entityStore,
+  const skillResolver: SkillResolver = {
+    async resolve(envelope: Envelope): Promise<string | null> {
+      const skills = await skillRegistry.findByTrigger(envelope);
+      const first = skills[0];
+      return first?.id ?? null;
+    },
+  };
+
+  const orch = apprentice.orchestrator as ConfigurableOrchestrator;
+  orch.setSkillResolver(skillResolver);
+
+  const toolExecutor: ToolExecutor = {
+    async execute(
+      name: string,
+      args: Record<string, unknown>,
+      _context: { sessionId: string }
+    ): Promise<unknown> {
+      const [namespace, procedure] = name.split(".");
+      if (!namespace || !procedure) {
+        throw new Error(`Invalid tool name: ${name}`);
+      }
+      return serviceRegistry.call(namespace, procedure, args);
+    },
+  };
+  orch.setToolExecutor(toolExecutor);
+
+  return {
+    eventBus: apprentice.eventBus,
+    entityStore: apprentice.entityGraph,
     skillRegistry,
-  });
-
-  if (config.enableOrchestrator) {
-    orchestrator.start();
-  }
-
-  return { eventBus, entityStore, skillRegistry, orchestrator };
+    serviceRegistry,
+    orchestrator: apprentice.orchestrator,
+    close() {
+      serviceRegistry.close();
+      apprentice.close();
+    },
+  };
 }
 
-export { createEnvelope } from "@patchwork/events";
+export { createEnvelope } from "@aprovan/apprentice";
 
 const URI_PATTERNS = [
   /github:[\w-]+\/[\w-]+#\d+/g,
@@ -156,7 +186,7 @@ export async function publishChatEvent(
   role: string,
   content: string
 ): Promise<void> {
-  const { createEnvelope } = await import("@patchwork/events");
+  const { createEnvelope } = await import("@aprovan/apprentice");
   await eventBus.publish(
     createEnvelope("chat.message.sent", `chat:${role}`, {
       sessionId,
@@ -171,7 +201,7 @@ export async function publishLLMComplete(
   sessionId: string,
   result: { usage?: unknown; finishReason?: string }
 ): Promise<void> {
-  const { createEnvelope } = await import("@patchwork/events");
+  const { createEnvelope } = await import("@aprovan/apprentice");
   await eventBus.publish(
     createEnvelope(`llm.${sessionId}.complete`, "chat:llm", result, {
       metadata: { chat: { sessionId } },
@@ -188,7 +218,7 @@ export async function publishServiceCall(
   durationMs: number,
   error?: string
 ): Promise<void> {
-  const { createEnvelope } = await import("@patchwork/events");
+  const { createEnvelope } = await import("@aprovan/apprentice");
   const type = error
     ? `service.${namespace}.${procedure}.error`
     : `service.${namespace}.${procedure}.success`;
@@ -226,7 +256,7 @@ export async function publishGitHubWebhook(
   payload: Record<string, unknown>,
   delivery?: string
 ): Promise<void> {
-  const { createEnvelope } = await import("@patchwork/events");
+  const { createEnvelope } = await import("@aprovan/apprentice");
   const action = (payload.action as string) ?? "unknown";
 
   await eventBus.publish(

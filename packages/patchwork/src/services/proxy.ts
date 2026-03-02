@@ -1,14 +1,14 @@
 // Service Proxy - Caching layer for service calls
 //
 // Provides a backend-agnostic service proxy with caching.
-// The actual backend (UTCP, MCP, HTTP, etc.) is set via setServiceBackend().
+// The actual backend (MCP, HTTP, etc.) is set via setServiceBackend().
 
 import type { ServiceResult, CacheEntry, CacheConfig } from './types';
 
 /**
  * Service backend interface - abstracts the actual service call mechanism
  *
- * Implementations can use UTCP, MCP, HTTP, or any other protocol.
+ * Implementations can use MCP, HTTP, or any other protocol.
  */
 export interface ServiceBackend {
   /**
@@ -36,12 +36,6 @@ const MAX_CACHE_SIZE = 1000;
  *
  * @example
  * ```typescript
- * // Using with UTCP
- * setServiceBackend({
- *   call: (service, procedure, args) =>
- *     utcpClient.callTool(`${service}.${procedure}`, args)
- * });
- *
  * // Using with HTTP proxy
  * setServiceBackend({
  *   call: async (service, procedure, args) => {

@@ -1,36 +1,26 @@
-import type { EventBus, Envelope } from "@patchwork/events";
-import { createEnvelope } from "@patchwork/events";
-import type { EntityStore } from "@patchwork/graph";
+import type { EventBus, Envelope, EntityGraph } from "@aprovan/apprentice";
+import { createEnvelope } from "@aprovan/apprentice";
 import type {
   SkillDefinition,
   SkillRegistry,
   SkillSummary,
-  SkillContext,
-  SkillResult,
   SkillTrigger,
 } from "./types.js";
 import { scanSkills, loadSkillContent, type ScanOptions } from "./scanner.js";
 
 export interface SkillRegistryOptions {
   eventBus?: EventBus;
-  entityStore?: EntityStore;
-  executor?: SkillExecutor;
-}
-
-export interface SkillExecutor {
-  execute(skill: SkillDefinition, context: SkillContext): Promise<SkillResult>;
+  entityGraph?: EntityGraph;
 }
 
 export class PersistentSkillRegistry implements SkillRegistry {
   private skills: Map<string, SkillDefinition> = new Map();
   private eventBus?: EventBus;
-  private entityStore?: EntityStore;
-  private executor?: SkillExecutor;
+  private entityGraph?: EntityGraph;
 
   constructor(options: SkillRegistryOptions = {}) {
     this.eventBus = options.eventBus;
-    this.entityStore = options.entityStore;
-    this.executor = options.executor;
+    this.entityGraph = options.entityGraph;
   }
 
   async scanAndRegister(options: ScanOptions): Promise<number> {
@@ -44,8 +34,8 @@ export class PersistentSkillRegistry implements SkillRegistry {
   async register(skill: SkillDefinition): Promise<void> {
     this.skills.set(skill.id, skill);
 
-    if (this.entityStore) {
-      await this.entityStore.upsert({
+    if (this.entityGraph) {
+      await this.entityGraph.upsert({
         uri: skill.uri,
         type: "skill.Definition",
         attrs: {
@@ -76,8 +66,8 @@ export class PersistentSkillRegistry implements SkillRegistry {
 
     this.skills.delete(skillId);
 
-    if (this.entityStore) {
-      await this.entityStore.delete(skill.uri);
+    if (this.entityGraph) {
+      await this.entityGraph.delete(skill.uri);
     }
 
     if (this.eventBus) {
@@ -129,82 +119,6 @@ export class PersistentSkillRegistry implements SkillRegistry {
     return matching
       .sort((a, b) => b.priority - a.priority)
       .map((m) => m.skill);
-  }
-
-  async execute(skillId: string, context: SkillContext): Promise<SkillResult> {
-    const skill = await this.get(skillId);
-    if (!skill) {
-      return {
-        skillId,
-        success: false,
-        error: `Skill not found: ${skillId}`,
-        duration: 0,
-        events: [],
-      };
-    }
-
-    if (!this.executor) {
-      return {
-        skillId,
-        success: false,
-        error: "No executor configured",
-        duration: 0,
-        events: [],
-      };
-    }
-
-    const startTime = Date.now();
-
-    if (this.eventBus) {
-      await this.eventBus.publish(
-        createEnvelope("skill.execution.started", "skill-registry", {
-          skillId,
-          eventId: context.event.id,
-        })
-      );
-    }
-
-    try {
-      const result = await this.executor.execute(skill, context);
-      
-      if (this.eventBus) {
-        await this.eventBus.publish(
-          createEnvelope(
-            result.success ? "skill.execution.completed" : "skill.execution.failed",
-            "skill-registry",
-            {
-              skillId,
-              success: result.success,
-              duration: result.duration,
-              error: result.error,
-            }
-          )
-        );
-      }
-
-      return result;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      if (this.eventBus) {
-        await this.eventBus.publish(
-          createEnvelope("skill.execution.failed", "skill-registry", {
-            skillId,
-            error: errorMessage,
-            duration,
-          })
-        );
-      }
-
-      return {
-        skillId,
-        success: false,
-        error: errorMessage,
-        duration,
-        events: [],
-      };
-    }
   }
 
   private matchesTrigger(event: Envelope, trigger: SkillTrigger): boolean {

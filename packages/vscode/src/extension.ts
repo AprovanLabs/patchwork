@@ -273,10 +273,7 @@ export function activate(context: vscode.ExtensionContext) {
       if (event.affectsConfiguration("patchwork.copilotProxyUrl")) {
         void updateProxyStatus(statusBar);
       }
-      if (
-        event.affectsConfiguration("patchwork.mcpServers") ||
-        event.affectsConfiguration("patchwork.utcpConfig")
-      ) {
+      if (event.affectsConfiguration("patchwork.mcpServers")) {
         void initializeEmbeddedStitchery(embeddedStitchery, previewProvider);
       }
     }),
@@ -594,7 +591,6 @@ async function initializeEmbeddedStitchery(
   const mcpServers = config.get("mcpServers") as
     | Array<{ name: string; command: string; args?: string[] }>
     | undefined;
-  const utcp = config.get("utcpConfig") as Record<string, unknown> | undefined;
 
   await embeddedStitchery.initialize({
     mcpServers: (mcpServers ?? []).map((server) => ({
@@ -602,7 +598,6 @@ async function initializeEmbeddedStitchery(
       command: server.command,
       args: server.args ?? [],
     })),
-    utcp,
   });
 
   previewProvider.postMessage({

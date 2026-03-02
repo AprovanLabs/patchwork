@@ -10,7 +10,6 @@ export {
 export type {
   ServerConfig,
   McpServerConfig,
-  UtcpConfig,
   ChatRequest,
   EditRequest,
 } from './types.js';

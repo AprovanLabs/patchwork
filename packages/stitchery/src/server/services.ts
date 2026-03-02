@@ -3,7 +3,7 @@
  *
  * Services can be registered from:
  * - MCP servers (via --mcp CLI)
- * - External backends (UTCP, HTTP, etc.)
+ * - External backends (HTTP, etc.)
  *
  * Provides unified interface for calling services and exposing metadata.
  */
@@ -12,7 +12,7 @@ import { jsonSchema, type Tool } from "ai";
 
 /**
  * Service backend interface - abstracts service call mechanisms
- * Backends can be UTCP, HTTP proxies, direct MCP, etc.
+ * Backends can be HTTP proxies, direct MCP, etc.
  */
 export interface ServiceBackend {
   call(service: string, procedure: string, args: unknown[]): Promise<unknown>;
@@ -88,7 +88,7 @@ export class ServiceRegistry {
   }
 
   /**
-   * Register a service backend (UTCP, HTTP, etc.)
+   * Register a service backend (HTTP, MCP, etc.)
    * Creates callable Tool objects for each procedure so the LLM can invoke them directly.
    * Backends are tried in order of registration, first success wins.
    */

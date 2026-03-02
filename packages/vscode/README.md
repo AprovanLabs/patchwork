@@ -15,7 +15,6 @@ Patchwork Viewer is a VS Code extension for opening Patchwork projects, previewi
 
 - `patchwork.copilotProxyUrl`: Base URL for the Copilot proxy server.
 - `patchwork.mcpServers`: MCP server configs (name, command, args).
-- `patchwork.utcpConfig`: UTCP configuration for service registration.
 
 ## Keybindings
 

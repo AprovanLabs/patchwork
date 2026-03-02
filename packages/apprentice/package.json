@@ -1,5 +1,5 @@
 {
-  "name": "@patchwork/orchestrator",
+  "name": "@aprovan/apprentice",
   "version": "0.0.1",
   "type": "module",
   "main": "./dist/index.js",
@@ -16,13 +16,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@patchwork/events": "workspace:^",
-    "@patchwork/graph": "workspace:^",
-    "@patchwork/services": "workspace:^",
-    "@patchwork/skills": "workspace:^",
+    "better-sqlite3": "^11.8.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/uuid": "^10.0.0",
     "typescript": "^5.7.3"
   }

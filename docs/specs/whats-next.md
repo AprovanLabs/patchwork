@@ -19,8 +19,8 @@
 ### Patchwork/Stitchery: Dynamic API Integration
 
 **What it does well:**
-- Config-driven API registration via `.utcp_config.json`
-- Unified `namespace.procedure()` interface across MCP/HTTP/GRPC
+- MCP server integration for API registration
+- Unified `namespace.procedure()` interface across MCP/HTTP
 - Service discovery via `search_services` tool
 - Widgets can call any registered API without code changes
 - LLM validation loop ensures services are tested before widget generation
@@ -29,8 +29,8 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  .utcp_config.json                                                       │
-│  { "manual_call_templates": [{ name, call_template_type, ... }] }       │
+│  MCP Server Config                                                       │
+│  { "mcpServers": [{ name, command, args }] }                            │
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │
 ┌────────────────────────────────────▼────────────────────────────────────┐
@@ -46,7 +46,7 @@
 │  window.weather.get_forecast({...})                                     │
 │    → Proxy → postMessage('patchwork:call')                              │
 │    → Parent → POST /api/proxy/weather/get_forecast                      │
-│    → ServiceRegistry.call() → UTCP/MCP backend                          │
+│    → ServiceRegistry.call() → MCP backend                               │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -394,7 +394,7 @@ interface ServiceDefinition {
 }
 
 interface ServiceSource {
-  type: "utcp" | "mcp" | "http" | "grpc" | "local";
+  type: "mcp" | "http" | "local";
   config: unknown;               // Source-specific config
 }
 

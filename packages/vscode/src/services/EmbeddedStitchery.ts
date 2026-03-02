@@ -1,10 +1,8 @@
 import { createMCPClient, type MCPTransport } from "@ai-sdk/mcp";
-import { createUtcpBackend } from "@aprovan/patchwork-utcp";
 import { ServiceRegistry } from "@aprovan/stitchery";
-import type { McpServerConfig, UtcpConfig } from "@aprovan/stitchery";
+import type { McpServerConfig } from "@aprovan/stitchery";
 
 export interface EmbeddedStitcheryConfig {
-  utcp?: UtcpConfig;
   mcpServers?: McpServerConfig[];
 }
 
@@ -26,22 +24,10 @@ export class EmbeddedStitchery {
 
   async initialize(config: EmbeddedStitcheryConfig = {}): Promise<void> {
     this.registry = new ServiceRegistry();
-    const { utcp, mcpServers = [] } = config;
+    const { mcpServers = [] } = config;
 
     if (mcpServers.length > 0) {
       await this.initMcpTools(mcpServers);
-    }
-
-    if (utcp) {
-      try {
-        const { backend, toolInfos } = await createUtcpBackend(
-          utcp as unknown as Parameters<typeof createUtcpBackend>[0],
-          utcp.cwd,
-        );
-        this.registry.registerBackend(backend, toolInfos);
-      } catch (error) {
-        console.error("[patchwork-vscode] UTCP init failed:", error);
-      }
     }
   }
 
