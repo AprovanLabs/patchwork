@@ -14,3 +14,15 @@ export type {
   ChatRequest,
   EditRequest,
 } from './types.js';
+export {
+  createUnifiedContext,
+  buildEntityContext,
+  formatEntityContext,
+  extractEntityUris,
+  publishChatEvent,
+  publishLLMComplete,
+  publishServiceCall,
+  publishGitHubWebhook,
+  type UnifiedContext,
+  type UnifiedContextConfig,
+} from './server/unified.js';

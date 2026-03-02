@@ -1,0 +1,29 @@
+{
+  "name": "@patchwork/orchestrator",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@patchwork/events": "workspace:^",
+    "@patchwork/graph": "workspace:^",
+    "@patchwork/services": "workspace:^",
+    "@patchwork/skills": "workspace:^",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.7.3"
+  }
+}

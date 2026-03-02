@@ -1,0 +1,28 @@
+{
+  "name": "@patchwork/skills",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "check-types": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@patchwork/events": "workspace:^",
+    "@patchwork/graph": "workspace:^",
+    "gray-matter": "^4.0.3",
+    "glob": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "typescript": "^5.7.3"
+  }
+}
