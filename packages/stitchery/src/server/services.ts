@@ -30,8 +30,10 @@ export interface ServiceToolInfo {
   procedure: string;
   /** Tool description */
   description?: string;
-  /** Parameter schema */
+  /** Parameter schema (inputs) */
   parameters?: Record<string, unknown>;
+  /** Response schema (outputs) */
+  outputs?: Record<string, unknown>;
   /** TypeScript interface definition (optional, for search results) */
   typescriptInterface?: string;
 }
@@ -97,7 +99,16 @@ export class ServiceRegistry {
     this.backends.push(backend);
     if (toolInfos) {
       for (const info of toolInfos) {
-        this.toolInfo.set(info.name, info);
+        // Generate TypeScript interface including response type if outputs schema provided
+        const infoWithInterface: ServiceToolInfo = {
+          ...info,
+          typescriptInterface: this.generateTypeScriptInterfaceFromSchema(
+            info.name,
+            info.parameters,
+            info.outputs,
+          ),
+        };
+        this.toolInfo.set(info.name, infoWithInterface);
 
         // Create a callable Tool object for LLM use
         const tool: Tool = {
@@ -119,34 +130,87 @@ export class ServiceRegistry {
    */
   private generateTypeScriptInterface(name: string, tool: Tool): string {
     const schema = tool.inputSchema as Record<string, unknown> | undefined;
-    const props = (schema?.properties ?? {}) as Record<
+    return this.generateTypeScriptInterfaceFromSchema(name, schema);
+  }
+
+  /**
+   * Convert JSON Schema type to TypeScript type
+   */
+  private schemaTypeToTs(schema: Record<string, unknown>): string {
+    const type = schema.type as string | undefined;
+    const items = schema.items as Record<string, unknown> | undefined;
+    const properties = schema.properties as
+      | Record<string, Record<string, unknown>>
+      | undefined;
+    const required = (schema.required ?? []) as string[];
+
+    if (type === "number" || type === "integer") return "number";
+    if (type === "boolean") return "boolean";
+    if (type === "null") return "null";
+    if (type === "array") {
+      if (items) {
+        return `${this.schemaTypeToTs(items)}[]`;
+      }
+      return "unknown[]";
+    }
+    if (type === "object" && properties) {
+      const props = Object.entries(properties)
+        .map(([key, val]) => {
+          const optional = !required.includes(key) ? "?" : "";
+          const propType = this.schemaTypeToTs(val);
+          return `${key}${optional}: ${propType}`;
+        })
+        .join("; ");
+      return `{ ${props} }`;
+    }
+    if (type === "object") return "Record<string, unknown>";
+    return "string";
+  }
+
+  /**
+   * Generate TypeScript interface from JSON Schema (supports both inputs and outputs)
+   */
+  private generateTypeScriptInterfaceFromSchema(
+    name: string,
+    inputSchema?: Record<string, unknown>,
+    outputSchema?: Record<string, unknown>,
+  ): string {
+    const safeName = name.replace(/[^a-zA-Z0-9]/g, "_");
+
+    // Generate Args interface
+    const inputProps = (inputSchema?.properties ?? {}) as Record<
       string,
       { type?: string; description?: string }
     >;
-    const required = (schema?.required ?? []) as string[];
+    const inputRequired = (inputSchema?.required ?? []) as string[];
 
-    const params = Object.entries(props)
+    const inputParams = Object.entries(inputProps)
       .map(([key, val]) => {
-        const optional = !required.includes(key) ? "?" : "";
+        const optional = !inputRequired.includes(key) ? "?" : "";
         const type =
           val.type === "number"
             ? "number"
             : val.type === "boolean"
-            ? "boolean"
-            : val.type === "array"
-            ? "unknown[]"
-            : val.type === "object"
-            ? "Record<string, unknown>"
-            : "string";
+              ? "boolean"
+              : val.type === "array"
+                ? "unknown[]"
+                : val.type === "object"
+                  ? "Record<string, unknown>"
+                  : "string";
         const comment = val.description ? ` // ${val.description}` : "";
         return `  ${key}${optional}: ${type};${comment}`;
       })
       .join("\n");
 
-    return `interface ${name.replace(
-      /[^a-zA-Z0-9]/g,
-      "_",
-    )}Args {\n${params}\n}`;
+    let result = `interface ${safeName}Args {\n${inputParams}\n}`;
+
+    // Generate Response interface if outputs schema provided
+    if (outputSchema && Object.keys(outputSchema).length > 0) {
+      const responseType = this.schemaTypeToTs(outputSchema);
+      result += `\n\ntype ${safeName}Response = ${responseType};`;
+    }
+
+    return result;
   }
 
   /**

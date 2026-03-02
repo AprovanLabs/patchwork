@@ -40,7 +40,7 @@ async function listAllFiles(
   relPath: string,
 ): Promise<string[]> {
   const targetPath = resolvePath(rootDir, relPath);
-  let entries: Awaited<ReturnType<typeof readdir>> = [];
+  let entries;
   try {
     entries = await readdir(targetPath, { withFileTypes: true });
   } catch {
@@ -49,7 +49,7 @@ async function listAllFiles(
 
   const results: string[] = [];
   for (const entry of entries) {
-    const entryRelPath = joinRelPath(relPath, entry.name);
+    const entryRelPath = joinRelPath(relPath, String(entry.name));
     if (entry.isDirectory()) {
       results.push(...(await listAllFiles(rootDir, entryRelPath)));
     } else {

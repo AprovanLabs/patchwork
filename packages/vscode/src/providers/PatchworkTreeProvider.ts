@@ -133,24 +133,24 @@ export class PatchworkTreeProvider
       let current = root;
       let currentPath = "";
 
-      for (let index = 0; index < parts.length; index += 1) {
-        const part = parts[index];
-        const isFile = index === parts.length - 1;
-        currentPath = currentPath ? `${currentPath}/${part}` : part;
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index]!;
+      const isFile = index === parts.length - 1;
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
 
-        if (!current.children.has(part)) {
-          current.children.set(part, {
-            label: part,
-            kind: isFile ? "file" : "folder",
-            projectId: project.id,
-            path: currentPath,
-            children: new Map(),
-          });
-        }
-
-        const next = current.children.get(part);
-        if (next) current = next;
+      if (!current.children.has(part)) {
+        current.children.set(part, {
+          label: part,
+          kind: isFile ? "file" : "folder",
+          projectId: project.id,
+          path: currentPath,
+          children: new Map(),
+        });
       }
+
+      const next = current.children.get(part);
+      if (next) current = next;
+    }
     }
 
     const collectChildren = (

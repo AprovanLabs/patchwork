@@ -8,7 +8,7 @@ import { CodeBlockExtension } from './CodeBlockExtension';
 function parseFrontmatter(content: string): { frontmatter: string; body: string } {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { frontmatter: '', body: content };
-  return { frontmatter: match[1], body: match[2] };
+  return { frontmatter: match[1]!, body: match[2]! };
 }
 
 function assembleFrontmatter(frontmatter: string, body: string): string {

@@ -68,6 +68,7 @@ export async function createUtcpBackend(
     procedure: string;
     description?: string;
     parameters?: Record<string, unknown>;
+    outputs?: Record<string, unknown>;
   }>;
 }> {
   const utcpConfig = new UtcpClientConfigSerializer().validateDict(
@@ -86,6 +87,7 @@ export async function createUtcpBackend(
     procedure: string;
     description?: string;
     parameters?: Record<string, unknown>;
+    outputs?: Record<string, unknown>;
   }> = [];
 
   // Access internal getTools method - Tool has name, description, inputs, outputs, tags
@@ -96,6 +98,7 @@ export async function createUtcpBackend(
           name: string;
           description?: string;
           inputs?: Record<string, unknown>;
+          outputs?: Record<string, unknown>;
         }>
       >;
     }
@@ -125,6 +128,7 @@ export async function createUtcpBackend(
       procedure,
       description: tool.description,
       parameters: tool.inputs,
+      outputs: tool.outputs,
     });
   }
 

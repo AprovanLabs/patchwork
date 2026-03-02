@@ -1,5 +1,4 @@
-import { createMCPClient } from "@ai-sdk/mcp";
-import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
+import { createMCPClient, type MCPTransport } from "@ai-sdk/mcp";
 import { createUtcpBackend } from "@aprovan/patchwork-utcp";
 import { ServiceRegistry } from "@aprovan/stitchery";
 import type { McpServerConfig, UtcpConfig } from "@aprovan/stitchery";
@@ -36,7 +35,7 @@ export class EmbeddedStitchery {
     if (utcp) {
       try {
         const { backend, toolInfos } = await createUtcpBackend(
-          utcp as Parameters<typeof createUtcpBackend>[0],
+          utcp as unknown as Parameters<typeof createUtcpBackend>[0],
           utcp.cwd,
         );
         this.registry.registerBackend(backend, toolInfos);
@@ -69,6 +68,10 @@ export class EmbeddedStitchery {
   }
 
   private async initMcpTools(servers: McpServerConfig[]): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Experimental_StdioMCPTransport } = require("@ai-sdk/mcp/mcp-stdio") as {
+      Experimental_StdioMCPTransport: new (config: { command: string; args?: string[] }) => MCPTransport;
+    };
     for (const server of servers) {
       const client = await createMCPClient({
         transport: new Experimental_StdioMCPTransport({
