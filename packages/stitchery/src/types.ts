@@ -29,14 +29,6 @@ export interface ServerConfig {
   vfsDir?: string;
   /** Use file paths from code blocks instead of UUIDs */
   vfsUsePaths?: boolean;
-  /** Directory for SQLite databases and persistent data */
-  dataDir?: string;
-  /** Directory containing SKILL.md files */
-  skillsDir?: string;
-  /** Enable unified event system */
-  enableEvents?: boolean;
-  /** Enable orchestrator for event-driven skills */
-  enableOrchestrator?: boolean;
   verbose: boolean;
 }
 

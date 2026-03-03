@@ -144,6 +144,3 @@ pnpm-lock.yaml
 # Hardcopy
 .hardcopy
 hardcopy.yaml
-
-# Ralph config (may contain API key)
-.cursor/ralph-config.json

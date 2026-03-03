@@ -8,17 +8,10 @@ import { handleChat, handleEdit, type RouteContext } from "./routes.js";
 import { handleLocalPackages } from "./local-packages.js";
 import { handleVFS, type VFSContext } from "./vfs-routes.js";
 import { ServiceRegistry, generateServicesPrompt } from "./services.js";
-import {
-  createUnifiedContext,
-  publishServiceCall,
-  publishGitHubWebhook,
-  type UnifiedContext,
-} from "./unified.js";
 
 export interface StitcheryServer {
   server: Server;
   registry: ServiceRegistry;
-  unified?: UnifiedContext;
   start(): Promise<{ port: number; host: string }>;
   stop(): Promise<void>;
 }
@@ -147,10 +140,6 @@ export async function createStitcheryServer(
     utcp,
     vfsDir,
     vfsUsePaths = false,
-    dataDir,
-    skillsDir,
-    enableEvents = false,
-    enableOrchestrator = false,
     verbose = false,
   } = config;
 
@@ -160,25 +149,6 @@ export async function createStitcheryServer(
 
   // Create service registry
   const registry = new ServiceRegistry();
-
-  // Initialize unified context if enabled
-  let unified: UnifiedContext | undefined;
-  if (enableEvents && dataDir) {
-    log("Initializing unified event system...");
-    try {
-      unified = await createUnifiedContext({
-        dataDir,
-        skillsDir,
-        enableOrchestrator,
-      });
-      log("Unified context initialized");
-      if (skillsDir) {
-        log(`Skills loaded from: ${skillsDir}`);
-      }
-    } catch (err) {
-      console.error("[stitchery] Failed to initialize unified context:", err);
-    }
-  }
 
   log("Initializing MCP tools...");
   await initMcpTools(mcpServers, registry);
@@ -220,7 +190,6 @@ export async function createStitcheryServer(
     registry,
     servicesPrompt: generateServicesPrompt(registry),
     log,
-    unified,
   };
 
   const localPkgCtx = { localPackages, log };
@@ -272,7 +241,6 @@ export async function createStitcheryServer(
       const proxyMatch = url.match(/^\/api\/proxy\/([^/]+)\/(.+)$/);
       if (proxyMatch && req.method === "POST") {
         const [, namespace, procedure] = proxyMatch;
-        const startTime = Date.now();
         try {
           const body = await parseBody<{ args?: unknown }>(req);
           const result = await registry.call(
@@ -280,36 +248,11 @@ export async function createStitcheryServer(
             procedure!,
             body.args ?? {},
           );
-
-          if (unified) {
-            await publishServiceCall(
-              unified.eventBus,
-              namespace!,
-              procedure!,
-              body.args,
-              result,
-              Date.now() - startTime
-            );
-          }
-
           res.setHeader("Content-Type", "application/json");
           res.writeHead(200);
           res.end(JSON.stringify(result));
         } catch (err) {
           log("Proxy error:", err);
-
-          if (unified) {
-            await publishServiceCall(
-              unified.eventBus,
-              namespace!,
-              procedure!,
-              {},
-              null,
-              Date.now() - startTime,
-              err instanceof Error ? err.message : "Service call failed"
-            );
-          }
-
           res.setHeader("Content-Type", "application/json");
           res.writeHead(500);
           res.end(
@@ -317,58 +260,6 @@ export async function createStitcheryServer(
               error: err instanceof Error ? err.message : "Service call failed",
             }),
           );
-        }
-        return;
-      }
-
-      // GitHub webhook endpoint
-      if (url === "/webhooks/github" && req.method === "POST") {
-        if (!unified) {
-          res.writeHead(503);
-          res.end("Event system not enabled");
-          return;
-        }
-        try {
-          const payload = await parseBody<Record<string, unknown>>(req);
-          const event = req.headers["x-github-event"] as string;
-          const delivery = req.headers["x-github-delivery"] as string | undefined;
-          await publishGitHubWebhook(unified.eventBus, event, payload, delivery);
-          log(`GitHub webhook: ${event}`);
-          res.writeHead(200);
-          res.end("OK");
-        } catch (err) {
-          log("Webhook error:", err);
-          res.writeHead(500);
-          res.end(err instanceof Error ? err.message : "Webhook processing failed");
-        }
-        return;
-      }
-
-      // Event query endpoint
-      if (url === "/api/events" && req.method === "POST") {
-        if (!unified) {
-          res.writeHead(503);
-          res.end(JSON.stringify({ error: "Event system not enabled" }));
-          return;
-        }
-        try {
-          const body = await parseBody<{
-            types?: string[];
-            subjects?: string[];
-            since?: string;
-            limit?: number;
-          }>(req);
-          const events = await unified.eventBus.query(
-            { types: body.types, subjects: body.subjects, since: body.since },
-            { limit: body.limit ?? 100 }
-          );
-          res.setHeader("Content-Type", "application/json");
-          res.writeHead(200);
-          res.end(JSON.stringify(events));
-        } catch (err) {
-          log("Event query error:", err);
-          res.writeHead(500);
-          res.end(JSON.stringify({ error: String(err) }));
         }
         return;
       }
@@ -451,18 +342,12 @@ export async function createStitcheryServer(
   return {
     server,
     registry,
-    unified,
 
     async start() {
       return new Promise((resolve, reject) => {
         server.on("error", reject);
         server.listen(port, host, () => {
           log(`Server listening on http://${host}:${port}`);
-          if (unified) {
-            log("Event system: enabled");
-            log(`Webhooks: POST /webhooks/github`);
-            log(`Events API: POST /api/events`);
-          }
           resolve({ port, host });
         });
       });

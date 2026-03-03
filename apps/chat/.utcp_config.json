@@ -17,9 +17,9 @@
         "mcpServers": {
           "hardcopy": {
             "transport": "stdio",
-            "command": "node",
+            "command": "npx",
             "args": [
-              "/Users/jsampson/Documents/JacobSampson/hardcopy/dist/cli.js",
+              "@aprovan/hardcopy",
               "mcp-serve"
             ]
           }
