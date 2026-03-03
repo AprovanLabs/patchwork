@@ -173,19 +173,11 @@ export async function mountEmbedded(
   injectImportMap(globalMapping, preloadUrls, deps);
 
   // Pre-load framework modules from image config
-  // Check global preload cache first (for mobile/offline support)
-  const preloadCache = (window as unknown as { __preloadedModules?: Map<string, unknown> }).__preloadedModules;
-  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const preloadedModules: any[] = await Promise.all(
-    preloadUrls.map(async (url: string) => {
-      // Check cache first
-      if (preloadCache?.has(url)) {
-        return preloadCache.get(url);
-      }
-      // Fall back to dynamic import
-      return import(/* webpackIgnore: true */ /* @vite-ignore */ url);
-    }),
+    preloadUrls.map(
+      (url: string) => import(/* webpackIgnore: true */ /* @vite-ignore */ url),
+    ),
   );
 
   // Set framework globals on window based on image config

@@ -16,7 +16,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@aprovan/apprentice": "workspace:^",
+    "@patchwork/events": "workspace:^",
     "better-sqlite3": "^11.8.1",
     "semver": "^7.7.1"
   },

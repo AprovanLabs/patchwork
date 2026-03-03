@@ -86,6 +86,11 @@
                             }
                         }
                     }
+                },
+                "patchwork.utcpConfig": {
+                    "type": "object",
+                    "default": {},
+                    "description": "UTCP configuration for service registration."
                 }
             }
         },
@@ -117,6 +122,7 @@
     "dependencies": {
         "@aprovan/patchwork-compiler": "workspace:*",
         "@aprovan/stitchery": "workspace:*",
+        "@aprovan/patchwork-utcp": "workspace:*",
         "@ai-sdk/openai-compatible": "^2.0.26",
         "@ai-sdk/mcp": "^1.0.18",
         "ai": "^6.0.67"

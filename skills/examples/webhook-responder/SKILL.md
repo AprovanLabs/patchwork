@@ -5,11 +5,8 @@ description: Responds to GitHub PR comments with code suggestions
 triggers:
   - eventFilter:
       types: ["webhook:github.issue_comment.created"]
-#       types: [
-#         "https://github.com/AprovanLabs/projects/issues"
-#       ]
     condition: "data.comment.body CONTAINS '/suggest'"
-#     priority: 5
+    priority: 5
 model:
   provider: anthropic
   model: claude-sonnet-4-20250514

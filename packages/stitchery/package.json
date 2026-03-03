@@ -31,9 +31,11 @@
     "@ai-sdk/openai-compatible": "^2.0.26",
     "@aprovan/devtools": "^0.1.0",
     "@aprovan/copilot-proxy": "link:../../../copilot-proxy",
-    "@aprovan/apprentice": "workspace:^",
-    "@patchwork/services": "workspace:^",
+    "@aprovan/patchwork-utcp": "workspace:^",
+    "@patchwork/events": "workspace:^",
+    "@patchwork/graph": "workspace:^",
     "@patchwork/skills": "workspace:^",
+    "@patchwork/orchestrator": "workspace:^",
     "ai": "^6.0.67",
     "commander": "^12.1.0"
   },

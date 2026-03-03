@@ -31,6 +31,7 @@ program
     "--mcp <servers...>",
     "MCP server commands (format: name:command:arg1,arg2)",
   )
+  .option("--utcp-config <path>", "Load UTCP configuration from JSON file")
   .option(
     "--local-package <packages...>",
     "Local package overrides (format: name:path)",
@@ -40,10 +41,6 @@ program
     "--vfs-use-paths",
     "Use file paths from code blocks instead of UUIDs for VFS storage",
   )
-  .option("--data-dir <path>", "Directory for SQLite databases and persistent data")
-  .option("--skills-dir <path>", "Directory containing SKILL.md files")
-  .option("--enable-events", "Enable unified event system")
-  .option("--enable-orchestrator", "Enable orchestrator for event-driven skills")
   .option("-v, --verbose", "Enable verbose logging")
   .action(async (options) => {
     if (options.verbose) {
@@ -73,6 +70,26 @@ program
       localPackages[name] = path.resolve(process.cwd(), pkgPath);
     }
 
+    // Load UTCP config from file if specified
+    let utcpConfig;
+    if (options.utcpConfig) {
+      const utcpPath = path.resolve(process.cwd(), options.utcpConfig);
+      if (!fs.existsSync(utcpPath)) {
+        console.error(`UTCP config file not found: ${utcpPath}`);
+        process.exit(1);
+      }
+      try {
+        const content = fs.readFileSync(utcpPath, "utf-8");
+        utcpConfig = JSON.parse(content);
+        if (options.verbose) {
+          console.log("[stitchery] Loaded UTCP config from:", utcpPath);
+        }
+      } catch (err) {
+        console.error(`Failed to parse UTCP config: ${err}`);
+        process.exit(1);
+      }
+    }
+
     // Resolve VFS directory path
     const vfsDir = options.vfsDir
       ? path.resolve(process.cwd(), options.vfsDir)
@@ -82,38 +99,15 @@ program
       console.log("[stitchery] VFS directory:", vfsDir);
     }
 
-    // Resolve data and skills directories
-    const dataDir = options.dataDir
-      ? path.resolve(process.cwd(), options.dataDir)
-      : undefined;
-    const skillsDir = options.skillsDir
-      ? path.resolve(process.cwd(), options.skillsDir)
-      : undefined;
-
-    // Create data directory if it doesn't exist
-    if (dataDir && options.enableEvents) {
-      fs.mkdirSync(dataDir, { recursive: true });
-      if (options.verbose) {
-        console.log("[stitchery] Data directory:", dataDir);
-      }
-    }
-
-    if (skillsDir && options.verbose) {
-      console.log("[stitchery] Skills directory:", skillsDir);
-    }
-
     const server = await createStitcheryServer({
       port,
       host: options.host,
       copilotProxyUrl: options.copilotProxyUrl,
       mcpServers,
       localPackages,
+      utcp: utcpConfig,
       vfsDir,
       vfsUsePaths: options.vfsUsePaths ?? false,
-      dataDir,
-      skillsDir,
-      enableEvents: options.enableEvents ?? false,
-      enableOrchestrator: options.enableOrchestrator ?? false,
       verbose: options.verbose,
     });
 

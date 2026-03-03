@@ -27,6 +27,7 @@ The Patchwork monorepo contains these relevant packages:
 | `@aprovan/bobbin` | Visual element selection/editing with design tokens and change tracking |
 | `@aprovan/patchwork-compiler` | JSX→ESM compilation, image loading, DOM mounting (`createCompiler`, `mount`, `unmount`) |
 | `@aprovan/patchwork-stitchery` | LLM server (Vercel AI SDK), MCP client integration, service registry, edit/chat prompts |
+| `@aprovan/patchwork-utcp` | Backend service integration through UTCP protocol |
 | `@aprovan/patchwork-vscode` | **Placeholder** - only contains package.json stub |
 
 ### Key Existing Components
@@ -324,14 +325,23 @@ Rather than requiring a separate stitchery server process, embed the service reg
 ```typescript
 // src/services/EmbeddedStitchery.ts
 import { ServiceRegistry } from '@aprovan/patchwork-stitchery';
+import { createUtcpBackend } from '@aprovan/patchwork-utcp';
 import { createMCPClient } from '@ai-sdk/mcp';
 import type { ServiceCallMessage, ServiceResultMessage } from '@aprovan/patchwork-vscode-common';
 
 export class EmbeddedStitchery {
   private registry: ServiceRegistry;
   
-  async initialize(mcpServers?: McpServerConfig[]): Promise<void> {
+  async initialize(utcpConfig?: object, mcpServers?: McpServerConfig[]): Promise<void> {
     this.registry = new ServiceRegistry();
+    
+    // Register UTCP services if configured
+    if (utcpConfig) {
+      const { toolInfos } = await createUtcpBackend(utcpConfig);
+      for (const tool of toolInfos) {
+        this.registry.registerTool(tool);
+      }
+    }
     
     // Register MCP servers if configured
     for (const server of mcpServers ?? []) {
@@ -439,7 +449,7 @@ Single shared preview panel that follows the active editor:
 │  │  - Receives compile errors, edit requests               │
 │  ├─────────────────────────────────────────────────────────┤
 │  │  EmbeddedStitchery                                      │
-│  │  - ServiceRegistry for MCP tools                        │
+│  │  - ServiceRegistry for UTCP/MCP tools                   │
 │  │  - Routes webview service calls to backends             │
 │  │  - EditService for LLM-powered code edits               │
 │  └─────────────────────────────────────────────────────────┤
@@ -543,6 +553,7 @@ vscode.languages.registerCodeActionsProvider(['typescriptreact', 'javascriptreac
   "dependencies": {
     "@aprovan/patchwork": "workspace:*",
     "@aprovan/patchwork-stitchery": "workspace:*",
+    "@aprovan/patchwork-utcp": "workspace:*",
     "@ai-sdk/openai-compatible": "^0.1.0",
     "@ai-sdk/mcp": "^0.1.0",
     "ai": "^4.0.0"
@@ -587,7 +598,7 @@ Pre-bundled React app (esbuild) including:
 - [x] Streaming response display
 - [x] Apply edits to document
 - [x] Edit history panel
-- [x] EmbeddedStitchery for service registration (MCP)
+- [x] EmbeddedStitchery for service registration (UTCP/MCP)
 
 ### Milestone 4: File System (1 week)
 - [x] PatchworkFileSystemProvider implementation
@@ -609,6 +620,6 @@ Pre-bundled React app (esbuild) including:
 
 2. **Multiple preview panels**: Single shared preview panel with file indicator that follows the active editor. No per-file preview panels.
 
-3. **Service registration**: Embed Stitchery directly in the extension host to handle service calls. The webview communicates with the extension host via postMessage, which routes to the embedded Stitchery for MCP service execution. Avoids requiring a separate background server process.
+3. **Service registration**: Embed Stitchery directly in the extension host to handle service calls. The webview communicates with the extension host via postMessage, which routes to the embedded Stitchery for UTCP/MCP service execution. Avoids requiring a separate background server process.
 
 4. **Theme synchronization**: Minimal theming—only respect VS Code's dark/light mode preference. Pass `colorScheme: 'dark' | 'light'` to the webview based on `vscode.window.activeColorTheme.kind`. No CSS variable mapping.

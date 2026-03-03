@@ -6,7 +6,7 @@
     "dev": "tsx scripts/start-dev.ts",
     "dev:client": "vite",
     "dev:proxy": "pnpm exec copilot-proxy serve",
-    "dev:stitchery": "node ../../packages/stitchery/dist/cli.js serve --local-package @aprovan/patchwork-image-shadcn:../../packages/images/shadcn -v --vfs-dir ./workspace --vfs-use-paths",
+    "dev:stitchery": "node ../../packages/stitchery/dist/cli.js serve --utcp-config .utcp_config.json --local-package @aprovan/patchwork-image-shadcn:../../packages/images/shadcn -v --vfs-dir ./workspace --vfs-use-paths",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

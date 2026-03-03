@@ -1,5 +1,5 @@
-import type { EventBus, Envelope } from "@aprovan/apprentice";
-import { createEnvelope } from "@aprovan/apprentice";
+import type { EventBus, Envelope } from "@patchwork/events";
+import { createEnvelope } from "@patchwork/events";
 import type {
   ServiceDefinition,
   ServiceRegistry,

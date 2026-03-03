@@ -20,4 +20,5 @@ export {
 export {
   PersistentSkillRegistry,
   type SkillRegistryOptions,
+  type SkillExecutor,
 } from "./registry.js";

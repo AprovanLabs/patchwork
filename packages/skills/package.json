@@ -16,7 +16,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@aprovan/apprentice": "workspace:^",
+    "@patchwork/events": "workspace:^",
+    "@patchwork/graph": "workspace:^",
     "gray-matter": "^4.0.3",
     "glob": "^11.0.0"
   },

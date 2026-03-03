@@ -188,7 +188,7 @@ export interface Compiler {
 /**
  * Service proxy interface - abstracts service calls to backend
  *
- * The compiler provides the interface; actual implementation (e.g., MCP, HTTP)
+ * The compiler provides the interface; actual implementation (e.g., UTCP, MCP)
  * is handled by the runtime/backend.
  */
 export interface ServiceProxy {

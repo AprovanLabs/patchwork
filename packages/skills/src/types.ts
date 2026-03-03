@@ -1,4 +1,5 @@
-import type { EventFilter, Envelope, Entity } from "@aprovan/apprentice";
+import type { EventFilter, Envelope } from "@patchwork/events";
+import type { Entity } from "@patchwork/graph";
 
 export interface SkillDefinition {
   id: string;
@@ -63,6 +64,7 @@ export interface SkillRegistry {
   list(): Promise<SkillSummary[]>;
   search(query: string): Promise<SkillDefinition[]>;
   findByTrigger(event: Envelope): Promise<SkillDefinition[]>;
+  execute(skillId: string, context: SkillContext): Promise<SkillResult>;
 }
 
 export interface SkillMetadata {
