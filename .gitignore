@@ -144,3 +144,6 @@ pnpm-lock.yaml
 # Hardcopy
 .hardcopy
 hardcopy.yaml
+
+# Graph Sitter
+.codegen

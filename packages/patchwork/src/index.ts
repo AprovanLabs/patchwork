@@ -1,10 +1,10 @@
-export * from './types';
+export * from "./types";
 
-export type { CacheConfig, ServiceResult } from './services/types.js';
+export type { CacheConfig, ServiceResult } from "./services/types.js";
 
 // Services
 export {
-  createServiceProxy,
+  createProxy,
   callProcedure,
   batchCall,
   configureCacheTtl,
@@ -12,4 +12,4 @@ export {
   getCacheStats,
   setServiceBackend,
   type ServiceBackend,
-} from './services/index.js';
+} from "./services/index.js";

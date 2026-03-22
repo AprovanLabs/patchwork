@@ -9,10 +9,10 @@ import type {
   LoadedImage,
   MountedWidget,
   MountOptions,
-  ServiceProxy,
-} from '../types.js';
-import { ParentBridge, generateIframeBridgeScript } from './bridge.js';
-import { generateImportMap } from '../transforms/cdn.js';
+  Proxy,
+} from "../types.js";
+import { ParentBridge, generateIframeBridgeScript } from "./bridge.js";
+import { generateImportMap } from "../transforms/cdn.js";
 
 let mountCounter = 0;
 
@@ -22,7 +22,7 @@ let sharedBridge: ParentBridge | null = null;
 /**
  * Get or create the shared parent bridge
  */
-function getParentBridge(proxy: ServiceProxy): ParentBridge {
+function getParentBridge(proxy: Proxy): ParentBridge {
   if (!sharedBridge) {
     sharedBridge = new ParentBridge(proxy);
   }
@@ -42,7 +42,7 @@ function generateMountId(): string {
  * By default, iframes are strictly sandboxed without same-origin access.
  * This is the safest option when widgets load all dependencies from external CDNs.
  */
-const DEFAULT_SANDBOX = ['allow-scripts'];
+const DEFAULT_SANDBOX = ["allow-scripts"];
 
 /**
  * Development sandbox attributes - includes allow-same-origin
@@ -58,7 +58,7 @@ const DEFAULT_SANDBOX = ['allow-scripts'];
  * WARNING: Combining allow-scripts + allow-same-origin allows the iframe to
  * escape its sandbox. Only use in development or when hosting on a separate subdomain.
  */
-export const DEV_SANDBOX = ['allow-scripts', 'allow-same-origin'];
+export const DEV_SANDBOX = ["allow-scripts", "allow-same-origin"];
 
 /**
  * Generate the HTML content for the iframe
@@ -78,13 +78,13 @@ function generateIframeContent(
   const importMap = generateImportMap(packages);
 
   // CSS from image
-  const css = image?.css || '';
+  const css = image?.css || "";
 
   const frameworkConfig = image?.config?.framework || {};
   const preloadUrls = frameworkConfig.preload || [];
   const globals = frameworkConfig.globals || {};
   const globalNames = Object.values(globals);
-  const imageModuleUrl = image?.moduleUrl || '';
+  const imageModuleUrl = image?.moduleUrl || "";
 
   const mountScript = `
     // Run image setup inside the iframe (styling/runtime)
@@ -306,16 +306,16 @@ export async function mountIframe(
   widget: CompiledWidget,
   options: MountOptions,
   image: LoadedImage | null,
-  proxy: ServiceProxy,
+  proxy: Proxy,
 ): Promise<MountedWidget> {
   const { target, sandbox = DEFAULT_SANDBOX, inputs = {} } = options;
   const mountId = generateMountId();
 
   // Create iframe
-  const iframe = document.createElement('iframe');
+  const iframe = document.createElement("iframe");
   iframe.id = mountId;
-  iframe.className = 'patchwork-widget patchwork-iframe';
-  iframe.style.cssText = 'width: 100%; border: none; overflow: hidden;';
+  iframe.className = "patchwork-widget patchwork-iframe";
+  iframe.style.cssText = "width: 100%; border: none; overflow: hidden;";
   iframe.sandbox.add(...sandbox);
 
   // Register with bridge before loading content
@@ -325,7 +325,7 @@ export async function mountIframe(
   // Generate and set iframe content (without widget code)
   // Use window.location.origin as base URL so relative paths like /_local-packages/ resolve correctly
   const services = widget.manifest.services || [];
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const content = generateIframeContent(image, inputs, services, baseUrl);
   iframe.srcdoc = content;
 
@@ -335,51 +335,51 @@ export async function mountIframe(
   // Handle resize messages from iframe
   const handleResize = (event: MessageEvent) => {
     if (event.source !== iframe.contentWindow) return;
-    if (event.data?.type === 'widget-resize') {
+    if (event.data?.type === "widget-resize") {
       const { height } = event.data;
-      if (typeof height === 'number' && height > 0) {
+      if (typeof height === "number" && height > 0) {
         iframe.style.height = `${height}px`;
       }
     }
   };
-  window.addEventListener('message', handleResize);
+  window.addEventListener("message", handleResize);
 
   // Wait for iframe to signal ready, then send widget code
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
       cleanup();
-      reject(new Error('Iframe mount timeout'));
+      reject(new Error("Iframe mount timeout"));
     }, 30000);
 
     const handleMessage = (event: MessageEvent) => {
       if (event.source !== iframe.contentWindow) return;
 
-      if (event.data?.type === 'widget-ready') {
+      if (event.data?.type === "widget-ready") {
         // Send widget code and origin for URL rewriting
         iframe.contentWindow?.postMessage(
-          { type: 'widget-code', code: widget.code, origin: baseUrl },
-          '*',
+          { type: "widget-code", code: widget.code, origin: baseUrl },
+          "*",
         );
-      } else if (event.data?.type === 'widget-mounted') {
+      } else if (event.data?.type === "widget-mounted") {
         cleanup();
         resolve();
-      } else if (event.data?.type === 'widget-error') {
+      } else if (event.data?.type === "widget-error") {
         cleanup();
-        reject(new Error(event.data.error || 'Widget mount failed'));
+        reject(new Error(event.data.error || "Widget mount failed"));
       }
     };
 
     const cleanup = () => {
       clearTimeout(timeout);
-      window.removeEventListener('message', handleMessage);
+      window.removeEventListener("message", handleMessage);
     };
 
-    window.addEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
   });
 
   // Create unmount function
   const unmount = () => {
-    window.removeEventListener('message', handleResize);
+    window.removeEventListener("message", handleResize);
     bridge.unregisterIframe(iframe);
     iframe.remove();
   };
@@ -387,7 +387,7 @@ export async function mountIframe(
   return {
     id: mountId,
     widget,
-    mode: 'iframe',
+    mode: "iframe",
     target,
     iframe,
     inputs,
@@ -403,7 +403,7 @@ export async function reloadIframe(
   mounted: MountedWidget,
   widget: CompiledWidget,
   image: LoadedImage | null,
-  proxy: ServiceProxy,
+  proxy: Proxy,
 ): Promise<MountedWidget> {
   // Unmount existing
   mounted.unmount();
@@ -413,7 +413,7 @@ export async function reloadIframe(
     widget,
     {
       target: mounted.target,
-      mode: 'iframe',
+      mode: "iframe",
       sandbox: mounted.sandbox,
       inputs: mounted.inputs,
     },

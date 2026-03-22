@@ -7,7 +7,7 @@ import type {
   Manifest,
   MountedWidget,
   MountOptions,
-  ServiceProxy,
+  Proxy,
 } from "./types.js";
 import type { VirtualProject } from "./vfs/types.js";
 import { createSingleFileProject } from "./vfs/project.js";
@@ -16,7 +16,7 @@ import { setCdnBaseUrl as setImageCdnBaseUrl } from "./images/loader.js";
 import { setCdnBaseUrl as setTransformCdnBaseUrl } from "./transforms/cdn.js";
 import { cdnTransformPlugin } from "./transforms/cdn.js";
 import { vfsPlugin } from "./transforms/vfs.js";
-import { createHttpServiceProxy } from "./mount/bridge.js";
+import { createHttpProxy } from "./mount/bridge.js";
 import { mountEmbedded, reloadEmbedded } from "./mount/embedded.js";
 import { mountIframe, reloadIframe } from "./mount/iframe.js";
 
@@ -30,11 +30,14 @@ const DEFAULT_ESBUILD_WASM_URL = "https://unpkg.com/esbuild-wasm/esbuild.wasm";
  * Initialize esbuild-wasm (must be called before using esbuild)
  * @param urlOverrides - Optional URL overrides for bundled assets
  */
-async function initEsbuild(urlOverrides?: Record<string, string>): Promise<void> {
+async function initEsbuild(
+  urlOverrides?: Record<string, string>,
+): Promise<void> {
   if (esbuildInitialized) return;
   if (esbuildInitPromise) return esbuildInitPromise;
 
-  const wasmUrl = urlOverrides?.["esbuild-wasm/esbuild.wasm"] || DEFAULT_ESBUILD_WASM_URL;
+  const wasmUrl =
+    urlOverrides?.["esbuild-wasm/esbuild.wasm"] || DEFAULT_ESBUILD_WASM_URL;
 
   esbuildInitPromise = (async () => {
     try {
@@ -43,7 +46,7 @@ async function initEsbuild(urlOverrides?: Record<string, string>): Promise<void>
       });
       esbuildInitialized = true;
     } catch (error) {
-      // If already initialized (e.g., HMR or multiple compiler instances), that's fine
+      // If already initialized (e.g., HMR or multiple compiler instances)
       if (error instanceof Error && error.message.includes("initialize")) {
         esbuildInitialized = true;
       } else {
@@ -98,7 +101,7 @@ export async function createCompiler(
   await registry.preload(imageSpec);
 
   // Create service proxy
-  const proxy: ServiceProxy = createHttpServiceProxy(proxyUrl);
+  const proxy: Proxy = createHttpProxy(proxyUrl);
 
   return new PatchworkCompiler(proxy, registry);
 }
@@ -107,13 +110,10 @@ export async function createCompiler(
  * Patchwork compiler implementation
  */
 class PatchworkCompiler implements Compiler {
-  private proxy: ServiceProxy;
+  private proxy: Proxy;
   private registry: ReturnType<typeof getImageRegistry>;
 
-  constructor(
-    proxy: ServiceProxy,
-    registry: ReturnType<typeof getImageRegistry>,
-  ) {
+  constructor(proxy: Proxy, registry: ReturnType<typeof getImageRegistry>) {
     this.proxy = proxy;
     this.registry = registry;
   }

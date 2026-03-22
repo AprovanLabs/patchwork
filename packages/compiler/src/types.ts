@@ -1,11 +1,11 @@
-import type { VirtualProject } from './vfs/types.js';
+import type { VirtualProject } from "./vfs/types.js";
 
 /**
  * Core types for the Patchwork compiler
  */
 
 // Platform types
-export type Platform = 'browser' | 'cli';
+export type Platform = "browser" | "cli";
 
 // Widget manifest
 export interface Manifest {
@@ -20,7 +20,7 @@ export interface Manifest {
 }
 
 export interface InputSpec {
-  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  type: "string" | "number" | "boolean" | "object" | "array";
   default?: unknown;
   required?: boolean;
   description?: string;
@@ -44,7 +44,7 @@ export interface CompiledWidget {
 }
 
 // Mount options
-export type MountMode = 'embedded' | 'iframe';
+export type MountMode = "embedded" | "iframe";
 
 export interface MountOptions {
   /** Target DOM element to mount into */
@@ -82,8 +82,8 @@ export interface ImageConfig {
   platform: Platform;
   esbuild?: {
     target?: string;
-    format?: 'esm' | 'cjs' | 'iife';
-    jsx?: 'automatic' | 'transform' | 'preserve';
+    format?: "esm" | "cjs" | "iife";
+    jsx?: "automatic" | "transform" | "preserve";
     jsxFactory?: string;
     jsxFragment?: string;
   };
@@ -191,7 +191,7 @@ export interface Compiler {
  * The compiler provides the interface; actual implementation (e.g., UTCP, MCP)
  * is handled by the runtime/backend.
  */
-export interface ServiceProxy {
+export interface Proxy {
   call(namespace: string, procedure: string, args: unknown[]): Promise<unknown>;
 }
 
@@ -219,7 +219,7 @@ export interface GlobalInterfaceDefinition {
 }
 
 // Message types for iframe bridge
-export type BridgeMessageType = 'service-call' | 'service-result' | 'error';
+export type BridgeMessageType = "service-call" | "service-result" | "error";
 
 export interface BridgeMessage {
   type: BridgeMessageType;

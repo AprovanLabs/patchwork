@@ -6,8 +6,8 @@ import type {
   BridgeMessage,
   ServiceCallPayload,
   ServiceResultPayload,
-  ServiceProxy,
-} from '../types.js';
+  Proxy,
+} from "../types.js";
 
 /**
  * Generate a unique message ID
@@ -19,7 +19,7 @@ function generateMessageId(): string {
 /**
  * Create a service proxy that calls the backend via HTTP
  */
-export function createHttpServiceProxy(proxyUrl: string): ServiceProxy {
+export function createHttpProxy(proxyUrl: string): Proxy {
   return {
     async call(
       namespace: string,
@@ -28,8 +28,8 @@ export function createHttpServiceProxy(proxyUrl: string): ServiceProxy {
     ): Promise<unknown> {
       const url = `${proxyUrl}/${namespace}/${procedure}`;
       const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ args: args[0] ?? {} }),
       });
 
@@ -66,7 +66,7 @@ export function createFieldAccessProxy<T = unknown>(
 
     return new Proxy(fn, {
       get(_, nestedName: string) {
-        if (typeof nestedName === 'symbol') return undefined;
+        if (typeof nestedName === "symbol") return undefined;
         const newPath = path ? `${path}.${nestedName}` : nestedName;
         return createNestedProxy(newPath);
       },
@@ -77,7 +77,7 @@ export function createFieldAccessProxy<T = unknown>(
     {},
     {
       get(_, fieldName: string) {
-        if (typeof fieldName === 'symbol') return undefined;
+        if (typeof fieldName === "symbol") return undefined;
         return createNestedProxy(fieldName);
       },
     },
@@ -104,7 +104,7 @@ export function createFieldAccessProxy<T = unknown>(
  */
 export function generateNamespaceGlobals(
   services: string[],
-  proxy: ServiceProxy,
+  proxy: Proxy,
 ): Record<string, unknown> {
   const namespaces: Record<string, unknown> = {};
   const uniqueNamespaces = extractNamespaces(services);
@@ -149,7 +149,7 @@ export function removeNamespaceGlobals(
 export function extractNamespaces(services: string[]): string[] {
   const namespaces = new Set<string>();
   for (const service of services) {
-    const parts = service.split('.');
+    const parts = service.split(".");
     if (parts[0]) {
       namespaces.add(parts[0]);
     }
@@ -163,7 +163,7 @@ export function extractNamespaces(services: string[]): string[] {
  * Listens for postMessage events from iframes and proxies service calls.
  */
 export class ParentBridge {
-  private proxy: ServiceProxy;
+  private proxy: Proxy;
   private pendingCalls = new Map<
     string,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
@@ -171,11 +171,11 @@ export class ParentBridge {
   private iframes = new Set<HTMLIFrameElement>();
   private messageHandler: (event: MessageEvent) => void;
 
-  constructor(proxy: ServiceProxy) {
+  constructor(proxy: Proxy) {
     this.proxy = proxy;
     this.messageHandler = this.handleMessage.bind(this);
-    if (typeof window !== 'undefined') {
-      window.addEventListener('message', this.messageHandler);
+    if (typeof window !== "undefined") {
+      window.addEventListener("message", this.messageHandler);
     }
   }
 
@@ -207,9 +207,9 @@ export class ParentBridge {
     }
 
     const message = event.data as BridgeMessage;
-    if (!message || typeof message !== 'object') return;
+    if (!message || typeof message !== "object") return;
 
-    if (message.type === 'service-call') {
+    if (message.type === "service-call") {
       const payload = message.payload as ServiceCallPayload;
       try {
         const result = await this.proxy.call(
@@ -219,22 +219,22 @@ export class ParentBridge {
         );
 
         const response: BridgeMessage = {
-          type: 'service-result',
+          type: "service-result",
           id: message.id,
           payload: { result } as ServiceResultPayload,
         };
 
-        sourceIframe.contentWindow?.postMessage(response, '*');
+        sourceIframe.contentWindow?.postMessage(response, "*");
       } catch (error) {
         const response: BridgeMessage = {
-          type: 'service-result',
+          type: "service-result",
           id: message.id,
           payload: {
             error: error instanceof Error ? error.message : String(error),
           } as ServiceResultPayload,
         };
 
-        sourceIframe.contentWindow?.postMessage(response, '*');
+        sourceIframe.contentWindow?.postMessage(response, "*");
       }
     }
   }
@@ -243,8 +243,8 @@ export class ParentBridge {
    * Dispose the bridge
    */
   dispose(): void {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('message', this.messageHandler);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("message", this.messageHandler);
     }
     this.iframes.clear();
     this.pendingCalls.clear();
@@ -256,19 +256,19 @@ export class ParentBridge {
  *
  * Creates a service proxy that sends postMessage to parent.
  */
-export function createIframeServiceProxy(): ServiceProxy {
+export function createIframeProxy(): Proxy {
   const pendingCalls = new Map<
     string,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >();
 
   // Listen for results from parent
-  if (typeof window !== 'undefined') {
-    window.addEventListener('message', (event: MessageEvent) => {
+  if (typeof window !== "undefined") {
+    window.addEventListener("message", (event: MessageEvent) => {
       const message = event.data as BridgeMessage;
-      if (!message || typeof message !== 'object') return;
+      if (!message || typeof message !== "object") return;
 
-      if (message.type === 'service-result') {
+      if (message.type === "service-result") {
         const pending = pendingCalls.get(message.id);
         if (pending) {
           pendingCalls.delete(message.id);
@@ -294,12 +294,12 @@ export function createIframeServiceProxy(): ServiceProxy {
         pendingCalls.set(id, { resolve, reject });
 
         const message: BridgeMessage = {
-          type: 'service-call',
+          type: "service-call",
           id,
           payload: { namespace, procedure, args } as ServiceCallPayload,
         };
 
-        window.parent.postMessage(message, '*');
+        window.parent.postMessage(message, "*");
 
         // Timeout after 30 seconds
         setTimeout(() => {
@@ -326,7 +326,7 @@ export function generateIframeBridgeScript(services: string[]): string {
   const uniqueNamespaces = extractNamespaces(services);
   const namespaceAssignments = uniqueNamespaces
     .map((ns) => `window.${ns} = createNamespaceProxy('${ns}');`)
-    .join('\n  ');
+    .join("\n  ");
 
   return `
 (function() {

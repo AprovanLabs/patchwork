@@ -1,0 +1,3 @@
+[submodule ".cicadas"]
+	path = .cicadas
+	url = https://github.com/AprovanLabs/patchwork.wiki

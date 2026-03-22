@@ -9,14 +9,14 @@ import type {
   LoadedImage,
   MountedWidget,
   MountOptions,
-  ServiceProxy,
-} from '../types.js';
+  Proxy,
+} from "../types.js";
 import {
   generateNamespaceGlobals,
   injectNamespaceGlobals,
   removeNamespaceGlobals,
   extractNamespaces,
-} from './bridge.js';
+} from "./bridge.js";
 
 let mountCounter = 0;
 let importMapInjected = false;
@@ -59,13 +59,13 @@ function injectImportMap(
   });
 
   // Also add common subpaths (e.g., react-dom/client)
-  if (imports['react-dom']) {
-    imports['react-dom/client'] = imports['react-dom'];
+  if (imports["react-dom"]) {
+    imports["react-dom/client"] = imports["react-dom"];
   }
 
   // Inject new import map
-  const script = document.createElement('script');
-  script.type = 'importmap';
+  const script = document.createElement("script");
+  script.type = "importmap";
   script.textContent = JSON.stringify({ imports }, null, 2);
   document.head.insertBefore(script, document.head.firstChild);
 
@@ -87,17 +87,17 @@ type CreateRootFn = (el: HTMLElement) => {
 type RenderFn = (el: unknown, container: HTMLElement) => void;
 
 type Renderer =
-  | { kind: 'root'; createRoot: CreateRootFn }
-  | { kind: 'render'; render: RenderFn };
+  | { kind: "root"; createRoot: CreateRootFn }
+  | { kind: "render"; render: RenderFn };
 
 function pickCreateElement(
   globals: Array<Record<string, unknown>>,
 ): CreateElementFn | null {
   for (const obj of globals) {
     const ce = obj?.createElement;
-    if (typeof ce === 'function') return ce as CreateElementFn;
+    if (typeof ce === "function") return ce as CreateElementFn;
     const def = obj?.default as Record<string, unknown> | undefined;
-    if (def && typeof def.createElement === 'function') {
+    if (def && typeof def.createElement === "function") {
       return def.createElement as CreateElementFn;
     }
   }
@@ -108,18 +108,18 @@ function pickRenderer(
   globals: Array<Record<string, unknown>>,
 ): Renderer | null {
   for (const obj of globals) {
-    if (obj && typeof obj.createRoot === 'function') {
-      return { kind: 'root', createRoot: obj.createRoot as CreateRootFn };
+    if (obj && typeof obj.createRoot === "function") {
+      return { kind: "root", createRoot: obj.createRoot as CreateRootFn };
     }
-    if (obj && typeof obj.render === 'function') {
-      return { kind: 'render', render: obj.render as RenderFn };
+    if (obj && typeof obj.render === "function") {
+      return { kind: "render", render: obj.render as RenderFn };
     }
     const def = obj?.default as Record<string, unknown> | undefined;
-    if (def && typeof def.createRoot === 'function') {
-      return { kind: 'root', createRoot: def.createRoot as CreateRootFn };
+    if (def && typeof def.createRoot === "function") {
+      return { kind: "root", createRoot: def.createRoot as CreateRootFn };
     }
-    if (def && typeof def.render === 'function') {
-      return { kind: 'render', render: def.render as RenderFn };
+    if (def && typeof def.render === "function") {
+      return { kind: "render", render: def.render as RenderFn };
     }
   }
   return null;
@@ -132,15 +132,15 @@ export async function mountEmbedded(
   widget: CompiledWidget,
   options: MountOptions,
   image: LoadedImage | null,
-  proxy: ServiceProxy,
+  proxy: Proxy,
 ): Promise<MountedWidget> {
   const { target, inputs = {} } = options;
   const mountId = generateMountId();
 
   // Create container
-  const container = document.createElement('div');
+  const container = document.createElement("div");
   container.id = mountId;
-  container.className = 'patchwork-widget patchwork-embedded';
+  container.className = "patchwork-widget patchwork-embedded";
   target.appendChild(container);
 
   // Run image setup if available
@@ -150,7 +150,7 @@ export async function mountEmbedded(
 
   // Inject CSS if available
   if (image?.css) {
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.id = `${mountId}-style`;
     style.textContent = image.css;
     document.head.appendChild(style);
@@ -194,7 +194,7 @@ export async function mountEmbedded(
   });
 
   // Create a blob with the widget code
-  const blob = new Blob([widget.code], { type: 'application/javascript' });
+  const blob = new Blob([widget.code], { type: "application/javascript" });
   const scriptUrl = URL.createObjectURL(blob);
 
   // Import the module
@@ -210,42 +210,42 @@ export async function mountEmbedded(
     // Image-provided mount handler takes priority
     if (image?.mount) {
       const result = await image.mount(module, container, inputs);
-      if (typeof result === 'function') {
+      if (typeof result === "function") {
         moduleCleanup = result;
       }
-    } else if (typeof module.mount === 'function') {
+    } else if (typeof module.mount === "function") {
       // Widget exports its own mount function
       const result = await module.mount(container, inputs);
-      if (typeof result === 'function') {
+      if (typeof result === "function") {
         moduleCleanup = result;
       }
-    } else if (typeof module.render === 'function') {
+    } else if (typeof module.render === "function") {
       // Custom render function
       const result = await module.render(container, inputs);
-      if (typeof result === 'function') {
+      if (typeof result === "function") {
         moduleCleanup = result;
       }
-    } else if (typeof module.default === 'function') {
+    } else if (typeof module.default === "function") {
       // Default export component - render using framework
       const Component = module.default;
 
       const createElement = pickCreateElement(globalObjects);
       const renderer = pickRenderer(globalObjects);
 
-      if (createElement && renderer?.kind === 'root') {
+      if (createElement && renderer?.kind === "root") {
         const root = renderer.createRoot(container);
         root.render(createElement(Component, inputs));
-        if (typeof root.unmount === 'function') {
+        if (typeof root.unmount === "function") {
           moduleCleanup = () => root.unmount!();
         }
-      } else if (createElement && renderer?.kind === 'render') {
+      } else if (createElement && renderer?.kind === "render") {
         renderer.render(createElement(Component, inputs), container);
       } else {
         // No framework renderer - try calling as plain function
         const result = Component(inputs);
         if (result instanceof HTMLElement) {
           container.appendChild(result);
-        } else if (typeof result === 'string') {
+        } else if (typeof result === "string") {
           container.innerHTML = result;
         }
       }
@@ -277,7 +277,7 @@ export async function mountEmbedded(
   return {
     id: mountId,
     widget,
-    mode: 'embedded',
+    mode: "embedded",
     target,
     inputs,
     unmount,
@@ -291,7 +291,7 @@ export async function reloadEmbedded(
   mounted: MountedWidget,
   widget: CompiledWidget,
   image: LoadedImage | null,
-  proxy: ServiceProxy,
+  proxy: Proxy,
 ): Promise<MountedWidget> {
   // Unmount existing
   mounted.unmount();
@@ -299,7 +299,7 @@ export async function reloadEmbedded(
   // Remount with new widget
   return mountEmbedded(
     widget,
-    { target: mounted.target, mode: 'embedded', inputs: mounted.inputs },
+    { target: mounted.target, mode: "embedded", inputs: mounted.inputs },
     image,
     proxy,
   );

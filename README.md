@@ -14,6 +14,17 @@
 
 Platform for building generative UI experiences
 
+## Cicadas
+
+Install Cicadas
+
+```bash
+$> uv venv .venv
+$> source .venv/bin/activate
+$> uv pip install aprovan-cicadas
+$> cicadas
+```
+
 ## VS Code extension quickstart
 
 1. Install dependencies from the repo root:

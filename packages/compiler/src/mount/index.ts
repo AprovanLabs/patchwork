@@ -1,18 +1,18 @@
-export { mountEmbedded, reloadEmbedded } from './embedded.js';
+export { mountEmbedded, reloadEmbedded } from "./embedded.js";
 export {
   mountIframe,
   reloadIframe,
   disposeIframeBridge,
   DEV_SANDBOX,
-} from './iframe.js';
+} from "./iframe.js";
 export {
-  createHttpServiceProxy,
+  createHttpProxy,
   createFieldAccessProxy,
   generateNamespaceGlobals,
   injectNamespaceGlobals,
   removeNamespaceGlobals,
   extractNamespaces,
   ParentBridge,
-  createIframeServiceProxy,
+  createIframeProxy,
   generateIframeBridgeScript,
-} from './bridge.js';
+} from "./bridge.js";

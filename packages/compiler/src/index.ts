@@ -65,7 +65,7 @@ export type {
   ImageMountFn,
   LoadedImage,
   // Service types
-  ServiceProxy,
+  Proxy,
   ServiceCallHandler,
   GlobalInterfaceDefinition,
   BridgeMessage,
@@ -130,13 +130,13 @@ export {
   disposeIframeBridge,
   DEV_SANDBOX,
   // Bridge
-  createHttpServiceProxy,
+  createHttpProxy,
   createFieldAccessProxy,
   generateNamespaceGlobals,
   injectNamespaceGlobals,
   removeNamespaceGlobals,
   extractNamespaces,
   ParentBridge,
-  createIframeServiceProxy,
+  createIframeProxy,
   generateIframeBridgeScript,
 } from "./mount/index.js";

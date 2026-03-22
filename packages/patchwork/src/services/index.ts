@@ -1,5 +1,5 @@
 export {
-  createServiceProxy,
+  createProxy,
   callProcedure,
   batchCall,
   configureCacheTtl,
@@ -8,4 +8,4 @@ export {
   setServiceBackend,
   type ServiceBackend,
   type BatchCall,
-} from './proxy';
+} from "./proxy";

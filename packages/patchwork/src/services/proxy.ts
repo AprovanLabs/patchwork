@@ -3,7 +3,7 @@
 // Provides a backend-agnostic service proxy with caching.
 // The actual backend (UTCP, MCP, HTTP, etc.) is set via setServiceBackend().
 
-import type { ServiceResult, CacheEntry, CacheConfig } from './types';
+import type { ServiceResult, CacheEntry, CacheConfig } from "./types";
 
 /**
  * Service backend interface - abstracts the actual service call mechanism
@@ -61,11 +61,11 @@ export function setServiceBackend(backend: ServiceBackend): void {
 /**
  * Create a service proxy that wraps the backend with caching
  */
-export function createServiceProxy(): ServiceBackend {
+export function createProxy(): ServiceBackend {
   return {
     call: (service, procedure, args) =>
       callProcedure(service, procedure, args).then((r) => {
-        if (!r.success) throw new Error(r.error || 'Service call failed');
+        if (!r.success) throw new Error(r.error || "Service call failed");
         return r.data;
       }),
   };
@@ -129,7 +129,7 @@ export async function callProcedure(
   if (!currentBackend) {
     return {
       success: false,
-      error: 'No service backend configured. Call setServiceBackend() first.',
+      error: "No service backend configured. Call setServiceBackend() first.",
       durationMs: 0,
     };
   }
@@ -186,7 +186,7 @@ export function invalidateCache(service?: string): void {
 export function getCacheStats(): { size: number; services: string[] } {
   const services = new Set<string>();
   for (const key of cache.keys()) {
-    const service = key.split(':')[0];
+    const service = key.split(":")[0];
     if (service) services.add(service);
   }
   return { size: cache.size, services: [...services] };
