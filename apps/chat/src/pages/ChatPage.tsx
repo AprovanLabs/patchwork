@@ -769,7 +769,7 @@ export default function ChatPage() {
             </CardHeader>
 
             <CardContent className="flex-1 p-0 min-h-0 flex">
-              <div className="w-64 border-r bg-muted/20 min-h-0 flex flex-col">
+              <div className="w-64 border-r bg-muted/20 min-h-0 flex flex-col min-w-sm">
                 <div className="px-3 py-2 border-b flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <span>Workspace</span>
                   <button
