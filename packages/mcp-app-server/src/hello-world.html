@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hello World — Patchwork MCP App</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #f0f4ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+
+      .card {
+        background: #fff;
+        border-radius: 1rem;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        padding: 2.5rem 3rem;
+        text-align: center;
+        max-width: 420px;
+        width: 100%;
+      }
+
+      .wave {
+        font-size: 3rem;
+        line-height: 1;
+        margin-bottom: 1rem;
+      }
+
+      h1 {
+        margin: 0 0 0.75rem;
+        font-size: 1.75rem;
+        color: #111827;
+      }
+
+      p {
+        margin: 0;
+        color: #6b7280;
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+
+      .badge {
+        display: inline-block;
+        margin-top: 1.5rem;
+        background: #eff6ff;
+        color: #3b82f6;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="wave">👋</div>
+      <h1>Hello, world!</h1>
+      <p>
+        This widget is served by the <strong>Patchwork MCP App Server</strong>.
+        It renders inline inside Claude Desktop and Claude web via a
+        <code>StreamableHTTPServerTransport</code>.
+      </p>
+      <span class="badge">MCP App</span>
+    </div>
+  </body>
+</html>
