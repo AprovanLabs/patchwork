@@ -62,4 +62,32 @@ describe("compile integration", () => {
     expect(result.html).toContain("<!DOCTYPE html>");
     expect(result.hash).toBeTruthy();
   }, 60000);
+
+  it("injects service shim when services option is provided", async () => {
+    const result = await compileWidget(SIMPLE_WIDGET, TEST_MANIFEST, {
+      services: ["weather", "stripe"],
+    });
+
+    expect(result.html).toContain("<!DOCTYPE html>");
+    expect(result.html).toContain("import { App } from");
+    expect(result.html).toContain("esm.sh/@modelcontextprotocol/ext-apps");
+    expect(result.html).toContain("weather");
+    expect(result.html).toContain("stripe");
+    expect(result.html).toContain("__patchwork_createNamespaceProxy");
+    expect(result.html).toContain("callServerTool");
+  }, 60000);
+
+  it("does not inject shim when services is empty", async () => {
+    const result = await compileWidget(SIMPLE_WIDGET, TEST_MANIFEST, {
+      services: [],
+    });
+
+    expect(result.html).not.toContain("__patchwork_createNamespaceProxy");
+  }, 60000);
+
+  it("does not inject shim when services option is not provided", async () => {
+    const result = await compileWidget(SIMPLE_WIDGET, TEST_MANIFEST);
+
+    expect(result.html).not.toContain("__patchwork_createNamespaceProxy");
+  }, 60000);
 });

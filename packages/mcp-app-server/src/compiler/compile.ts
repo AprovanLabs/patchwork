@@ -21,6 +21,7 @@ import {
   get as cacheGet,
   type CachedWidget,
 } from "./cache.js";
+import { generateServiceShim } from "../shim.js";
 
 const WIDGET_RESOURCE_PREFIX = "ui://widget/";
 
@@ -181,17 +182,32 @@ async function writeProjectFiles(
     : entryName;
 }
 
+function injectShimIntoHtml(html: string, shimScript: string): string {
+  const shimTag = `<script type="module">\n${shimScript}\n</script>`;
+  const bodyCloseIndex = html.lastIndexOf("</body>");
+  if (bodyCloseIndex === -1) return html;
+  return html.slice(0, bodyCloseIndex) + shimTag + "\n" + html.slice(bodyCloseIndex);
+}
+
 export interface CompileWidgetResult {
   html: string;
   hash: string;
   resourceUri: string;
 }
 
+export interface CompileWidgetOptions {
+  services?: string[];
+}
+
 export async function compileWidget(
   source: string | VirtualProject,
   manifest: Manifest,
+  options: CompileWidgetOptions = {},
 ): Promise<CompileWidgetResult> {
-  const cacheKey = computeCacheKey(source, manifest);
+  const baseCacheKey = computeCacheKey(source, manifest);
+  const cacheKey = options.services?.length
+    ? `${baseCacheKey}:svc:${options.services.sort().join(",")}`
+    : baseCacheKey;
   if (cacheHas(cacheKey)) {
     const cached = cacheGet(cacheKey)!;
     return {
@@ -247,17 +263,24 @@ export async function compileWidget(
       "utf-8",
     );
 
+    const servicesScript = options.services?.length
+      ? generateServiceShim({ namespaces: options.services })
+      : undefined;
+    const finalHtml = servicesScript
+      ? injectShimIntoHtml(outputHtml, servicesScript)
+      : outputHtml;
+
     const resourceUri = `${WIDGET_RESOURCE_PREFIX}${cacheKey}/view.html`;
 
     const cacheEntry: CachedWidget = {
-      html: outputHtml,
+      html: finalHtml,
       manifest,
       resourceUri,
       createdAt: Date.now(),
     };
     cacheSet(cacheKey, cacheEntry);
 
-    return { html: outputHtml, hash: cacheKey, resourceUri };
+    return { html: finalHtml, hash: cacheKey, resourceUri };
   } finally {
     await rm(projectDir, { recursive: true, force: true });
   }

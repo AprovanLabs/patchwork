@@ -16,7 +16,15 @@ import {
   allEntries,
   type CompileWidgetResult,
 } from "./compiler/index.js";
+import {
+  ServiceBridge,
+  type ServiceBackend,
+  type ServiceToolInfo,
+  type ServiceBridgeConfig,
+} from "./services.js";
 import HELLO_WORLD_HTML from "./hello-world.html";
+
+export type { ServiceBackend, ServiceToolInfo, ServiceBridgeConfig };
 
 const HELLO_WORLD_RESOURCE_URI = "ui://hello-world/view.html";
 
@@ -34,6 +42,7 @@ function buildManifest(input?: Record<string, unknown>): Manifest {
     platform: "browser",
     image:
       (input?.["image"] as string) ?? MANIFEST_DEFAULTS.image,
+    services: (input?.["services"] as string[] | undefined),
   };
 }
 
@@ -74,11 +83,19 @@ function registerWidgetResources(server: McpServer): void {
   }
 }
 
-export function createMcpAppServer(): McpServer {
+export interface McpAppServerOptions {
+  services?: ServiceBridgeConfig;
+}
+
+export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer {
   const server = new McpServer({
     name: "patchwork-mcp-app-server",
     version: "0.1.0",
   });
+
+  const serviceBridge = options.services
+    ? new ServiceBridge(options.services)
+    : null;
 
   registerAppTool(
     server,
@@ -158,6 +175,13 @@ export function createMcpAppServer(): McpServer {
           .describe(
             "Patchwork image package to use. Defaults to '@aprovan/patchwork-image-shadcn'.",
           ),
+        services: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Service namespaces the widget calls (e.g., ['weather', 'stripe']). " +
+            "A proxy shim is injected so widget code can call namespace.procedure(args) directly.",
+          ),
       },
       _meta: {
         ui: { resourceUri: "ui://widget/{hash}/view.html" },
@@ -169,16 +193,38 @@ export function createMcpAppServer(): McpServer {
         | Array<{ path: string; content: string }>
         | undefined;
       const entry = args?.["entry"] as string | undefined;
+      const requestedServices = args?.["services"] as string[] | undefined;
 
       const manifestInput: Record<string, unknown> = {};
       if (args?.["name"]) manifestInput["name"] = args["name"];
       if (args?.["image"]) manifestInput["image"] = args["image"];
+      if (requestedServices) manifestInput["services"] = requestedServices;
 
       const manifest = buildManifest(manifestInput);
       const project = buildVirtualProject(source, files, entry);
 
+      let compileServices: string[] | undefined;
+      if (requestedServices && requestedServices.length > 0 && serviceBridge) {
+        const availableNamespaces = serviceBridge.getNamespaces();
+        compileServices = requestedServices.filter((ns) =>
+          availableNamespaces.includes(ns),
+        );
+        const unavailable = requestedServices.filter(
+          (ns) => !availableNamespaces.includes(ns),
+        );
+        if (unavailable.length > 0) {
+          console.warn(
+            `[mcp-app-server] Requested services not available: ${unavailable.join(", ")}. Available: ${availableNamespaces.join(", ")}`,
+          );
+        }
+      }
+
       try {
-        const result: CompileWidgetResult = await compileWidget(project, manifest);
+        const result: CompileWidgetResult = await compileWidget(
+          project,
+          manifest,
+          compileServices ? { services: compileServices } : {},
+        );
 
         registerAppResource(
           server,
@@ -228,6 +274,11 @@ export function createMcpAppServer(): McpServer {
       }
     },
   );
+
+  if (serviceBridge) {
+    serviceBridge.registerTools(server);
+    serviceBridge.registerSearchServices(server);
+  }
 
   registerWidgetResources(server);
 
