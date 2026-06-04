@@ -2,10 +2,17 @@ import cors from 'cors';
 import { randomUUID } from 'node:crypto';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { createMcpAppServer } from './index.js';
+import { createMcpAppServer, type McpAppServerOptions } from './index.js';
 
 const PORT = Number(process.env['PORT'] ?? 3000);
 const HOST = process.env['HOST'] ?? '0.0.0.0';
+
+const serverOptions: McpAppServerOptions = {};
+
+const SERVICES_URL = process.env['SERVICES_URL'];
+if (SERVICES_URL) {
+  console.log(`[mcp-app-server] SERVICES_URL is set to ${SERVICES_URL} — service bridge not yet auto-configured; pass ServiceBridgeConfig programmatically.`);
+}
 
 const app = createMcpExpressApp({ host: HOST });
 
@@ -20,7 +27,7 @@ app.use(cors());
  * Swap to a session store if you need multi-turn stateful interactions.
  */
 app.all('/mcp', async (req, res) => {
-  const mcpServer = createMcpAppServer();
+  const mcpServer = createMcpAppServer(serverOptions);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => randomUUID(),
   });
