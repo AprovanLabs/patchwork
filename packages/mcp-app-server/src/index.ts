@@ -19,7 +19,7 @@ import {
 import HELLO_WORLD_HTML from "./hello-world.html";
 import {
   subscribeSession,
-  _unsubscribeSession,
+  unsubscribeSession as _unsubscribeSession,
   getEvents,
   pushStreamUpdate,
   currentSeq,
