@@ -21,7 +21,7 @@ import {
   get as cacheGet,
   type CachedWidget,
 } from "./cache.js";
-import { generateServiceShim } from "../shim.js";
+import { generateServiceShim, generateLiveUpdateShim } from "../shim.js";
 
 const WIDGET_RESOURCE_PREFIX = "ui://widget/";
 
@@ -197,6 +197,8 @@ export interface CompileWidgetResult {
 
 export interface CompileWidgetOptions {
   services?: string[];
+  /** Inject the live-update shim (window.patchwork) into the compiled widget. Defaults to true. */
+  liveUpdates?: boolean;
 }
 
 export async function compileWidget(
@@ -204,10 +206,16 @@ export async function compileWidget(
   manifest: Manifest,
   options: CompileWidgetOptions = {},
 ): Promise<CompileWidgetResult> {
+  const liveUpdates = options.liveUpdates ?? true;
+
   const baseCacheKey = computeCacheKey(source, manifest);
-  const cacheKey = options.services?.length
-    ? `${baseCacheKey}:svc:${options.services.sort().join(",")}`
-    : baseCacheKey;
+  let cacheKey = baseCacheKey;
+  if (options.services?.length) {
+    cacheKey += `:svc:${options.services.sort().join(",")}`;
+  }
+  if (liveUpdates) {
+    cacheKey += `:live`;
+  }
   if (cacheHas(cacheKey)) {
     const cached = cacheGet(cacheKey)!;
     return {
@@ -263,12 +271,21 @@ export async function compileWidget(
       "utf-8",
     );
 
-    const servicesScript = options.services?.length
-      ? generateServiceShim({ namespaces: options.services })
-      : undefined;
-    const finalHtml = servicesScript
-      ? injectShimIntoHtml(outputHtml, servicesScript)
-      : outputHtml;
+    // Build up the shim scripts. The live-update shim is injected first so
+    // __patchwork_app is available when the service shim runs. If both are
+    // present the live-update shim guards against double-initialisation.
+    const shimParts: string[] = [];
+    if (liveUpdates) {
+      shimParts.push(generateLiveUpdateShim());
+    }
+    if (options.services?.length) {
+      shimParts.push(generateServiceShim({ namespaces: options.services }));
+    }
+
+    let finalHtml = outputHtml;
+    for (const script of shimParts) {
+      finalHtml = injectShimIntoHtml(finalHtml, script);
+    }
 
     const resourceUri = `${WIDGET_RESOURCE_PREFIX}${cacheKey}/view.html`;
 

@@ -26,9 +26,19 @@ import {
   WidgetStore,
   getWidgetStore,
 } from "./widget-store/index.js";
+import {
+  subscribeSession,
+  unsubscribeSession,
+  getEvents,
+  pushStreamUpdate,
+  currentSeq,
+  type StreamEvent,
+} from "./live-update.js";
 import HELLO_WORLD_HTML from "./hello-world.html";
 
 export type { ServiceBackend, ServiceToolInfo, ServiceBridgeConfig };
+export type { StreamEvent };
+export { pushStreamUpdate };
 
 const HELLO_WORLD_RESOURCE_URI = "ui://hello-world/view.html";
 
@@ -492,11 +502,140 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
   );
 
   registerCachedWidgetResources(server);
-
   void registerStoredWidgetResources(server, store);
+  registerLiveUpdateTools(server);
 
   return server;
 }
 
 export { WidgetStore, getWidgetStore, resetWidgetStore } from "./widget-store/index.js";
 export type { StoredWidget, StoredWidgetInfo, WidgetStoreOptions } from "./widget-store/types.js";
+
+// ---------------------------------------------------------------------------
+// Live-update tools
+// ---------------------------------------------------------------------------
+
+/**
+ * Register the three tools that power the live-update channel:
+ *
+ * - `subscribe_stream`  — widget declares interest in a named data stream.
+ * - `poll_updates`      — widget fetches buffered events since a given seq.
+ * - `push_update`       — backend/LLM pushes new data onto a stream.
+ *
+ * The session ID is extracted from the MCP request's `_meta` extra or from the
+ * internal `RequestHandlerExtra`. Tools that need the session ID use the
+ * `extra.meta?.sessionId` field that the SDK populates from the transport.
+ */
+function registerLiveUpdateTools(server: McpServer): void {
+  // subscribe_stream — widget registers interest in a named data stream.
+  server.registerTool(
+    "subscribe_stream",
+    {
+      description:
+        "Subscribe this widget session to a named data stream. " +
+        "The server will send `notifications/tools/list_changed` whenever new " +
+        "events arrive; the widget should then call `poll_updates` to fetch them. " +
+        "Returns the current sequence number so the widget knows where to start polling.",
+      inputSchema: {
+        stream: z.string().describe("Name of the data stream to subscribe to."),
+        session_id: z
+          .string()
+          .optional()
+          .describe(
+            "MCP session ID. Widgets should pass the value returned in the " +
+            "Mcp-Session-Id response header during initialization.",
+          ),
+      },
+    },
+    (args, extra) => {
+      const stream = (args as Record<string, unknown>)["stream"] as string;
+      // Prefer an explicit session_id arg; fall back to the transport session
+      const sessionId =
+        ((args as Record<string, unknown>)["session_id"] as string | undefined) ??
+        (extra as Record<string, unknown>)["sessionId"] as string | undefined;
+
+      if (sessionId) {
+        subscribeSession(sessionId, stream);
+      }
+
+      const seq = currentSeq();
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ success: true, stream, seq }),
+          },
+        ],
+      };
+    },
+  );
+
+  // poll_updates — returns buffered events for a stream since afterSeq.
+  server.registerTool(
+    "poll_updates",
+    {
+      description:
+        "Fetch buffered events for a data stream that arrived after the given " +
+        "sequence number. Call this after receiving a `notifications/tools/list_changed` " +
+        "notification (which the server sends when new data is available). " +
+        "Pass the highest `seq` value from the last successful poll to avoid duplicates.",
+      inputSchema: {
+        stream: z.string().describe("Name of the data stream to poll."),
+        after_seq: z
+          .number()
+          .int()
+          .default(0)
+          .describe(
+            "Return only events with seq > after_seq. Pass 0 to retrieve all buffered events.",
+          ),
+      },
+    },
+    (args) => {
+      const stream = (args as Record<string, unknown>)["stream"] as string;
+      const afterSeq = ((args as Record<string, unknown>)["after_seq"] as number) ?? 0;
+
+      const events = getEvents(stream, afterSeq);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ success: true, stream, events }),
+          },
+        ],
+      };
+    },
+  );
+
+  // push_update — backend or LLM pushes new data onto a stream.
+  server.registerTool(
+    "push_update",
+    {
+      description:
+        "Push a data update onto a named stream, broadcasting it to all " +
+        "subscribed widget sessions. Subscribing widgets will receive a " +
+        "`notifications/tools/list_changed` signal and then call `poll_updates` " +
+        "to retrieve the new data. Use this tool from server-side code or as an " +
+        "LLM tool to drive real-time widget updates.",
+      inputSchema: {
+        stream: z.string().describe("Name of the data stream to push to."),
+        data: z
+          .record(z.unknown())
+          .describe("Arbitrary JSON-serialisable payload to push to subscribers."),
+      },
+    },
+    async (args) => {
+      const stream = (args as Record<string, unknown>)["stream"] as string;
+      const data = (args as Record<string, unknown>)["data"];
+
+      const seq = await pushStreamUpdate(stream, data);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ success: true, stream, seq }),
+          },
+        ],
+      };
+    },
+  );
+}
