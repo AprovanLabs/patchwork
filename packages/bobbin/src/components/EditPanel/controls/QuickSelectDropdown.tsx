@@ -13,7 +13,7 @@ export function QuickSelectDropdown({
   tokens,
   quickKeys,
   onChange,
-  placeholder = 'More...',
+  placeholder: _placeholder = 'More...',
 }: QuickSelectDropdownProps) {
   const [showDropdown, setShowDropdown] = useState(false);
 

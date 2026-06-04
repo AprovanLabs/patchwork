@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
 import { FileImage, FileVideo, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { isImageFile, isVideoFile } from './fileTypes';
 
 export interface MediaPreviewProps {

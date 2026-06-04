@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
-import type { SelectedElement, BobbinActions, DesignTokens, Change, StyleChange, Annotation } from '../../types';
-import { LayoutSection } from './sections/LayoutSection';
-import { SpacingSection } from './sections/SpacingSection';
-import { SizeSection } from './sections/SizeSection';
-import { TypographySection } from './sections/TypographySection';
+import { AnnotationSection } from './sections/AnnotationSection';
 import { BackgroundSection } from './sections/BackgroundSection';
 import { EffectsSection } from './sections/EffectsSection';
-import { AnnotationSection } from './sections/AnnotationSection';
+import { LayoutSection } from './sections/LayoutSection';
+import { SizeSection } from './sections/SizeSection';
+import { SpacingSection } from './sections/SpacingSection';
+import { TypographySection } from './sections/TypographySection';
+import type { SelectedElement, BobbinActions, DesignTokens, Change, StyleChange, Annotation } from '../../types';
 
 // Theme icons
 const SunIcon = () => (

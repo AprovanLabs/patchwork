@@ -1,5 +1,5 @@
-import type { Plugin, Loader } from 'esbuild-wasm';
 import type { VirtualProject } from '../vfs/types.js';
+import type { Plugin, Loader } from 'esbuild-wasm';
 
 function dirname(path: string): string {
   const idx = path.lastIndexOf('/');

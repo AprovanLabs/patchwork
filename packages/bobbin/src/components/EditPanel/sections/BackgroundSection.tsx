@@ -1,7 +1,7 @@
-import type { DesignTokens } from '../../../types';
-import { SectionWrapper } from './SectionWrapper';
 import { ColorPicker } from '../controls/ColorPicker';
 import { TokenDropdown } from '../controls/TokenDropdown';
+import { SectionWrapper } from './SectionWrapper';
+import type { DesignTokens } from '../../../types';
 
 interface BackgroundSectionProps {
   expanded: boolean;

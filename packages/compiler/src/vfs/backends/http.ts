@@ -1,3 +1,4 @@
+import { createDirEntry, createFileStats } from "../core/utils.js";
 import type {
   DirEntry,
   FileStats,
@@ -5,7 +6,6 @@ import type {
   WatchCallback,
   WatchEventType,
 } from "../core/types.js";
-import { createDirEntry, createFileStats } from "../core/utils.js";
 
 export interface HttpBackendConfig {
   baseUrl: string;

@@ -4,6 +4,12 @@
  * For trusted widgets that need full window access.
  */
 
+import {
+  generateNamespaceGlobals,
+  injectNamespaceGlobals,
+  removeNamespaceGlobals,
+  extractNamespaces,
+} from "./bridge.js";
 import type {
   CompiledWidget,
   LoadedImage,
@@ -11,12 +17,6 @@ import type {
   MountOptions,
   Proxy,
 } from "../types.js";
-import {
-  generateNamespaceGlobals,
-  injectNamespaceGlobals,
-  removeNamespaceGlobals,
-  extractNamespaces,
-} from "./bridge.js";
 
 let mountCounter = 0;
 let importMapInjected = false;

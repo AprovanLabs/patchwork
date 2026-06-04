@@ -1,9 +1,9 @@
-import type { DesignTokens } from '../../../types';
-import { SectionWrapper } from './SectionWrapper';
-import { TokenDropdown } from '../controls/TokenDropdown';
-import { QuickSelectDropdown } from '../controls/QuickSelectDropdown';
 import { ColorPicker } from '../controls/ColorPicker';
+import { QuickSelectDropdown } from '../controls/QuickSelectDropdown';
 import { ToggleGroup } from '../controls/ToggleGroup';
+import { TokenDropdown } from '../controls/TokenDropdown';
+import { SectionWrapper } from './SectionWrapper';
+import type { DesignTokens } from '../../../types';
 
 // Text alignment icons
 const AlignLeftIcon = () => (

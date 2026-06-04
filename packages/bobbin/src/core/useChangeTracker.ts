@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
+import { generateId } from '../utils/selectors';
 import type {
   Change,
   StyleChange,
@@ -6,7 +7,6 @@ import type {
   MoveChange,
   ChangeType,
 } from '../types';
-import { generateId } from '../utils/selectors';
 
 export function useChangeTracker() {
   const [changes, setChanges] = useState<Change[]>([]);

@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { ChevronDown, Server } from "lucide-react";
+import { useState } from "react";
 
 export interface ServiceInfo {
   name: string;

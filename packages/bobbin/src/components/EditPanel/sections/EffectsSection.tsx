@@ -1,7 +1,7 @@
-import type { DesignTokens } from '../../../types';
-import { SectionWrapper } from './SectionWrapper';
 import { QuickSelectDropdown } from '../controls/QuickSelectDropdown';
 import { SliderInput } from '../controls/SliderInput';
+import { SectionWrapper } from './SectionWrapper';
+import type { DesignTokens } from '../../../types';
 
 interface EffectsSectionProps {
   expanded: boolean;

@@ -1,5 +1,5 @@
-import { useRef, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useRef, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { EditHistoryEntry } from './types';

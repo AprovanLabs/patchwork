@@ -1,5 +1,6 @@
-import type { DesignTokens } from '../types';
+import { borderRadius, borderWidth } from './borders';
 import { colors } from './colors';
+import { boxShadow } from './shadows';
 import { spacing } from './spacing';
 import {
   fontSize,
@@ -8,8 +9,7 @@ import {
   lineHeight,
   letterSpacing,
 } from './typography';
-import { borderRadius, borderWidth } from './borders';
-import { boxShadow } from './shadows';
+import type { DesignTokens } from '../types';
 
 export const defaultTokens: DesignTokens = {
   colors,

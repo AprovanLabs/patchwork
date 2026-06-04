@@ -4,8 +4,8 @@
  * Images must be installed as npm packages or available on CDN.
  */
 
-import type { LoadedImage } from '../types.js';
 import { safeParseImageConfig, DEFAULT_IMAGE_CONFIG } from '../schemas.js';
+import type { LoadedImage } from '../types.js';
 
 const DEFAULT_CDN_BASE = 'https://esm.sh';
 

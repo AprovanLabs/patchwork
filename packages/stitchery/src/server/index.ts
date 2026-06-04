@@ -3,11 +3,11 @@ import { createMCPClient } from "@ai-sdk/mcp";
 import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import { createUtcpBackend } from "@aprovan/patchwork-utcp";
 import { jsonSchema, type Tool } from "ai";
-import type { ServerConfig, McpServerConfig } from "../types.js";
-import { handleChat, handleEdit, type RouteContext } from "./routes.js";
 import { handleLocalPackages } from "./local-packages.js";
-import { handleVFS, type VFSContext } from "./vfs-routes.js";
+import { handleChat, handleEdit, type RouteContext } from "./routes.js";
 import { ServiceRegistry, generateServicesPrompt } from "./services.js";
+import { handleVFS, type VFSContext } from "./vfs-routes.js";
+import type { ServerConfig, McpServerConfig } from "../types.js";
 
 export interface StitcheryServer {
   server: Server;

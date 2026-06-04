@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { DesignTokens } from '../../../types';
-import { SectionWrapper } from './SectionWrapper';
 import { SliderInput } from '../controls/SliderInput';
+import { SectionWrapper } from './SectionWrapper';
+import type { DesignTokens } from '../../../types';
 
 // Common size presets
 const sizePresets: Record<string, string> = {

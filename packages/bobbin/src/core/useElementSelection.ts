@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { SelectedElement } from '../types';
 import { getElementPath, getElementXPath } from '../utils/selectors';
+import type { SelectedElement } from '../types';
 
 export interface UseElementSelectionOptions {
   container?: HTMLElement | null;

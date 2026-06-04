@@ -1,5 +1,5 @@
-import type { Plugin } from "vite";
 import type { ImageConfig } from "@aprovan/patchwork-compiler";
+import type { Plugin } from "vite";
 
 const ESM_SH_BASE = "https://esm.sh";
 

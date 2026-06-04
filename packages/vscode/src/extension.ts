@@ -1,10 +1,10 @@
 import * as path from "path";
-import * as vscode from "vscode";
 import {
   createProjectFromFiles,
   type VirtualFile,
   type VirtualProject,
 } from "@aprovan/patchwork-compiler";
+import * as vscode from "vscode";
 import { PatchworkFileSystemProvider } from "./providers/PatchworkFileSystemProvider";
 import { PatchworkTreeProvider } from "./providers/PatchworkTreeProvider";
 import { PreviewPanelProvider } from "./providers/PreviewPanelProvider";

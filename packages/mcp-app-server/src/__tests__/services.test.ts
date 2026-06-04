@@ -1,6 +1,6 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { describe, it, expect, vi } from "vitest";
 import { ServiceBridge, type ServiceBackend, type ServiceToolInfo } from "../services.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const mockBackend: ServiceBackend = {
   call: vi.fn(async () => ({

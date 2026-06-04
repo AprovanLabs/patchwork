@@ -1,3 +1,4 @@
+import { watch } from "node:fs";
 import {
   readFile,
   writeFile,
@@ -7,7 +8,6 @@ import {
   mkdir,
   rm,
 } from "node:fs/promises";
-import { watch } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 

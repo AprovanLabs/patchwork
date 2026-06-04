@@ -1,6 +1,6 @@
-import type { DesignTokens } from '../../../types';
-import { SectionWrapper } from './SectionWrapper';
 import { SpacingControl } from '../controls/SpacingControl';
+import { SectionWrapper } from './SectionWrapper';
+import type { DesignTokens } from '../../../types';
 
 interface SpacingSectionProps {
   expanded: boolean;

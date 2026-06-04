@@ -1,6 +1,6 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
 import path from "path";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 const STITCHERY_URL = process.env.STITCHERY_URL ?? "http://127.0.0.1:6435";
 

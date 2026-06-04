@@ -1,10 +1,3 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import {
-  registerAppTool,
-  registerAppResource,
-  RESOURCE_MIME_TYPE,
-} from "@modelcontextprotocol/ext-apps/server";
 import {
   createProjectFromFiles,
   type Manifest,
@@ -12,10 +5,26 @@ import {
   type VirtualProject,
 } from "@aprovan/patchwork-compiler";
 import {
+  registerAppTool,
+  registerAppResource,
+  RESOURCE_MIME_TYPE,
+} from "@modelcontextprotocol/ext-apps/server";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import {
   compileWidget,
   allEntries,
   type CompileWidgetResult,
 } from "./compiler/index.js";
+import HELLO_WORLD_HTML from "./hello-world.html";
+import {
+  subscribeSession,
+  unsubscribeSession as _unsubscribeSession,
+  getEvents,
+  pushStreamUpdate,
+  currentSeq,
+  type StreamEvent,
+} from "./live-update.js";
 import {
   ServiceBridge,
   type ServiceBackend,
@@ -23,18 +32,9 @@ import {
   type ServiceBridgeConfig,
 } from "./services.js";
 import {
-  WidgetStore,
+  type WidgetStore,
   getWidgetStore,
 } from "./widget-store/index.js";
-import {
-  subscribeSession,
-  unsubscribeSession,
-  getEvents,
-  pushStreamUpdate,
-  currentSeq,
-  type StreamEvent,
-} from "./live-update.js";
-import HELLO_WORLD_HTML from "./hello-world.html";
 
 export type { ServiceBackend, ServiceToolInfo, ServiceBridgeConfig };
 export type { StreamEvent };

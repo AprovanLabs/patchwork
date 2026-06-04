@@ -1,10 +1,10 @@
-import cors from 'cors';
 import { randomUUID } from 'node:crypto';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { createMcpAppServer, type McpAppServerOptions } from './index.js';
-import { createRegistryBackend, type RegistryBackend } from './registry-backend.js';
+import cors from 'cors';
 import { registerSession, unregisterSession } from './live-update.js';
+import { createRegistryBackend, type RegistryBackend } from './registry-backend.js';
+import { createMcpAppServer, type McpAppServerOptions } from './index.js';
 
 const PORT = Number(process.env['PORT'] ?? 3000);
 const HOST = process.env['HOST'] ?? '0.0.0.0';

@@ -1,16 +1,15 @@
+import {
+  createDirEntry,
+  createFileStats,
+  dirname,
+  normalizePath,
+} from "../core/utils.js";
 import type {
   DirEntry,
   FileStats,
   FSProvider,
   WatchCallback,
 } from "../core/types.js";
-import {
-  basename,
-  createDirEntry,
-  createFileStats,
-  dirname,
-  normalizePath,
-} from "../core/utils.js";
 
 interface FileEntry {
   content: string;

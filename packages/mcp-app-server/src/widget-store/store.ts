@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
-import type { Manifest } from "@aprovan/patchwork-compiler";
-import type { FSProvider, StoredWidget, StoredWidgetInfo, WidgetStoreOptions } from "./types.js";
 import { LocalFileBackend } from "./local-backend.js";
+import type { FSProvider, StoredWidget, StoredWidgetInfo, WidgetStoreOptions } from "./types.js";
+import type { Manifest } from "@aprovan/patchwork-compiler";
 
 const WIDGETS_PREFIX = "widgets";
 const RESOURCE_URI_PREFIX = "ui://widgets/";

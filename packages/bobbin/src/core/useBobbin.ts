@@ -1,4 +1,11 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { defaultTokens } from '../tokens';
+import { applyStyleToElement, enableContentEditable } from '../utils/dom';
+import { getElementPath, getElementXPath } from '../utils/selectors';
+import { serializeChangesToYAML } from './changeSerializer';
+import { useChangeTracker } from './useChangeTracker';
+import { useClipboard } from './useClipboard';
+import { useElementSelection } from './useElementSelection';
 import type {
   BobbinState,
   BobbinActions,
@@ -6,13 +13,6 @@ import type {
   DesignTokens,
   Annotation,
 } from '../types';
-import { useElementSelection } from './useElementSelection';
-import { useChangeTracker } from './useChangeTracker';
-import { useClipboard } from './useClipboard';
-import { serializeChangesToYAML } from './changeSerializer';
-import { defaultTokens } from '../tokens';
-import { getElementPath, getElementXPath } from '../utils/selectors';
-import { applyStyleToElement, enableContentEditable } from '../utils/dom';
 
 export function useBobbin(props: BobbinProps = {}) {
   const {

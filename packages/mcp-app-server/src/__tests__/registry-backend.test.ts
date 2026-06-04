@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { parseRegistryToolName, createRegistryBackend } from "../registry-backend.js";
 import type { Mock } from "vitest";
-
 // ---------------------------------------------------------------------------
 // Module-level mocks (hoisted by vitest)
 // ---------------------------------------------------------------------------
@@ -30,8 +30,6 @@ vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
 // ---------------------------------------------------------------------------
 // Import under test (after mocks are registered)
 // ---------------------------------------------------------------------------
-
-import { parseRegistryToolName, createRegistryBackend } from "../registry-backend.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

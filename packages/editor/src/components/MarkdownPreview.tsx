@@ -1,8 +1,8 @@
+import Typography from '@tiptap/extension-typography';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Typography from '@tiptap/extension-typography';
-import { Markdown } from 'tiptap-markdown';
 import { useEffect, useCallback, useRef, useState } from 'react';
+import { Markdown } from 'tiptap-markdown';
 import { CodeBlockExtension } from './CodeBlockExtension';
 
 function parseFrontmatter(content: string): { frontmatter: string; body: string } {
