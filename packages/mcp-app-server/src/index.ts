@@ -22,6 +22,10 @@ import {
   type ServiceToolInfo,
   type ServiceBridgeConfig,
 } from "./services.js";
+import {
+  WidgetStore,
+  getWidgetStore,
+} from "./widget-store/index.js";
 import HELLO_WORLD_HTML from "./hello-world.html";
 
 export type { ServiceBackend, ServiceToolInfo, ServiceBridgeConfig };
@@ -61,7 +65,33 @@ function buildVirtualProject(
   return source ?? 'export default function Widget() { return <div>Hello Patchwork</div>; }';
 }
 
-function registerWidgetResources(server: McpServer): void {
+async function registerStoredWidgetResources(
+  server: McpServer,
+  store: WidgetStore,
+): Promise<void> {
+  const widgets = await store.loadAll();
+  for (const widget of widgets) {
+    registerAppResource(
+      server,
+      `Widget ${widget.manifest.name}`,
+      widget.resourceUri,
+      {
+        description: widget.manifest.description ?? `Persisted widget: ${widget.manifest.name}`,
+      },
+      async () => ({
+        contents: [
+          {
+            uri: widget.resourceUri,
+            mimeType: RESOURCE_MIME_TYPE,
+            text: widget.html,
+          },
+        ],
+      }),
+    );
+  }
+}
+
+function registerCachedWidgetResources(server: McpServer): void {
   for (const [, entry] of allEntries()) {
     registerAppResource(
       server,
@@ -96,6 +126,8 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
   const serviceBridge = options.services
     ? new ServiceBridge(options.services)
     : null;
+
+  const store = getWidgetStore();
 
   registerAppTool(
     server,
@@ -142,7 +174,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
       description:
         "Compile a JSX/TSX widget into a self-contained HTML page served as an MCP App resource. " +
         "Pass source code for a single-file widget, or a files array for a multi-file project. " +
-        "The compiled widget is cached and served at the returned resource URI.",
+        "The compiled widget is cached in memory and persisted to the VFS widget store.",
       inputSchema: {
         source: z
           .string()
@@ -226,9 +258,31 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
           compileServices ? { services: compileServices } : {},
         );
 
+        const entryPath = typeof project === "string" ? undefined : project.entry;
+        await store.saveWidget(result.hash, result.html, manifest, entryPath);
+
+        const storedUri = store.resourceUriFor(manifest.name, result.hash);
         registerAppResource(
           server,
           `Widget ${manifest.name}`,
+          storedUri,
+          {
+            description: manifest.description ?? `Persisted widget: ${manifest.name}`,
+          },
+          async () => ({
+            contents: [
+              {
+                uri: storedUri,
+                mimeType: RESOURCE_MIME_TYPE,
+                text: result.html,
+              },
+            ],
+          }),
+        );
+
+        registerAppResource(
+          server,
+          `Widget ${manifest.name} (cached)`,
           result.resourceUri,
           {
             description: `Compiled widget: ${manifest.name}`,
@@ -248,7 +302,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
           content: [
             {
               type: "text" as const,
-              text: `Widget compiled successfully. View it at: ${result.resourceUri}`,
+              text: `Widget compiled and persisted. Resource URI: ${storedUri}`,
             },
             {
               type: "text" as const,
@@ -280,7 +334,169 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
     serviceBridge.registerSearchServices(server);
   }
 
-  registerWidgetResources(server);
+  registerAppTool(
+    server,
+    "list_widgets",
+    {
+      description:
+        "List all persisted widgets in the VFS widget store. " +
+        "Returns each widget's name, version, description, path, and resource URI.",
+      _meta: { ui: { resourceUri: "ui://widgets/list" } },
+    },
+    async () => {
+      const widgets = await store.listWidgets();
+
+      if (widgets.length === 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "No widgets stored in the VFS widget store.",
+            },
+          ],
+        };
+      }
+
+      const lines = widgets.map((w) => {
+        const parts = [`- **${w.name}** (v${w.version})`];
+        if (w.description) parts.push(`  ${w.description}`);
+        parts.push(`  Path: ${w.path}`);
+        parts.push(`  URI: ${w.resourceUri}`);
+        if (w.entry) parts.push(`  Entry: ${w.entry}`);
+        if (w.services && w.services.length > 0) parts.push(`  Services: ${w.services.join(", ")}`);
+        return parts.join("\n");
+      });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Stored widgets (${widgets.length}):\n\n${lines.join("\n\n")}`,
+          },
+        ],
+      };
+    },
+  );
+
+  registerAppTool(
+    server,
+    "render_widget",
+    {
+      description:
+        "Render a persisted widget by its name and hash. " +
+        "Serves the compiled widget as an MCP App resource rendered inline in the conversation.",
+      inputSchema: {
+        name: z
+          .string()
+          .describe("Widget name (as stored in the VFS widget store)."),
+        hash: z
+          .string()
+          .optional()
+          .describe("Widget content hash. If omitted, renders the most recent version of the named widget."),
+      },
+      _meta: {
+        ui: { resourceUri: "ui://widgets/{name}/{hash}/view.html" },
+      },
+    },
+    async (args) => {
+      const name = args?.["name"] as string;
+      const hashInput = args?.["hash"] as string | undefined;
+
+      if (!name) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Widget name is required.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      let hash = hashInput;
+      if (!hash) {
+        const widgets = await store.listWidgets();
+        const match = widgets.find((w) => w.name === name);
+        if (!match) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `No stored widget found with name "${name}".`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        const resourcePath = match.resourceUri.replace("ui://widgets/", "").replace("/view.html", "");
+        const parts = resourcePath.split("/");
+        hash = parts[1] ?? parts[0] ?? "";
+      }
+
+      if (!hash) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Could not determine hash for widget "${name}".`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const widget = await store.getWidget(name, hash);
+      if (!widget) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Widget "${name}" with hash "${hash}" not found in the VFS store.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      registerAppResource(
+        server,
+        `Widget ${widget.manifest.name}`,
+        widget.resourceUri,
+        {
+          description: widget.manifest.description ?? `Persisted widget: ${widget.manifest.name}`,
+        },
+        async () => ({
+          contents: [
+            {
+              uri: widget.resourceUri,
+              mimeType: RESOURCE_MIME_TYPE,
+              text: widget.html,
+            },
+          ],
+        }),
+      );
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Rendering widget "${name}" (hash: ${hash}).`,
+          },
+        ],
+        _meta: {
+          ui: { resourceUri: widget.resourceUri },
+        },
+      };
+    },
+  );
+
+  registerCachedWidgetResources(server);
+
+  void registerStoredWidgetResources(server, store);
 
   return server;
 }
+
+export { WidgetStore, getWidgetStore, resetWidgetStore } from "./widget-store/index.js";
+export type { StoredWidget, StoredWidgetInfo, WidgetStoreOptions } from "./widget-store/types.js";
