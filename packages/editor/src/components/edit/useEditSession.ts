@@ -1,6 +1,5 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import type { VirtualProject } from "@aprovan/patchwork-compiler";
 import { createSingleFileProject } from "@aprovan/patchwork-compiler";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { sendEditRequest } from "./api";
 import type {
   EditHistoryEntry,
@@ -8,6 +7,7 @@ import type {
   EditSessionActions,
   CompileFn,
 } from "./types";
+import type { VirtualProject } from "@aprovan/patchwork-compiler";
 
 export interface UseEditSessionOptions {
   originalCode?: string;

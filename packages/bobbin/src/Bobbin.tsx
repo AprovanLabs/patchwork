@@ -1,12 +1,12 @@
 import { createPortal } from 'react-dom';
-import type { BobbinProps } from './types';
-import { useBobbin } from './core/useBobbin';
-import { Pill } from './components/Pill/Pill';
-import { SelectionOverlay } from './components/Overlay/SelectionOverlay';
-import { ControlHandles } from './components/Overlay/ControlHandles';
-import { MarginPaddingOverlay } from './components/Overlay/MarginPaddingOverlay';
 import { EditPanel } from './components/EditPanel/EditPanel';
 import { Inspector } from './components/Inspector/Inspector';
+import { ControlHandles } from './components/Overlay/ControlHandles';
+import { MarginPaddingOverlay } from './components/Overlay/MarginPaddingOverlay';
+import { SelectionOverlay } from './components/Overlay/SelectionOverlay';
+import { Pill } from './components/Pill/Pill';
+import { useBobbin } from './core/useBobbin';
+import type { BobbinProps } from './types';
 
 export interface BobbinComponentProps extends BobbinProps {
   /** Show inspector panel */

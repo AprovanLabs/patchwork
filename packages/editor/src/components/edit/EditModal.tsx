@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect, type ReactNode } from 'react';
+import { Bobbin, serializeChangesToYAML, type Change } from '@aprovan/bobbin';
 import {
   Code,
   Eye,
@@ -11,18 +11,18 @@ import {
   FolderTree,
   FileCode,
 } from 'lucide-react';
+import { useState, useCallback, useMemo, useRef, useEffect, type ReactNode } from 'react';
 import { MarkdownEditor } from '../MarkdownEditor';
 import { MarkdownPreview } from '../MarkdownPreview';
 import { SaveStatusButton, type SaveStatus } from '../SaveStatusButton';
+import { CodeBlockView } from './CodeBlockView';
 import { EditHistory } from './EditHistory';
 import { FileTree } from './FileTree';
-import { SaveConfirmDialog } from './SaveConfirmDialog';
-import { CodeBlockView } from './CodeBlockView';
-import { MediaPreview } from './MediaPreview';
-import { useEditSession, type UseEditSessionOptions } from './useEditSession';
-import { getActiveContent, getFiles } from './types';
 import { getFileType, isCompilable, isMarkdownFile, getMimeType } from './fileTypes';
-import { Bobbin, serializeChangesToYAML, type Change } from '@aprovan/bobbin';
+import { MediaPreview } from './MediaPreview';
+import { SaveConfirmDialog } from './SaveConfirmDialog';
+import { getActiveContent, getFiles } from './types';
+import { useEditSession, type UseEditSessionOptions } from './useEditSession';
 import type { VirtualProject } from '@aprovan/patchwork-compiler';
 
 // Simple hash for React key to force re-render on code changes

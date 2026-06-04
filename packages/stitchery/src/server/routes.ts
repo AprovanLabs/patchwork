@@ -1,4 +1,3 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import {
   streamText,
@@ -9,6 +8,7 @@ import {
 } from 'ai';
 import { PATCHWORK_PROMPT, EDIT_PROMPT } from '../prompts.js';
 import type { ServiceRegistry } from './services.js';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 
 export interface RouteContext {
   copilotProxyUrl: string;

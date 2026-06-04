@@ -1,4 +1,12 @@
 import * as esbuild from "esbuild-wasm";
+import { setCdnBaseUrl as setImageCdnBaseUrl } from "./images/loader.js";
+import { getImageRegistry } from "./images/registry.js";
+import { createHttpProxy } from "./mount/bridge.js";
+import { mountEmbedded, reloadEmbedded } from "./mount/embedded.js";
+import { mountIframe, reloadIframe } from "./mount/iframe.js";
+import { setCdnBaseUrl as setTransformCdnBaseUrl , cdnTransformPlugin } from "./transforms/cdn.js";
+import { vfsPlugin } from "./transforms/vfs.js";
+import { createSingleFileProject } from "./vfs/project.js";
 import type {
   Compiler,
   CompilerOptions,
@@ -10,15 +18,6 @@ import type {
   Proxy,
 } from "./types.js";
 import type { VirtualProject } from "./vfs/types.js";
-import { createSingleFileProject } from "./vfs/project.js";
-import { getImageRegistry } from "./images/registry.js";
-import { setCdnBaseUrl as setImageCdnBaseUrl } from "./images/loader.js";
-import { setCdnBaseUrl as setTransformCdnBaseUrl } from "./transforms/cdn.js";
-import { cdnTransformPlugin } from "./transforms/cdn.js";
-import { vfsPlugin } from "./transforms/vfs.js";
-import { createHttpProxy } from "./mount/bridge.js";
-import { mountEmbedded, reloadEmbedded } from "./mount/embedded.js";
-import { mountIframe, reloadIframe } from "./mount/iframe.js";
 
 // Track esbuild initialization
 let esbuildInitialized = false;

@@ -1,6 +1,6 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { streamText } from "ai";
 import { EDIT_PROMPT } from "@aprovan/stitchery";
+import { streamText } from "ai";
 
 export class EditService {
   constructor(private readonly baseUrl: string) {}

@@ -1,10 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, writeFile, rm, readFile } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
-import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { build, type InlineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { viteSingleFile } from "vite-plugin-singlefile";
 import {
   createCompiler,
   loadImage,
@@ -13,7 +10,10 @@ import {
   type ImageConfig,
   type LoadedImage,
 } from "@aprovan/patchwork-compiler";
-import { patchworkCdnPlugin, getPreloadScripts } from "./cdn-plugin.js";
+import react from "@vitejs/plugin-react";
+import { build, type InlineConfig } from "vite";
+import { viteSingleFile } from "vite-plugin-singlefile";
+import { generateServiceShim, generateLiveUpdateShim } from "../shim.js";
 import {
   computeCacheKey,
   set as cacheSet,
@@ -21,7 +21,7 @@ import {
   get as cacheGet,
   type CachedWidget,
 } from "./cache.js";
-import { generateServiceShim, generateLiveUpdateShim } from "../shim.js";
+import { patchworkCdnPlugin, getPreloadScripts } from "./cdn-plugin.js";
 
 const WIDGET_RESOURCE_PREFIX = "ui://widget/";
 

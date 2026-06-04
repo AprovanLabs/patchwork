@@ -1,5 +1,5 @@
-import type { VirtualFile, VirtualProject } from '@aprovan/patchwork-compiler';
 import { createProjectFromFiles, detectMainFile } from '@aprovan/patchwork-compiler';
+import type { VirtualFile, VirtualProject } from '@aprovan/patchwork-compiler';
 
 // Matches fenced code blocks with optional attributes: ```language attr="value"\n...content...```
 // Captures: [1] = language (optional), [2] = attributes (optional), [3] = content

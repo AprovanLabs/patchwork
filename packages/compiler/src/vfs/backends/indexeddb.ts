@@ -1,11 +1,10 @@
-import type { DirEntry, FileStats, FSProvider } from "../core/types.js";
 import {
-  basename,
   createDirEntry,
   createFileStats,
   dirname,
   normalizePath,
 } from "../core/utils.js";
+import type { DirEntry, FileStats, FSProvider } from "../core/types.js";
 
 const DB_NAME = "patchwork-vfs";
 const DB_VERSION = 2;
@@ -22,7 +21,7 @@ function openDB(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = (_event) => {
       const db = request.result;
       if (!db.objectStoreNames.contains(FILES_STORE)) {
         db.createObjectStore(FILES_STORE);

@@ -50,7 +50,7 @@ export function ControlHandles({
   const [isDragging, setIsDragging] = useState(false);
   const [dropTarget, setDropTarget] = useState<HTMLElement | null>(null);
   const [cornerToolbarExpanded, setCornerToolbarExpanded] = useState(false);
-  const toolbarRef = useRef<HTMLDivElement>(null);
+  const _toolbarRef = useRef<HTMLDivElement>(null);
   const { rect } = selectedElement;
 
   const layoutDirection = useMemo(
@@ -59,7 +59,7 @@ export function ControlHandles({
   );
 
   // Check if corner toolbar should collapse
-  const isNarrowElement = rect.width < MIN_WIDTH_FOR_CORNER_TOOLBAR;
+  const _isNarrowElement = rect.width < MIN_WIDTH_FOR_CORNER_TOOLBAR;
   
   // Check if edge zones need collapsing (based on element dimension perpendicular to edge)
   const isShortForVerticalEdge = rect.height < MIN_SIZE_FOR_EDGE_ICONS; // for left/right edges
@@ -117,7 +117,7 @@ export function ControlHandles({
     </svg>
   );
 
-  const MoreIcon = () => (
+  const _MoreIcon = () => (
     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="12" r="1" fill="currentColor" />
       <circle cx="19" cy="12" r="1" fill="currentColor" />
@@ -125,7 +125,7 @@ export function ControlHandles({
     </svg>
   );
 
-  const MoreIconVertical = () => (
+  const _MoreIconVertical = () => (
     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="5" r="1" fill="currentColor" />
       <circle cx="12" cy="12" r="1" fill="currentColor" />
@@ -270,7 +270,7 @@ export function ControlHandles({
   };
 
   // Check if an edge needs collapse based on position
-  const edgeNeedsCollapse = (position: HandlePosition): boolean => {
+  const _edgeNeedsCollapse = (position: HandlePosition): boolean => {
     const isHorizontal = position === 'top' || position === 'bottom';
     return isHorizontal ? isShortForHorizontalEdge : isShortForVerticalEdge;
   };
@@ -417,7 +417,7 @@ export function ControlHandles({
   };
 
   // Expanded popup for collapsed edge zones
-  const EdgeExpandedPopup = ({ position }: { position: HandlePosition }) => {
+  const _EdgeExpandedPopup = ({ position }: { position: HandlePosition }) => {
     const isHorizontal = position === 'top' || position === 'bottom';
     
     // Position the popup to extend in the direction it needs space
@@ -518,7 +518,7 @@ export function ControlHandles({
   );
 
   // Toolbar buttons (always the same, rendered conditionally based on narrow state)
-  const ToolbarButtons = () => (
+  const _ToolbarButtons = () => (
     <>
       <ActionButton
         icon={<MoveIcon />}

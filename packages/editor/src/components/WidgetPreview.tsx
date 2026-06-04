@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { Compiler, Manifest, MountedWidget } from '@aprovan/patchwork-compiler';
 
 export interface WidgetPreviewProps {

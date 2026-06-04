@@ -1,14 +1,17 @@
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { Bobbin } from '@aprovan/bobbin';
+import { createCompiler, type Compiler , type VirtualProject } from "@aprovan/patchwork-compiler";
 import {
-  useState,
-  useRef,
-  useEffect,
-  useMemo,
-  useCallback,
-  createContext,
-  useContext,
-} from "react";
+  extractCodeBlocks,
+  CodePreview,
+  WidgetPreview,
+  MarkdownEditor,
+  ServicesInspector,
+  EditModal,
+  FileTree,
+  type ServiceInfo,
+} from "@aprovan/patchwork-editor";
+import { DefaultChatTransport } from "ai";
 import {
   Send,
   Loader2,
@@ -20,13 +23,22 @@ import {
   RefreshCw,
   X,
 } from "lucide-react";
-import { Bobbin } from '@aprovan/bobbin';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+  createContext,
+  useContext,
+} from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import type { UIMessage } from "ai";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -38,21 +50,8 @@ import {
   DialogContent,
   DialogClose,
 } from "@/components/ui/dialog";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import type { UIMessage } from "ai";
-import { createCompiler, type Compiler } from "@aprovan/patchwork-compiler";
-import {
-  extractCodeBlocks,
-  CodePreview,
-  WidgetPreview,
-  MarkdownEditor,
-  ServicesInspector,
-  EditModal,
-  FileTree,
-  type ServiceInfo,
-} from "@aprovan/patchwork-editor";
-import type { VirtualProject } from "@aprovan/patchwork-compiler";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   listWorkspaceEntries,
   listWorkspacePaths,

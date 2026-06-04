@@ -1,4 +1,3 @@
-import { useMemo, useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -12,8 +11,9 @@ import {
   PinOff,
   X,
 } from 'lucide-react';
-import type { VirtualFile } from '@aprovan/patchwork-compiler';
+import { useMemo, useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
 import { isMediaFile } from './fileTypes';
+import type { VirtualFile } from '@aprovan/patchwork-compiler';
 
 interface TreeNode {
   name: string;
@@ -384,7 +384,6 @@ function LazyTreeNode({
         .catch((err) => setLoadError(err instanceof Error ? err.message : 'Failed to load directory'))
         .finally(() => setLoading(false));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadToken]);
 
   const isActive = entry.path === activePath;

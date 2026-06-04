@@ -1,13 +1,12 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Code, Eye, Pencil, RotateCcw, MessageSquare } from 'lucide-react';
-import type { Compiler, Manifest } from '@aprovan/patchwork-compiler';
 import { createSingleFileProject } from '@aprovan/patchwork-compiler';
+import { Code, Eye, Pencil, RotateCcw, MessageSquare } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { saveProject, getVFSConfig, loadFile, subscribeToChanges } from '../lib/vfs';
 import { EditModal, type CompileFn, CodeBlockView, MediaPreview, getFileType } from './edit';
+import { MarkdownPreview } from './MarkdownPreview';
 import { SaveStatusButton, type SaveStatus } from './SaveStatusButton';
 import { WidgetPreview } from './WidgetPreview';
-import { MarkdownPreview } from './MarkdownPreview';
-import { saveProject, getVFSConfig, loadFile, subscribeToChanges } from '../lib/vfs';
-import type { VirtualProject } from '@aprovan/patchwork-compiler';
+import type { Compiler, Manifest , VirtualProject } from '@aprovan/patchwork-compiler';
 
 interface CodePreviewProps {
   code: string;

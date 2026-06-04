@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { WidgetStore, resetWidgetStore } from "../widget-store/store.js";
-import type { Manifest } from "@aprovan/patchwork-compiler";
 import { MemoryBackend } from "./memory-backend.js";
+import type { Manifest } from "@aprovan/patchwork-compiler";
 
 const TEST_MANIFEST: Manifest = {
   name: "test-widget",

@@ -4,6 +4,8 @@
  * For untrusted widgets that need isolation.
  */
 
+import { generateImportMap } from "../transforms/cdn.js";
+import { ParentBridge, generateIframeBridgeScript } from "./bridge.js";
 import type {
   CompiledWidget,
   LoadedImage,
@@ -11,8 +13,6 @@ import type {
   MountOptions,
   Proxy,
 } from "../types.js";
-import { ParentBridge, generateIframeBridgeScript } from "./bridge.js";
-import { generateImportMap } from "../transforms/cdn.js";
 
 let mountCounter = 0;
 

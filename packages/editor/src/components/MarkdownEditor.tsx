@@ -1,10 +1,10 @@
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Typography from '@tiptap/extension-typography';
-import { Markdown } from 'tiptap-markdown';
 import { TextSelection } from '@tiptap/pm/state';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useCallback, useRef } from 'react';
+import { Markdown } from 'tiptap-markdown';
 import { CodeBlockExtension } from './CodeBlockExtension';
 
 interface MarkdownEditorProps {

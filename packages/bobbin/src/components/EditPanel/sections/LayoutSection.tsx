@@ -1,7 +1,7 @@
-import type { DesignTokens } from '../../../types';
-import { SectionWrapper } from './SectionWrapper';
 import { ToggleGroup } from '../controls/ToggleGroup';
 import { TokenDropdown } from '../controls/TokenDropdown';
+import { SectionWrapper } from './SectionWrapper';
+import type { DesignTokens } from '../../../types';
 
 // Direction icons
 const ArrowRightIcon = () => (

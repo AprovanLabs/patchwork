@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { compileWidget, cacheHas } from "../compiler/compile.js";
-import { clear } from "../compiler/cache.js";
 import { createProjectFromFiles, type Manifest } from "@aprovan/patchwork-compiler";
-import { ServiceBridge, type ServiceBackend, type ServiceToolInfo } from "../services.js";
-import { WidgetStore, resetWidgetStore } from "../widget-store/store.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { clear } from "../compiler/cache.js";
+import { compileWidget, cacheHas } from "../compiler/compile.js";
 import {
   appendEvent,
   getEvents,
@@ -13,13 +12,14 @@ import {
   subscribeSession,
   _resetForTests,
 } from "../live-update.js";
-import { generateServiceShim, generateLiveUpdateShim } from "../shim.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { MemoryBackend } from "./memory-backend.js";
 import {
   REFERENCE_WIDGET_FILES,
   REFERENCE_WIDGET_MANIFEST,
 } from "../reference-widgets/live-dashboard.js";
+import { ServiceBridge, type ServiceBackend, type ServiceToolInfo } from "../services.js";
+import { generateServiceShim, generateLiveUpdateShim } from "../shim.js";
+import { WidgetStore, resetWidgetStore } from "../widget-store/store.js";
+import { MemoryBackend } from "./memory-backend.js";
 
 const DASHBOARD_MANIFEST: Manifest = REFERENCE_WIDGET_MANIFEST;
 

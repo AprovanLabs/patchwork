@@ -2,8 +2,8 @@
  * Image registry - manages loaded images
  */
 
-import type { LoadedImage } from '../types.js';
 import { loadImage, parseImageSpec } from './loader.js';
+import type { LoadedImage } from '../types.js';
 
 /**
  * Registry of loaded images

@@ -1,3 +1,6 @@
+import { join, normalizePath } from "../core/utils.js";
+import { readChecksums } from "./differ.js";
+import { resolveConflict } from "./resolver.js";
 import type {
   ChangeRecord,
   ConflictRecord,
@@ -11,9 +14,6 @@ import type {
   WatchEventType,
 } from "../core/types.js";
 import type { VirtualFS } from "../core/virtual-fs.js";
-import { join, normalizePath } from "../core/utils.js";
-import { readChecksums } from "./differ.js";
-import { resolveConflict } from "./resolver.js";
 
 export interface SyncEngineConfig {
   conflictStrategy?: ConflictStrategy;

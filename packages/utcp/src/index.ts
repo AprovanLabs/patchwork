@@ -13,9 +13,8 @@ import {
   UtcpClient,
   ensureCorePluginsInitialized,
   UtcpClientConfigSerializer,
-  UtcpClientConfig,
+  type UtcpClientConfig,
 } from '@utcp/sdk';
-
 import type { ServiceBackend } from '@aprovan/patchwork';
 
 // Ensure plugins are loaded

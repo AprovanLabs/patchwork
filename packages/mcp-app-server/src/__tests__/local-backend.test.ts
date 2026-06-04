@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdir, rm } from "node:fs/promises";
-import { resolve } from "node:path";
-import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { LocalFileBackend } from "../widget-store/local-backend.js";
 
 let testDir: string;

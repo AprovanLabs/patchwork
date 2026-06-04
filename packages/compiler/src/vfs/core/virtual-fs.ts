@@ -1,3 +1,5 @@
+import { MemoryBackend } from "../backends/memory.js";
+import { dirname } from "./utils.js";
 import type {
   ChangeRecord,
   DirEntry,
@@ -6,8 +8,6 @@ import type {
   WatchCallback,
   WatchEventType,
 } from "./types.js";
-import { MemoryBackend } from "../backends/memory.js";
-import { dirname } from "./utils.js";
 
 type ChangeListener = (record: ChangeRecord) => void;
 

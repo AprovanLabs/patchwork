@@ -1,3 +1,7 @@
+import { join } from "./core/utils.js";
+import { VirtualFS } from "./core/virtual-fs.js";
+import { resolveEntry } from "./project.js";
+import { SyncEngineImpl } from "./sync/index.js";
 import type {
   ChangeRecord,
   ConflictRecord,
@@ -11,11 +15,7 @@ import type {
   SyncStatus,
   WatchCallback,
 } from "./core/types.js";
-import { join } from "./core/utils.js";
-import { VirtualFS } from "./core/virtual-fs.js";
-import { SyncEngineImpl } from "./sync/index.js";
 import type { VirtualFile, VirtualProject } from "./types.js";
-import { resolveEntry } from "./project.js";
 
 export interface VFSStoreOptions {
   root?: string;

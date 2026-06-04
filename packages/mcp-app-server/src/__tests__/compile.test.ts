@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { compileWidget, cacheHas } from "../compiler/compile.js";
-import { clear } from "../compiler/cache.js";
 import { createProjectFromFiles } from "@aprovan/patchwork-compiler";
+import { describe, it, expect } from "vitest";
+import { clear } from "../compiler/cache.js";
+import { compileWidget, cacheHas } from "../compiler/compile.js";
 import type { Manifest } from "@aprovan/patchwork-compiler";
 
 const TEST_MANIFEST: Manifest = {

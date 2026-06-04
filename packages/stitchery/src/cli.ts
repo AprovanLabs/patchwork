@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import path from "path";
 import fs from "fs";
-import { Command } from "commander";
+import path from "path";
 import { getAvailablePort } from "@aprovan/devtools";
+import { Command } from "commander";
 import { createStitcheryServer } from "./server/index.js";
 
 const program = new Command();
