@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateServiceShim } from "../shim.js";
+import { generateServiceShim, generateLiveUpdateShim } from "../shim.js";
 
 describe("generateServiceShim", () => {
   it("returns empty string when namespaces is empty", () => {
@@ -76,5 +76,57 @@ describe("generateServiceShim", () => {
     const result = generateServiceShim({ namespaces: ["weather"] });
     expect(result).toContain(".catch");
     expect(result).toContain("Failed to connect");
+  });
+});
+
+describe("generateLiveUpdateShim", () => {
+  it("imports App from esm.sh ext-apps", () => {
+    const shim = generateLiveUpdateShim();
+    expect(shim).toContain("import { App } from");
+    expect(shim).toContain("esm.sh/@modelcontextprotocol/ext-apps");
+  });
+
+  it("uses default ext-apps version when not specified", () => {
+    const shim = generateLiveUpdateShim();
+    expect(shim).toContain("^1.7.3");
+  });
+
+  it("uses custom ext-apps version when specified", () => {
+    const shim = generateLiveUpdateShim({ extAppsVersion: "2.0.0" });
+    expect(shim).toContain("@modelcontextprotocol/ext-apps@2.0.0");
+  });
+
+  it("guards against double App initialisation", () => {
+    const shim = generateLiveUpdateShim();
+    expect(shim).toContain("if (!window.__patchwork_app)");
+  });
+
+  it("exposes window.patchwork.subscribe", () => {
+    const shim = generateLiveUpdateShim();
+    expect(shim).toContain("subscribe:");
+    expect(shim).toContain("subscribe_stream");
+  });
+
+  it("exposes window.patchwork.updateContext", () => {
+    const shim = generateLiveUpdateShim();
+    expect(shim).toContain("updateContext:");
+    expect(shim).toContain("ui/update-model-context");
+  });
+
+  it("exposes window.patchwork.fireEvent", () => {
+    const shim = generateLiveUpdateShim();
+    expect(shim).toContain("fireEvent:");
+    expect(shim).toContain("callServerTool");
+  });
+
+  it("registers a notifications/tools/list_changed handler for polling", () => {
+    const shim = generateLiveUpdateShim();
+    expect(shim).toContain("notifications/tools/list_changed");
+    expect(shim).toContain("poll_updates");
+  });
+
+  it("poll_updates passes after_seq to avoid duplicates", () => {
+    const shim = generateLiveUpdateShim();
+    expect(shim).toContain("after_seq");
   });
 });

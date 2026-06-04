@@ -4,6 +4,7 @@ import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createMcpAppServer, type McpAppServerOptions } from './index.js';
 import { createRegistryBackend, type RegistryBackend } from './registry-backend.js';
+import { registerSession, unregisterSession } from './live-update.js';
 
 const PORT = Number(process.env['PORT'] ?? 3000);
 const HOST = process.env['HOST'] ?? '0.0.0.0';
@@ -68,20 +69,70 @@ async function startServer(): Promise<void> {
   app.use(cors());
 
   /**
-   * MCP endpoint — stateless mode.
+   * Session store for stateful MCP connections.
    *
-   * Each HTTP request gets its own McpServer + StreamableHTTPServerTransport pair.
-   * The underlying Registry connection (registryBackend) is long-lived and shared.
+   * Each MCP session gets its own McpServer + StreamableHTTPServerTransport pair.
+   * The session ID is minted on initialization and echoed in the Mcp-Session-Id
+   * response header so the host can route subsequent requests and the standalone
+   * GET SSE stream back to the correct server instance.
+   *
+   * Stateful sessions are required for server-initiated push: calling
+   * `mcpServer.server.notification(...)` on a live session delivers the
+   * message through the session's SSE stream to the host, which forwards it to
+   * the widget iframe.
+   */
+  const sessionStore = new Map<
+    string,
+    { server: ReturnType<typeof createMcpAppServer>; transport: StreamableHTTPServerTransport }
+  >();
+
+  /**
+   * MCP endpoint — stateful session mode.
+   *
+   * First request (no Mcp-Session-Id header): creates a new session.
+   * Subsequent requests carry the session ID and are routed to the existing
+   * server + transport pair.
    */
   app.all('/mcp', async (req, res) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+    if (sessionId) {
+      const existing = sessionStore.get(sessionId);
+      if (existing) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          await existing.transport.handleRequest(req, res, req.body);
+        } catch (err) {
+          console.error('[mcp] session request error', err);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Internal server error' });
+          }
+        }
+        return;
+      }
+      // Unknown session ID — fall through to create a fresh session.
+    }
+
+    // New session
     const mcpServer = createMcpAppServer(serverOptions);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (id) => {
+        sessionStore.set(id, { server: mcpServer, transport });
+        registerSession(id, mcpServer);
+      },
+      onsessionclosed: (id) => {
+        sessionStore.delete(id);
+        unregisterSession(id);
+      },
     });
 
-    // Clean up when the response finishes
+    // Clean up when the response finishes (handles SSE streams that close early)
     res.on('close', () => {
-      void mcpServer.close();
+      const id = transport.sessionId;
+      if (id && !sessionStore.has(id)) {
+        void mcpServer.close();
+      }
     });
 
     try {
@@ -89,7 +140,7 @@ async function startServer(): Promise<void> {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       await transport.handleRequest(req, res, req.body);
     } catch (err) {
-      console.error('[mcp] request error', err);
+      console.error('[mcp] new session error', err);
       if (!res.headersSent) {
         res.status(500).json({ error: 'Internal server error' });
       }
@@ -103,7 +154,7 @@ async function startServer(): Promise<void> {
 
   app.listen(PORT, HOST, () => {
     console.log(`MCP App Server listening on http://${HOST}:${PORT}`);
-    console.log(`  POST /mcp    — MCP Streamable HTTP endpoint`);
+    console.log(`  POST /mcp    — MCP Streamable HTTP endpoint (stateful sessions)`);
     console.log(`  GET  /health — health check`);
     console.log();
     console.log('To expose locally via cloudflared:');
