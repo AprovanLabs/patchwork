@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { createHighlighter, type Highlighter, type BundledLanguage } from 'shiki';
 
@@ -117,12 +118,15 @@ export function CodeBlockView({ content, language, editable = false, onChange }:
   const highlightedHtml = useMemo(() => {
     if (!highlighter) return null;
     try {
-      return highlighter.codeToHtml(content, {
+      const raw = highlighter.codeToHtml(content, {
         lang: shikiLang,
         theme: 'github-light',
       });
+      return DOMPurify.sanitize(raw, {
+        ALLOWED_TAGS: ['pre', 'code', 'span', 'div'],
+        ALLOWED_ATTR: ['class', 'style'],
+      });
     } catch {
-      // Fallback if language is not supported
       return null;
     }
   }, [highlighter, content, shikiLang]);
