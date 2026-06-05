@@ -22,6 +22,7 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { log, warn } from "./logger.js";
 import type { ServiceBackend, ServiceToolInfo } from "./services.js";
 
 // ---------------------------------------------------------------------------
@@ -112,12 +113,12 @@ async function loadRegistryToolInfos(client: Client): Promise<ServiceToolInfo[]>
   try {
     toolNames = JSON.parse(listText);
   } catch {
-    console.warn("[registry-backend] Failed to parse tool list response from Registry");
+    warn("registry-backend", "Failed to parse tool list response from Registry");
     return [];
   }
 
   if (!Array.isArray(toolNames)) {
-    console.warn("[registry-backend] Unexpected tool list format from Registry (expected array)");
+    warn("registry-backend", "Unexpected tool list format from Registry (expected array)");
     return [];
   }
 
@@ -158,7 +159,7 @@ async function loadRegistryToolInfos(client: Client): Promise<ServiceToolInfo[]>
             parameters: raw.inputSchema as Record<string, unknown> | undefined,
           };
         } catch (err) {
-          console.warn(`[registry-backend] Failed to fetch tool info for '${mcpName}': ${err}`);
+          warn("registry-backend", `Failed to fetch tool info for '${mcpName}': ${err}`);
           return null;
         }
       }),
@@ -172,8 +173,9 @@ async function loadRegistryToolInfos(client: Client): Promise<ServiceToolInfo[]>
   }
 
   const providerCount = new Set(toolInfos.map((t) => t.namespace)).size;
-  console.log(
-    `[registry-backend] Loaded ${toolInfos.length} tools from ${providerCount} provider(s)`,
+  log(
+    "registry-backend",
+    `Loaded ${toolInfos.length} tools from ${providerCount} provider(s)`,
   );
 
   return toolInfos;

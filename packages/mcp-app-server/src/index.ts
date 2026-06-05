@@ -25,6 +25,7 @@ import {
   currentSeq,
   type StreamEvent,
 } from "./live-update.js";
+import { warn } from "./logger.js";
 import {
   ServiceBridge,
   type ServiceBackend,
@@ -255,8 +256,9 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
           (ns) => !availableNamespaces.includes(ns),
         );
         if (unavailable.length > 0) {
-          console.warn(
-            `[mcp-app-server] Requested services not available: ${unavailable.join(", ")}. Available: ${availableNamespaces.join(", ")}`,
+          warn(
+            "mcp-app-server",
+            `Requested services not available: ${unavailable.join(", ")}. Available: ${availableNamespaces.join(", ")}`,
           );
         }
       }
