@@ -13,7 +13,7 @@ export type {
   SyncStatus,
   WatchCallback,
   WatchEventType,
-} from "./core/index.js";
+} from "./core/types.js";
 
 export {
   basename,
@@ -22,11 +22,14 @@ export {
   dirname,
   join,
   normalizePath,
-  VirtualFS,
-} from "./core/index.js";
+} from "./core/utils.js";
+
+export { VirtualFS } from "./core/virtual-fs.js";
 
 // Sync engine
-export { SyncEngineImpl, type SyncEngineConfig } from "./sync/index.js";
+export { SyncEngineImpl, type SyncEngineConfig } from "./sync/engine.js";
+export { hashContent, readChecksum, readChecksums } from "./sync/differ.js";
+export { resolveConflict, type ConflictResolutionInput } from "./sync/resolver.js";
 
 // Backends
 export { MemoryBackend } from "./backends/memory.js";
