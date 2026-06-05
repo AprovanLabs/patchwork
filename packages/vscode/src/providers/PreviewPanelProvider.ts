@@ -284,7 +284,7 @@ export class PreviewPanelProvider {
       try {
         return await import(compilerUrl);
       } catch (error) {
-        console.warn('[patchwork-vscode] Failed to load local compiler:', error);
+        console.warn('Failed to load local compiler, using fallback:', error);
         return import(fallbackCompilerUrl);
       }
     }
