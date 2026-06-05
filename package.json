@@ -14,17 +14,20 @@
     "clean": "turbo run clean && rm -rf node_modules packages/*/node_modules packages/*/dist"
   },
   "devDependencies": {
-    "@aprovan/eslint-config": "file:../core/packages/eslint-config",
-    "@aprovan/tsconfig": "file:../core/packages/tsconfig",
-    "eslint": "^8.57.0",
+    "@aprovan/eslint-config": "^1.0.0",
+    "@aprovan/prettier-config": "^1.0.0",
+    "@aprovan/tsconfig": "^0.1.0",
+    "eslint": "^9.0.0",
     "eslint-plugin-tsdoc": "^0.5.0",
+    "globals": "^15.0.0",
     "lint-staged": "^13.0.3",
-    "prettier": "^2.7.1",
+    "prettier": "^3.0.0",
     "tsx": "^4.19.2",
     "turbo": "^2.3.3",
     "typescript": "^5.7.3",
     "vitest": "2.1.5"
   },
+  "prettier": "@aprovan/prettier-config",
   "lint-staged": {
     "*.{ts,tsx}": "eslint --fix",
     "*.{js,jsx,ts,tsx,md,scss}": "prettier --write"
