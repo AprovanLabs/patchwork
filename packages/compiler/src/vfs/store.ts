@@ -1,7 +1,7 @@
 import { join } from "./core/utils.js";
 import { VirtualFS } from "./core/virtual-fs.js";
 import { resolveEntry } from "./project.js";
-import { SyncEngineImpl } from "./sync/index.js";
+import { SyncEngineImpl } from "./sync/engine.js";
 import type {
   ChangeRecord,
   ConflictRecord,

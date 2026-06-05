@@ -92,12 +92,10 @@ export {
 export {
   cdnTransformPlugin,
   generateImportMap,
-  vfsPlugin,
-} from "./transforms/index.js";
-export type {
-  CdnTransformOptions,
-  VFSPluginOptions,
-} from "./transforms/index.js";
+} from "./transforms/cdn.js";
+export type { CdnTransformOptions } from "./transforms/cdn.js";
+export { vfsPlugin } from "./transforms/vfs.js";
+export type { VFSPluginOptions } from "./transforms/vfs.js";
 
 // VFS
 export {
