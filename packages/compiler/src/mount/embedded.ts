@@ -246,7 +246,7 @@ export async function mountEmbedded(
         if (result instanceof HTMLElement) {
           container.appendChild(result);
         } else if (typeof result === "string") {
-          container.innerHTML = result;
+          container.textContent = result;
         }
       }
     }

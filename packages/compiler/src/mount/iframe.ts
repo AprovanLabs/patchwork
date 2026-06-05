@@ -205,7 +205,7 @@ function generateIframeContent(
         return;
       }
       if (typeof result === 'string') {
-        root.innerHTML = result;
+        root.textContent = result;
         return;
       }
 
