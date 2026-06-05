@@ -11,12 +11,7 @@ import {
 } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import {
-  compileWidget,
-  allEntries,
-  type CompileWidgetResult,
-} from "./compiler/index.js";
-import HELLO_WORLD_HTML from "./hello-world.html";
+import { compileWidget, allEntries, type CompileWidgetResult } from "./compiler/index.js";
 import {
   subscribeSession,
   unsubscribeSession as _unsubscribeSession,
@@ -32,16 +27,11 @@ import {
   type ServiceToolInfo,
   type ServiceBridgeConfig,
 } from "./services.js";
-import {
-  type WidgetStore,
-  getWidgetStore,
-} from "./widget-store/index.js";
+import { type WidgetStore, getWidgetStore } from "./widget-store/index.js";
 
 export type { ServiceBackend, ServiceToolInfo, ServiceBridgeConfig };
 export type { StreamEvent };
 export { pushStreamUpdate };
-
-const HELLO_WORLD_RESOURCE_URI = "ui://hello-world/view.html";
 
 const MANIFEST_DEFAULTS: Manifest = {
   name: "widget",
@@ -55,16 +45,15 @@ function buildManifest(input?: Record<string, unknown>): Manifest {
     name: (input?.["name"] as string) ?? MANIFEST_DEFAULTS.name,
     version: (input?.["version"] as string) ?? MANIFEST_DEFAULTS.version,
     platform: "browser",
-    image:
-      (input?.["image"] as string) ?? MANIFEST_DEFAULTS.image,
-    services: (input?.["services"] as string[] | undefined),
+    image: (input?.["image"] as string) ?? MANIFEST_DEFAULTS.image,
+    services: input?.["services"] as string[] | undefined,
   };
 }
 
 function buildVirtualProject(
   source?: string,
   files?: Array<{ path: string; content: string }>,
-  entry?: string,
+  entry?: string
 ): string | VirtualProject {
   if (files && files.length > 0) {
     const virtualFiles: VirtualFile[] = files.map((f) => ({
@@ -73,13 +62,10 @@ function buildVirtualProject(
     }));
     return createProjectFromFiles(virtualFiles, entry);
   }
-  return source ?? 'export default function Widget() { return <div>Hello Patchwork</div>; }';
+  return source ?? "export default function Widget() { return <div>Hello Patchwork</div>; }";
 }
 
-async function registerStoredWidgetResources(
-  server: McpServer,
-  store: WidgetStore,
-): Promise<void> {
+async function registerStoredWidgetResources(server: McpServer, store: WidgetStore): Promise<void> {
   const widgets = await store.loadAll();
   for (const widget of widgets) {
     registerAppResource(
@@ -97,7 +83,7 @@ async function registerStoredWidgetResources(
             text: widget.html,
           },
         ],
-      }),
+      })
     );
   }
 }
@@ -119,7 +105,7 @@ function registerCachedWidgetResources(server: McpServer): void {
             text: entry.html,
           },
         ],
-      }),
+      })
     );
   }
 }
@@ -134,49 +120,9 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
     version: "0.1.0",
   });
 
-  const serviceBridge = options.services
-    ? new ServiceBridge(options.services)
-    : null;
+  const serviceBridge = options.services ? new ServiceBridge(options.services) : null;
 
   const store = getWidgetStore();
-
-  registerAppTool(
-    server,
-    "hello_world",
-    {
-      description:
-        "Display a hello-world widget inline in the conversation. " +
-        "Returns a static greeting card rendered as an MCP App.",
-      _meta: { ui: { resourceUri: HELLO_WORLD_RESOURCE_URI } },
-    },
-    async () => ({
-      content: [
-        {
-          type: "text" as const,
-          text: "Hello, world! The widget is rendered inline above.",
-        },
-      ],
-    }),
-  );
-
-  registerAppResource(
-    server,
-    "Hello World View",
-    HELLO_WORLD_RESOURCE_URI,
-    {
-      description:
-        "Hello-world HTML widget for the Patchwork MCP App Server demo.",
-    },
-    async () => ({
-      contents: [
-        {
-          uri: HELLO_WORLD_RESOURCE_URI,
-          mimeType: RESOURCE_MIME_TYPE,
-          text: HELLO_WORLD_HTML,
-        },
-      ],
-    }),
-  );
 
   registerAppTool(
     server,
@@ -191,39 +137,36 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
           .string()
           .optional()
           .describe(
-            "JSX/TSX source code for a single-file widget. Must export a default React component.",
+            "JSX/TSX source code for a single-file widget. Must export a default React component."
           ),
         files: z
           .array(
             z.object({
               path: z.string().describe("File path relative to project root (e.g. 'main.tsx')"),
               content: z.string().describe("File contents"),
-            }),
+            })
           )
           .optional()
           .describe(
-            "Array of files for a multi-file widget project. At least one file should be the entry point (main.tsx or index.tsx).",
+            "Array of files for a multi-file widget project. At least one file should be the entry point (main.tsx or index.tsx)."
           ),
         entry: z
           .string()
           .optional()
           .describe("Entry point file path. Defaults to auto-detection (main.tsx, index.tsx)."),
-        name: z
-          .string()
-          .optional()
-          .describe("Widget name for the manifest. Defaults to 'widget'."),
+        name: z.string().optional().describe("Widget name for the manifest. Defaults to 'widget'."),
         image: z
           .string()
           .optional()
           .describe(
-            "Patchwork image package to use. Defaults to '@aprovan/patchwork-image-shadcn'.",
+            "Patchwork image package to use. Defaults to '@aprovan/patchwork-image-shadcn'."
           ),
         services: z
           .array(z.string())
           .optional()
           .describe(
             "Service namespaces the widget calls (e.g., ['weather', 'stripe']). " +
-            "A proxy shim is injected so widget code can call namespace.procedure(args) directly.",
+              "A proxy shim is injected so widget code can call namespace.procedure(args) directly."
           ),
       },
       _meta: {
@@ -232,9 +175,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
     },
     async (args) => {
       const source = args?.["source"] as string | undefined;
-      const files = args?.["files"] as
-        | Array<{ path: string; content: string }>
-        | undefined;
+      const files = args?.["files"] as Array<{ path: string; content: string }> | undefined;
       const entry = args?.["entry"] as string | undefined;
       const requestedServices = args?.["services"] as string[] | undefined;
 
@@ -249,16 +190,12 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
       let compileServices: string[] | undefined;
       if (requestedServices && requestedServices.length > 0 && serviceBridge) {
         const availableNamespaces = serviceBridge.getNamespaces();
-        compileServices = requestedServices.filter((ns) =>
-          availableNamespaces.includes(ns),
-        );
-        const unavailable = requestedServices.filter(
-          (ns) => !availableNamespaces.includes(ns),
-        );
+        compileServices = requestedServices.filter((ns) => availableNamespaces.includes(ns));
+        const unavailable = requestedServices.filter((ns) => !availableNamespaces.includes(ns));
         if (unavailable.length > 0) {
           warn(
             "mcp-app-server",
-            `Requested services not available: ${unavailable.join(", ")}. Available: ${availableNamespaces.join(", ")}`,
+            `Requested services not available: ${unavailable.join(", ")}. Available: ${availableNamespaces.join(", ")}`
           );
         }
       }
@@ -267,7 +204,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
         const result: CompileWidgetResult = await compileWidget(
           project,
           manifest,
-          compileServices ? { services: compileServices } : {},
+          compileServices ? { services: compileServices } : {}
         );
 
         const entryPath = typeof project === "string" ? undefined : project.entry;
@@ -289,7 +226,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
                 text: result.html,
               },
             ],
-          }),
+          })
         );
 
         registerAppResource(
@@ -307,7 +244,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
                 text: result.html,
               },
             ],
-          }),
+          })
         );
 
         return {
@@ -326,8 +263,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
           },
         };
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         return {
           content: [
             {
@@ -338,7 +274,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
           isError: true,
         };
       }
-    },
+    }
   );
 
   if (serviceBridge) {
@@ -387,7 +323,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
           },
         ],
       };
-    },
+    }
   );
 
   registerAppTool(
@@ -398,13 +334,13 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
         "Render a persisted widget by its name and hash. " +
         "Serves the compiled widget as an MCP App resource rendered inline in the conversation.",
       inputSchema: {
-        name: z
-          .string()
-          .describe("Widget name (as stored in the VFS widget store)."),
+        name: z.string().describe("Widget name (as stored in the VFS widget store)."),
         hash: z
           .string()
           .optional()
-          .describe("Widget content hash. If omitted, renders the most recent version of the named widget."),
+          .describe(
+            "Widget content hash. If omitted, renders the most recent version of the named widget."
+          ),
       },
       _meta: {
         ui: { resourceUri: "ui://widgets/{name}/{hash}/view.html" },
@@ -441,7 +377,9 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
             isError: true,
           };
         }
-        const resourcePath = match.resourceUri.replace("ui://widgets/", "").replace("/view.html", "");
+        const resourcePath = match.resourceUri
+          .replace("ui://widgets/", "")
+          .replace("/view.html", "");
         const parts = resourcePath.split("/");
         hash = parts[1] ?? parts[0] ?? "";
       }
@@ -486,7 +424,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
               text: widget.html,
             },
           ],
-        }),
+        })
       );
 
       return {
@@ -500,7 +438,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
           ui: { resourceUri: widget.resourceUri },
         },
       };
-    },
+    }
   );
 
   registerCachedWidgetResources(server);
@@ -545,7 +483,7 @@ function registerLiveUpdateTools(server: McpServer): void {
           .optional()
           .describe(
             "MCP session ID. Widgets should pass the value returned in the " +
-            "Mcp-Session-Id response header during initialization.",
+              "Mcp-Session-Id response header during initialization."
           ),
       },
     },
@@ -554,7 +492,7 @@ function registerLiveUpdateTools(server: McpServer): void {
       // Prefer an explicit session_id arg; fall back to the transport session
       const sessionId =
         ((args as Record<string, unknown>)["session_id"] as string | undefined) ??
-        (extra as Record<string, unknown>)["sessionId"] as string | undefined;
+        ((extra as Record<string, unknown>)["sessionId"] as string | undefined);
 
       if (sessionId) {
         subscribeSession(sessionId, stream);
@@ -569,7 +507,7 @@ function registerLiveUpdateTools(server: McpServer): void {
           },
         ],
       };
-    },
+    }
   );
 
   // poll_updates — returns buffered events for a stream since afterSeq.
@@ -588,7 +526,7 @@ function registerLiveUpdateTools(server: McpServer): void {
           .int()
           .default(0)
           .describe(
-            "Return only events with seq > after_seq. Pass 0 to retrieve all buffered events.",
+            "Return only events with seq > after_seq. Pass 0 to retrieve all buffered events."
           ),
       },
     },
@@ -605,7 +543,7 @@ function registerLiveUpdateTools(server: McpServer): void {
           },
         ],
       };
-    },
+    }
   );
 
   // push_update — backend or LLM pushes new data onto a stream.
@@ -638,6 +576,6 @@ function registerLiveUpdateTools(server: McpServer): void {
           },
         ],
       };
-    },
+    }
   );
 }

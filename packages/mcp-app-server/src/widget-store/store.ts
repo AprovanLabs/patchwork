@@ -1,18 +1,23 @@
 import { join, resolve } from "node:path";
+import { homedir } from "node:os";
 import { LocalFileBackend } from "./local-backend.js";
 import type { FSProvider, StoredWidget, StoredWidgetInfo, WidgetStoreOptions } from "./types.js";
 import type { Manifest } from "@aprovan/patchwork-compiler";
 
 const WIDGETS_PREFIX = "widgets";
 const RESOURCE_URI_PREFIX = "ui://widgets/";
-const DEFAULT_STORAGE_DIR = ".widget-store";
+
+function getDefaultStorageDir(): string {
+  // Use WIDGET_STORE_PATH env var, or fall back to ~/.patchwork/widget-store
+  return process.env["WIDGET_STORE_PATH"] ?? join(homedir(), ".patchwork", "widget-store");
+}
 
 export class WidgetStore {
   private provider: FSProvider;
   private storageDir: string;
 
   constructor(options: WidgetStoreOptions = {}) {
-    this.storageDir = resolve(options.storageDir ?? DEFAULT_STORAGE_DIR);
+    this.storageDir = resolve(options.storageDir ?? getDefaultStorageDir());
     this.provider = options.backend ?? new LocalFileBackend(this.storageDir);
   }
 

@@ -18,21 +18,22 @@ function formatMessage(tag: string, ...args: unknown[]): unknown[] {
   return [`[${tag}]`, ...args];
 }
 
+// All logging goes to stderr to avoid interfering with MCP stdio protocol on stdout
 export function debug(tag: string, ...args: unknown[]): void {
   if (shouldLog('debug')) {
-    console.debug(...formatMessage(tag, ...args));
+    console.error(...formatMessage(tag, ...args));
   }
 }
 
 export function log(tag: string, ...args: unknown[]): void {
   if (shouldLog('info')) {
-    console.info(...formatMessage(tag, ...args));
+    console.error(...formatMessage(tag, ...args));
   }
 }
 
 export function warn(tag: string, ...args: unknown[]): void {
   if (shouldLog('warn')) {
-    console.warn(...formatMessage(tag, ...args));
+    console.error(...formatMessage(tag, ...args));
   }
 }
 

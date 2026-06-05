@@ -37,20 +37,46 @@ Claude Desktop connects to the MCP App Server via a local MCP server configurati
 
 ### Setup
 
-1. Open Claude Desktop settings → Developer → Edit Config
-2. Add the MCP server entry to `claude_desktop_config.json`:
+1. Install the MCP App Server globally or use npx:
+   ```bash
+   # Option A: Install globally
+   cd packages/mcp-app-server
+   pnpm build
+   npm link
+   
+   # Option B: Use npx (after publishing to npm)
+   # npx @aprovan/mcp-app-server
+   ```
 
-```json
-{
-  "mcpServers": {
-    "patchwork": {
-      "url": "http://localhost:3000/mcp"
-    }
-  }
-}
-```
+2. Open Claude Desktop settings → Developer → Edit Config
+3. Add the MCP server entry to `claude_desktop_config.json`:
 
-3. Restart Claude Desktop
+   **For local development (HTTP transport):**
+   ```json
+   {
+     "mcpServers": {
+       "patchwork": {
+         "url": "http://localhost:3000/mcp"
+       }
+     }
+   }
+   ```
+
+   **For stdio transport (after npm link):**
+   ```json
+   {
+     "mcpServers": {
+       "patchwork": {
+         "command": "mcp-app-server",
+         "env": {
+           "PORT": "3000"
+         }
+       }
+     }
+   }
+   ```
+
+4. Restart Claude Desktop
 
 ### Testing procedure
 

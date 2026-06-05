@@ -191,12 +191,12 @@ export class ServiceRegistry {
           val.type === "number"
             ? "number"
             : val.type === "boolean"
-              ? "boolean"
-              : val.type === "array"
-                ? "unknown[]"
-                : val.type === "object"
-                  ? "Record<string, unknown>"
-                  : "string";
+            ? "boolean"
+            : val.type === "array"
+            ? "unknown[]"
+            : val.type === "object"
+            ? "Record<string, unknown>"
+            : "string";
         const comment = val.description ? ` // ${val.description}` : "";
         return `  ${key}${optional}: ${type};${comment}`;
       })
@@ -219,29 +219,6 @@ export class ServiceRegistry {
    */
   private toLLMToolName(internalName: string): string {
     return internalName.replace(/\./g, "_");
-  }
-
-  /**
-   * Convert LLM tool name (namespace_procedure) back to internal name (namespace.procedure)
-   * Only converts the first underscore after the namespace prefix
-   */
-  private fromLLMToolName(llmName: string): string {
-    // Find the tool by checking if any registered tool converts to this LLM name
-    for (const internalName of this.tools.keys()) {
-      if (this.toLLMToolName(internalName) === llmName) {
-        return internalName;
-      }
-    }
-    // Fallback: convert first underscore to dot
-    const underscoreIndex = llmName.indexOf("_");
-    if (underscoreIndex > 0) {
-      return (
-        llmName.substring(0, underscoreIndex) +
-        "." +
-        llmName.substring(underscoreIndex + 1)
-      );
-    }
-    return llmName;
   }
 
   /**

@@ -135,7 +135,7 @@ describe("createRegistryBackend", () => {
   it("loads tool infos from the Registry and maps them to ServiceToolInfo", async () => {
     const backend = await createRegistryBackend({
       command: "npx",
-      args: ["@utdk/mcp-server"],
+      args: ["@utdk/mcp"],
       providers: "github,stripe",
     });
 
@@ -171,7 +171,7 @@ describe("createRegistryBackend", () => {
 
     const backend = await createRegistryBackend({
       command: "npx",
-      args: ["@utdk/mcp-server"],
+      args: ["@utdk/mcp"],
       providers: "github",
     });
 
@@ -196,7 +196,7 @@ describe("createRegistryBackend", () => {
 
     const backend = await createRegistryBackend({
       command: "npx",
-      args: ["@utdk/mcp-server"],
+      args: ["@utdk/mcp"],
       providers: "bad",
     });
 
@@ -214,7 +214,7 @@ describe("createRegistryBackend", () => {
 
     const backend = await createRegistryBackend({
       command: "npx",
-      args: ["@utdk/mcp-server"],
+      args: ["@utdk/mcp"],
       providers: "stripe",
     });
 
@@ -231,7 +231,7 @@ describe("createRegistryBackend", () => {
 
     const backend = await createRegistryBackend({
       command: "npx",
-      args: ["@utdk/mcp-server"],
+      args: ["@utdk/mcp"],
       providers: "some",
     });
 
@@ -247,7 +247,7 @@ describe("createRegistryBackend", () => {
 
     const backend = await createRegistryBackend({
       command: "npx",
-      args: ["@utdk/mcp-server"],
+      args: ["@utdk/mcp"],
       providers: "",
     });
 

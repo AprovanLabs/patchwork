@@ -24,7 +24,7 @@ Set `REGISTRY_PROVIDERS` before starting the server:
 REGISTRY_PROVIDERS=github,slack,stripe pnpm dev
 ```
 
-The server will spawn `npx @utdk/mcp-server` automatically with the requested providers.
+The server will spawn `npx @utdk/mcp` automatically with the requested providers.
 
 ### Credential configuration
 
@@ -99,11 +99,11 @@ const intent = await stripe.payment_intents_create({
 });
 ```
 
-The call chain is: widget → `callServerTool` → `ServiceBridge` → `RegistryBackend` → `@utdk/mcp-server` → provider API.
+The call chain is: widget → `callServerTool` → `ServiceBridge` → `RegistryBackend` → `@utdk/mcp` → provider API.
 
 ### Overriding the Registry command
 
-By default the server uses `npx @utdk/mcp-server`. You can point to a locally built binary instead:
+By default the server uses `npx @utdk/mcp`. You can point to a locally built binary instead:
 
 ```bash
 REGISTRY_COMMAND=/path/to/registry/apps/mcp-server/dist/server.js \
@@ -124,7 +124,7 @@ Registry tool namespaces (one per provider) are registered separately from any l
 | `HOST` | `0.0.0.0` | Host interface |
 | `REGISTRY_PROVIDERS` | _(unset)_ | Enable Registry backend; comma-separated provider list |
 | `REGISTRY_COMMAND` | `npx` | Command used to spawn the Registry MCP server |
-| `REGISTRY_ARGS` | _(unset)_ | Space-separated extra args appended after `@utdk/mcp-server` |
+| `REGISTRY_ARGS` | _(unset)_ | Space-separated extra args appended after `@utdk/mcp` |
 
 ## MCP endpoints
 

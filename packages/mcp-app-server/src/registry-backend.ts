@@ -10,7 +10,7 @@
  *
  *   const backend = await createRegistryBackend({
  *     command: "npx",
- *     args: ["@utdk/mcp-server"],
+ *     args: ["@utdk/mcp"],
  *     providers: "github,slack,stripe",
  *   });
  *
@@ -42,7 +42,7 @@ interface McpToolResult {
 export interface RegistryBackendOptions {
   /** Executable to start the Registry MCP server (e.g. "npx" or an absolute path). */
   command: string;
-  /** Arguments passed to the command (e.g. ["@utdk/mcp-server"]). */
+  /** Arguments passed to the command (e.g. ["@utdk/mcp"]). */
   args?: string[];
   /**
    * Additional environment variables for the Registry process.
@@ -198,7 +198,7 @@ async function loadRegistryToolInfos(client: Client): Promise<ServiceToolInfo[]>
  * ```ts
  * const backend = await createRegistryBackend({
  *   command: "npx",
- *   args: ["@utdk/mcp-server"],
+ *   args: ["@utdk/mcp"],
  *   providers: "github,stripe",
  * });
  *
