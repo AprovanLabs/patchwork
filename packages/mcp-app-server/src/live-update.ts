@@ -1,4 +1,5 @@
 import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { warn } from "./logger.js";
 
 /**
  * A single buffered event for a data stream.
@@ -124,7 +125,7 @@ export async function pushStreamUpdate(
       const notifyPromise = entry.server.server
         .notification({ method: "notifications/tools/list_changed" })
         .catch((err: unknown) => {
-          console.warn("[live-update] Failed to notify session:", err);
+          warn("live-update", "Failed to notify session:", err);
         });
       pushPromises.push(notifyPromise);
     }
