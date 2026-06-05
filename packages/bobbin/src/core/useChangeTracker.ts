@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
+import { deduplicateChanges } from '../utils/deduplicateChanges';
 import { generateId } from '../utils/selectors';
 import type {
   Change,
@@ -138,37 +139,10 @@ export function useChangeTracker() {
 
   // Deduplicated changes - only count unique (element + property) combinations
   // This prevents counting every keystroke as a separate change
-  const deduplicatedChanges = useMemo(() => {
-    const uniqueChanges = new Map<string, Change>();
-
-    for (const change of changes) {
-      let key: string;
-
-      if (change.type === 'style') {
-        const styleChange = change as StyleChange;
-        key = `${change.target.path}:style:${styleChange.after.property}`;
-      } else {
-        key = `${change.target.path}:${change.type}:${change.id}`;
-      }
-
-      // Check if the value has changed back to original
-      if (change.type === 'style') {
-        const styleChange = change as StyleChange;
-        const originalValue = originalStatesRef.current
-          .get(change.target.path)
-          ?.get(styleChange.after.property);
-        if (originalValue === styleChange.after.value) {
-          // Value is back to original, remove from unique changes
-          uniqueChanges.delete(key);
-          continue;
-        }
-      }
-
-      uniqueChanges.set(key, change);
-    }
-
-    return Array.from(uniqueChanges.values());
-  }, [changes]);
+  const deduplicatedChanges = useMemo(
+    () => deduplicateChanges(changes, originalStatesRef.current),
+    [changes],
+  );
 
   return {
     changes,

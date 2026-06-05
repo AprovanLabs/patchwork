@@ -14,6 +14,21 @@ export {
   parseYAMLChangeset,
 } from './core/changeSerializer';
 export { getElementPath, getElementXPath, generateId } from './utils/selectors';
+export { deduplicateChanges } from './utils/deduplicateChanges';
+
+// Type guards
+export {
+  isChangeType,
+  isChange,
+  isStyleChange,
+  isTextChange,
+  isMoveChange,
+  isSelectedElement,
+  isAnnotation,
+  isDesignTokens,
+  isBobbinState,
+  isBobbinChangeset,
+} from './typeGuards';
 
 // Types
 export type {
