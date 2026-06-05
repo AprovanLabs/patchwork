@@ -2,166 +2,66 @@
  * CDN transform - converts bare imports to CDN URLs (esm.sh)
  */
 
-import type { Plugin } from 'esbuild-wasm';
+import type { Plugin } from "esbuild-wasm";
+import {
+  setCdnBaseUrl,
+  getCdnBaseUrl,
+  toEsmShUrl,
+  isBareImport,
+  parsePackageSpec,
+  parseImportPath,
+  matchAlias,
+  getCommonExports,
+} from "../cdn-config.js";
 
-const DEFAULT_CDN_BASE = 'https://esm.sh';
-let cdnBaseUrl = DEFAULT_CDN_BASE;
-
-export function setCdnBaseUrl(url: string): void {
-  cdnBaseUrl = url;
-}
-
-export function getCdnBaseUrl(): string {
-  return cdnBaseUrl;
-}
+// Re-export CDN utilities for external use
+export {
+  setCdnBaseUrl,
+  getCdnBaseUrl,
+  toEsmShUrl,
+  isBareImport,
+  parsePackageSpec,
+  parseImportPath,
+  matchAlias,
+  getCommonExports,
+};
 
 // Packages that should be externalized (not bundled from CDN)
-const EXTERNAL_PACKAGES = new Set(['react', 'react-dom', 'ink']);
+const EXTERNAL_PACKAGES = new Set(["react", "react-dom", "ink"]);
 
 // Built-in Node.js modules that should remain external
 const NODE_BUILTINS = new Set([
-  'assert',
-  'buffer',
-  'child_process',
-  'cluster',
-  'crypto',
-  'dgram',
-  'dns',
-  'events',
-  'fs',
-  'http',
-  'http2',
-  'https',
-  'net',
-  'os',
-  'path',
-  'perf_hooks',
-  'process',
-  'querystring',
-  'readline',
-  'stream',
-  'string_decoder',
-  'timers',
-  'tls',
-  'tty',
-  'url',
-  'util',
-  'v8',
-  'vm',
-  'worker_threads',
-  'zlib',
+  "assert",
+  "buffer",
+  "child_process",
+  "cluster",
+  "crypto",
+  "dgram",
+  "dns",
+  "events",
+  "fs",
+  "http",
+  "http2",
+  "https",
+  "net",
+  "os",
+  "path",
+  "perf_hooks",
+  "process",
+  "querystring",
+  "readline",
+  "stream",
+  "string_decoder",
+  "timers",
+  "tls",
+  "tty",
+  "url",
+  "util",
+  "v8",
+  "vm",
+  "worker_threads",
+  "zlib",
 ]);
-
-/**
- * Parse a package specifier into name and version
- */
-export function parsePackageSpec(spec: string): {
-  name: string;
-  version?: string;
-} {
-  // Handle scoped packages (@scope/name)
-  if (spec.startsWith('@')) {
-    const parts = spec.split('/');
-    if (parts.length >= 2) {
-      const scope = parts[0];
-      const nameAndVersion = parts.slice(1).join('/');
-      const atIndex = nameAndVersion.lastIndexOf('@');
-      if (atIndex > 0) {
-        return {
-          name: `${scope}/${nameAndVersion.slice(0, atIndex)}`,
-          version: nameAndVersion.slice(atIndex + 1),
-        };
-      }
-      return { name: `${scope}/${nameAndVersion}` };
-    }
-  }
-
-  // Handle non-scoped packages
-  const atIndex = spec.lastIndexOf('@');
-  if (atIndex > 0) {
-    return {
-      name: spec.slice(0, atIndex),
-      version: spec.slice(atIndex + 1),
-    };
-  }
-  return { name: spec };
-}
-
-/**
- * Convert a package specifier to an esm.sh URL
- *
- * @param packageName - The npm package name
- * @param version - Optional version specifier
- * @param subpath - Optional subpath (e.g., '/client' for 'react-dom/client')
- * @param deps - Optional dependency version overrides (use ?deps=react@18)
- */
-export function toEsmShUrl(
-  packageName: string,
-  version?: string,
-  subpath?: string,
-  deps?: Record<string, string>,
-): string {
-  let url = `${cdnBaseUrl}/${packageName}`;
-
-  if (version) {
-    url += `@${version}`;
-  }
-
-  if (subpath) {
-    url += `/${subpath}`;
-  }
-
-  // Add deps flag to ensure consistent dependency versions across all packages
-  // This makes all packages use the same React version, avoiding version mismatches
-  if (deps && Object.keys(deps).length > 0) {
-    const depsStr = Object.entries(deps)
-      .map(([name, ver]) => `${name}@${ver}`)
-      .join(',');
-    url += `?deps=${depsStr}`;
-  }
-
-  return url;
-}
-
-/**
- * Check if an import path is a bare module specifier
- */
-export function isBareImport(path: string): boolean {
-  // Not bare if starts with ., /, or is a URL
-  if (
-    path.startsWith('.') ||
-    path.startsWith('/') ||
-    path.startsWith('http://') ||
-    path.startsWith('https://')
-  ) {
-    return false;
-  }
-  return true;
-}
-
-/**
- * Extract package name and subpath from an import
- */
-export function parseImportPath(importPath: string): {
-  packageName: string;
-  subpath?: string;
-} {
-  // Handle scoped packages
-  if (importPath.startsWith('@')) {
-    const parts = importPath.split('/');
-    if (parts.length >= 2) {
-      const packageName = `${parts[0]}/${parts[1]}`;
-      const subpath = parts.slice(2).join('/');
-      return { packageName, subpath: subpath || undefined };
-    }
-  }
-
-  // Handle non-scoped packages
-  const parts = importPath.split('/');
-  const packageName = parts[0] as string;
-  const subpath = parts.slice(1).join('/');
-  return { packageName, subpath: subpath || undefined };
-}
 
 export interface CdnTransformOptions {
   /** Map of package names to versions */
@@ -176,30 +76,6 @@ export interface CdnTransformOptions {
   deps?: Record<string, string>;
   /** Import path aliases (e.g., { '@/components/ui/*': '@packagedcn/react' }) */
   aliases?: Record<string, string>;
-}
-
-/**
- * Match an import path against alias patterns
- * Supports glob patterns like '@/components/ui/*'
- */
-function matchAlias(
-  importPath: string,
-  aliases: Record<string, string>,
-): string | null {
-  for (const [pattern, target] of Object.entries(aliases)) {
-    // Handle glob patterns ending with /*
-    if (pattern.endsWith('/*')) {
-      const prefix = pattern.slice(0, -2); // Remove /*
-      if (importPath === prefix || importPath.startsWith(prefix + '/')) {
-        return target;
-      }
-    }
-    // Exact match
-    if (importPath === pattern) {
-      return target;
-    }
-  }
-  return null;
 }
 
 /**
@@ -220,7 +96,7 @@ export function cdnTransformPlugin(options: CdnTransformOptions = {}): Plugin {
   const globalsSet = new Set(Object.keys(globals));
 
   return {
-    name: 'cdn-transform',
+    name: "cdn-transform",
     setup(build) {
       // Handle import aliases first (e.g., @/components/ui/* -> @packagedcn/react)
       // This must resolve directly to CDN URL or global-inject
@@ -233,7 +109,7 @@ export function cdnTransformPlugin(options: CdnTransformOptions = {}): Plugin {
           if (globalsSet.has(packageName)) {
             return {
               path: aliasTarget,
-              namespace: 'global-inject',
+              namespace: "global-inject",
             };
           }
 
@@ -243,10 +119,10 @@ export function cdnTransformPlugin(options: CdnTransformOptions = {}): Plugin {
             packageName,
             version,
             subpath,
-            Object.keys(deps).length > 0 ? deps : undefined,
+            Object.keys(deps).length > 0 ? deps : undefined
           );
           if (bundle) {
-            url += url.includes('?') ? '&bundle' : '?bundle';
+            url += url.includes("?") ? "&bundle" : "?bundle";
           }
 
           return {
@@ -269,7 +145,7 @@ export function cdnTransformPlugin(options: CdnTransformOptions = {}): Plugin {
         if (globalsSet.has(packageName)) {
           return {
             path: args.path,
-            namespace: 'global-inject',
+            namespace: "global-inject",
           };
         }
 
@@ -277,7 +153,7 @@ export function cdnTransformPlugin(options: CdnTransformOptions = {}): Plugin {
       });
 
       // Provide virtual modules that export window globals
-      build.onLoad({ filter: /.*/, namespace: 'global-inject' }, (args) => {
+      build.onLoad({ filter: /.*/, namespace: "global-inject" }, (args) => {
         const { packageName, subpath } = parseImportPath(args.path);
         const globalName = globals[packageName];
 
@@ -288,7 +164,7 @@ export function cdnTransformPlugin(options: CdnTransformOptions = {}): Plugin {
           // For react-dom/client, we need to access window.ReactDOM (which is already the client)
           return {
             contents: `export * from '${packageName}'; export { default } from '${packageName}';`,
-            loader: 'js',
+            loader: "js",
           };
         }
 
@@ -298,12 +174,12 @@ export function cdnTransformPlugin(options: CdnTransformOptions = {}): Plugin {
 const mod = window.${globalName};
 export default mod;
 // Re-export all properties as named exports
-const { ${getCommonExports(packageName).join(', ')} } = mod;
-export { ${getCommonExports(packageName).join(', ')} };
+const { ${getCommonExports(packageName).join(", ")} } = mod;
+export { ${getCommonExports(packageName).join(", ")} };
 `;
         return {
           contents,
-          loader: 'js',
+          loader: "js",
         };
       });
 
@@ -339,10 +215,10 @@ export { ${getCommonExports(packageName).join(', ')} };
           packageName,
           version,
           subpath,
-          Object.keys(deps).length > 0 ? deps : undefined,
+          Object.keys(deps).length > 0 ? deps : undefined
         );
         if (bundle) {
-          url += url.includes('?') ? '&bundle' : '?bundle';
+          url += url.includes("?") ? "&bundle" : "?bundle";
         }
 
         return {
@@ -355,52 +231,9 @@ export { ${getCommonExports(packageName).join(', ')} };
 }
 
 /**
- * Get common named exports for known packages
- */
-function getCommonExports(packageName: string): string[] {
-  const exports: Record<string, string[]> = {
-    react: [
-      'useState',
-      'useEffect',
-      'useCallback',
-      'useMemo',
-      'useRef',
-      'useContext',
-      'useReducer',
-      'useLayoutEffect',
-      'useId',
-      'createContext',
-      'createElement',
-      'cloneElement',
-      'createRef',
-      'forwardRef',
-      'lazy',
-      'memo',
-      'Fragment',
-      'Suspense',
-      'StrictMode',
-      'Component',
-      'PureComponent',
-      'Children',
-      'isValidElement',
-    ],
-    'react-dom': [
-      'createPortal',
-      'flushSync',
-      'render',
-      'hydrate',
-      'unmountComponentAtNode',
-    ],
-  };
-  return exports[packageName] || [];
-}
-
-/**
  * Generate import map for CDN dependencies
  */
-export function generateImportMap(
-  packages: Record<string, string>,
-): Record<string, string> {
+export function generateImportMap(packages: Record<string, string>): Record<string, string> {
   const imports: Record<string, string> = {};
 
   for (const [name, version] of Object.entries(packages)) {

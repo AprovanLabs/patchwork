@@ -108,7 +108,7 @@ Claude web uses a remote MCP server, accessible through a cloudflared tunnel.
 2. Expose it via cloudflared:
 
 ```bash
-cloudflared tunnel --url http://localhost:3000
+cloudflared tunnel --url http://localhost:3002
 ```
 
 3. Copy the generated `https://xxx.trycloudflare.com` URL

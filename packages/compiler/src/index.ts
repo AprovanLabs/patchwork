@@ -84,15 +84,23 @@ export {
   loadImage,
   parseImageSpec,
   fetchPackageJson,
-  setCdnBaseUrl,
-  getCdnBaseUrl,
 } from "./images/index.js";
 
 // Transforms
 export {
   cdnTransformPlugin,
   generateImportMap,
+  // CDN utilities (shared with Vite plugins)
+  toEsmShUrl,
+  parseImportPath,
+  isBareImport,
+  parsePackageSpec,
+  setCdnBaseUrl,
+  getCdnBaseUrl,
+  matchAlias,
+  getCommonExports,
 } from "./transforms/cdn.js";
+export { DEFAULT_CDN_BASE } from "./cdn-config.js";
 export type { CdnTransformOptions } from "./transforms/cdn.js";
 export { vfsPlugin } from "./transforms/vfs.js";
 export type { VFSPluginOptions } from "./transforms/vfs.js";

@@ -24,9 +24,7 @@ function toMcpToolName(namespace: string, procedure: string): string {
   return `${namespace}${TOOL_SEPARATOR}${procedure}`;
 }
 
-function jsonSchemaToZodShape(
-  schema?: Record<string, unknown>,
-): Record<string, z.ZodTypeAny> {
+function jsonSchemaToZodShape(schema?: Record<string, unknown>): Record<string, z.ZodTypeAny> {
   const properties = (schema?.["properties"] ?? {}) as Record<
     string,
     { type?: string; description?: string }
@@ -85,32 +83,22 @@ export class ServiceBridge {
       server.registerTool(
         mcpToolName,
         {
-          description:
-            info.description ??
-            `Call ${info.namespace}.${info.procedure}`,
+          description: info.description ?? `Call ${info.namespace}.${info.procedure}`,
           inputSchema: inputShape,
         },
         async (args) => {
           try {
-            const result = await this.backend.call(
-              info.namespace,
-              info.procedure,
-              [args ?? {}],
-            );
+            const result = await this.backend.call(info.namespace, info.procedure, [args ?? {}]);
             return {
               content: [
                 {
                   type: "text" as const,
-                  text:
-                    typeof result === "string"
-                      ? result
-                      : JSON.stringify(result),
+                  text: typeof result === "string" ? result : JSON.stringify(result),
                 },
               ],
             };
           } catch (error) {
-            const message =
-              error instanceof Error ? error.message : String(error);
+            const message = error instanceof Error ? error.message : String(error);
             return {
               content: [
                 {
@@ -121,7 +109,7 @@ export class ServiceBridge {
               isError: true,
             };
           }
-        },
+        }
       );
     }
   }
@@ -138,22 +126,17 @@ export class ServiceBridge {
             .string()
             .optional()
             .describe(
-              'Natural language description of what you want to do (e.g., "get weather forecast")',
+              'Natural language description of what you want to do (e.g., "get weather forecast")'
             ),
           namespace: z
             .string()
             .optional()
-            .describe(
-              'Filter results to a specific service namespace (e.g., "weather")',
-            ),
+            .describe('Filter results to a specific service namespace (e.g., "weather")'),
           tool_name: z
             .string()
             .optional()
             .describe("Get detailed info about a specific tool by name"),
-          limit: z
-            .number()
-            .optional()
-            .describe("Maximum number of results to return"),
+          limit: z.number().optional().describe("Maximum number of results to return"),
         },
       },
       async (args) => {
@@ -164,8 +147,7 @@ export class ServiceBridge {
 
         if (toolName) {
           const dotName = toolName.replace(/__/g, ".");
-          const info =
-            this.tools.get(toolName) ?? this.tools.get(dotName);
+          const info = this.tools.get(toolName) ?? this.tools.get(dotName);
           if (!info) {
             return {
               content: [
@@ -192,9 +174,7 @@ export class ServiceBridge {
         let results = Array.from(this.tools.values());
 
         if (namespace) {
-          results = results.filter(
-            (info) => info.namespace === namespace,
-          );
+          results = results.filter((info) => info.namespace === namespace);
         }
 
         if (query) {
@@ -204,9 +184,7 @@ export class ServiceBridge {
             .map((info) => {
               const searchText =
                 `${info.name} ${info.namespace} ${info.procedure} ${info.description ?? ""}`.toLowerCase();
-              const matchCount = keywords.filter((kw) =>
-                searchText.includes(kw),
-              ).length;
+              const matchCount = keywords.filter((kw) => searchText.includes(kw)).length;
               return { info, score: matchCount / keywords.length };
             })
             .filter(({ score }) => score > 0)
@@ -229,7 +207,85 @@ export class ServiceBridge {
             },
           ],
         };
+      }
+    );
+
+    // call_service: Execute any service by namespace/procedure
+    server.registerTool(
+      "call_service",
+      {
+        description:
+          "Call a service tool by namespace and procedure. Use search_services to discover available tools first.",
+        inputSchema: {
+          namespace: z.string().describe('Service namespace (e.g., "github", "stripe")'),
+          procedure: z.string().describe('Procedure name (e.g., "repos_list", "customers_create")'),
+          args: z.record(z.unknown()).optional().describe("Arguments to pass to the procedure"),
+        },
       },
+      async (params) => {
+        const namespace = params?.["namespace"] as string;
+        const procedure = params?.["procedure"] as string;
+        const args = (params?.["args"] ?? {}) as Record<string, unknown>;
+
+        if (!namespace || !procedure) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  success: false,
+                  error: "namespace and procedure are required",
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        // Look up tool info for validation
+        const toolKey = `${namespace}.${procedure}`;
+        const info = this.tools.get(toolKey);
+        if (!info) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  success: false,
+                  error: `Tool '${namespace}.${procedure}' not found. Use search_services to discover available tools.`,
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        try {
+          const result = await this.backend.call(namespace, procedure, [args]);
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: typeof result === "string" ? result : JSON.stringify(result),
+              },
+            ],
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  success: false,
+                  error: `Service call failed: ${message}`,
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
     );
   }
 

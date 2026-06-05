@@ -33,6 +33,29 @@ export type { ServiceBackend, ServiceToolInfo, ServiceBridgeConfig };
 export type { StreamEvent };
 export { pushStreamUpdate };
 
+const DEFAULT_WIDGET_PORT = Number(process.env["WIDGET_PORT"] ?? 3002);
+const DEFAULT_WIDGET_HOST = process.env["WIDGET_HOST"] ?? "localhost";
+const DEFAULT_WIDGET_BASE_URL = `http://${DEFAULT_WIDGET_HOST}:${DEFAULT_WIDGET_PORT}`;
+
+function generateIframeWrapper(widgetUrl: string, name: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${name}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    iframe { width: 100%; height: 100%; border: none; }
+  </style>
+</head>
+<body>
+  <iframe src="${widgetUrl}" title="${name}" sandbox="allow-scripts allow-same-origin"></iframe>
+</body>
+</html>`;
+}
+
 const MANIFEST_DEFAULTS: Manifest = {
   name: "widget",
   version: "0.1.0",
@@ -112,6 +135,8 @@ function registerCachedWidgetResources(server: McpServer): void {
 
 export interface McpAppServerOptions {
   services?: ServiceBridgeConfig;
+  /** Base URL for serving widgets (e.g., tunnel URL). Defaults to localhost:3002. */
+  widgetBaseUrl?: string;
 }
 
 export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer {
@@ -121,6 +146,12 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
   });
 
   const serviceBridge = options.services ? new ServiceBridge(options.services) : null;
+  const widgetBaseUrl = options.widgetBaseUrl ?? DEFAULT_WIDGET_BASE_URL;
+
+  // Helper to generate widget URLs with the configured base
+  const getWidgetUrl = (name: string, hash: string): string => {
+    return `${widgetBaseUrl}/widget/${name}/${hash}`;
+  };
 
   const store = getWidgetStore();
 
@@ -168,6 +199,13 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
             "Service namespaces the widget calls (e.g., ['weather', 'stripe']). " +
               "A proxy shim is injected so widget code can call namespace.procedure(args) directly."
           ),
+        standalone: z
+          .boolean()
+          .optional()
+          .describe(
+            "Compile a standalone widget without runtime dependencies (no ext-apps connection). " +
+              "Defaults to true. Set to false only when an HTTP host is available for live updates."
+          ),
       },
       _meta: {
         ui: { resourceUri: "ui://widget/{hash}/view.html" },
@@ -178,6 +216,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
       const files = args?.["files"] as Array<{ path: string; content: string }> | undefined;
       const entry = args?.["entry"] as string | undefined;
       const requestedServices = args?.["services"] as string[] | undefined;
+      const standalone = (args?.["standalone"] as boolean | undefined) ?? true;
 
       const manifestInput: Record<string, unknown> = {};
       if (args?.["name"]) manifestInput["name"] = args["name"];
@@ -201,66 +240,35 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
       }
 
       try {
-        const result: CompileWidgetResult = await compileWidget(
-          project,
-          manifest,
-          compileServices ? { services: compileServices } : {}
-        );
+        const result: CompileWidgetResult = await compileWidget(project, manifest, {
+          services: compileServices,
+          liveUpdates: !standalone,
+        });
 
         const entryPath = typeof project === "string" ? undefined : project.entry;
         await store.saveWidget(result.hash, result.html, manifest, entryPath);
 
         const storedUri = store.resourceUriFor(manifest.name, result.hash);
-        registerAppResource(
-          server,
-          `Widget ${manifest.name}`,
-          storedUri,
-          {
-            description: manifest.description ?? `Persisted widget: ${manifest.name}`,
-          },
-          async () => ({
-            contents: [
-              {
-                uri: storedUri,
-                mimeType: RESOURCE_MIME_TYPE,
-                text: result.html,
-              },
-            ],
-          })
-        );
+        const widgetUrl = getWidgetUrl(manifest.name, result.hash);
+        const iframeHtml = generateIframeWrapper(widgetUrl, manifest.name);
 
-        registerAppResource(
-          server,
-          `Widget ${manifest.name} (cached)`,
-          result.resourceUri,
-          {
-            description: `Compiled widget: ${manifest.name}`,
-          },
-          async () => ({
-            contents: [
-              {
-                uri: result.resourceUri,
-                mimeType: RESOURCE_MIME_TYPE,
-                text: result.html,
-              },
-            ],
-          })
-        );
-
+        // Return an iframe wrapper that loads the widget from the HTTP server
+        // The actual widget HTML is served by the widget server on WIDGET_PORT
         return {
           content: [
             {
-              type: "text" as const,
-              text: `Widget compiled and persisted. Resource URI: ${storedUri}`,
+              type: "resource" as const,
+              resource: {
+                uri: storedUri,
+                mimeType: RESOURCE_MIME_TYPE,
+                text: iframeHtml,
+              },
             },
             {
               type: "text" as const,
-              text: `Cache key: ${result.hash}`,
+              text: `Widget "${manifest.name}" compiled. Hash: ${result.hash}\nServed at: ${widgetUrl}`,
             },
           ],
-          _meta: {
-            ui: { resourceUri: result.resourceUri },
-          },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -278,7 +286,8 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
   );
 
   if (serviceBridge) {
-    serviceBridge.registerTools(server);
+    // Register search_services and call_service tools only (not individual service tools)
+    // This avoids exposing hundreds of tools with names that may exceed 64 chars
     serviceBridge.registerSearchServices(server);
   }
 
@@ -409,40 +418,32 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
         };
       }
 
-      registerAppResource(
-        server,
-        `Widget ${widget.manifest.name}`,
-        widget.resourceUri,
-        {
-          description: widget.manifest.description ?? `Persisted widget: ${widget.manifest.name}`,
-        },
-        async () => ({
-          contents: [
-            {
-              uri: widget.resourceUri,
-              mimeType: RESOURCE_MIME_TYPE,
-              text: widget.html,
-            },
-          ],
-        })
-      );
+      const widgetUrl = getWidgetUrl(name, hash);
+      const iframeHtml = generateIframeWrapper(widgetUrl, name);
 
+      // Return an iframe wrapper that loads the widget from the HTTP server
       return {
         content: [
           {
+            type: "resource" as const,
+            resource: {
+              uri: widget.resourceUri,
+              mimeType: RESOURCE_MIME_TYPE,
+              text: iframeHtml,
+            },
+          },
+          {
             type: "text" as const,
-            text: `Rendering widget "${name}" (hash: ${hash}).`,
+            text: `Rendered widget "${name}" (hash: ${hash}).\nServed at: ${widgetUrl}`,
           },
         ],
-        _meta: {
-          ui: { resourceUri: widget.resourceUri },
-        },
       };
     }
   );
 
   registerCachedWidgetResources(server);
-  void registerStoredWidgetResources(server, store);
+  // Note: Stored widget resources are registered on-demand via render_widget tool
+  // to avoid async registration after transport connection
   registerLiveUpdateTools(server);
 
   return server;

@@ -7,10 +7,7 @@ const SHADCN_CONFIG: ImageConfig = {
   esbuild: { target: "es2020", format: "esm", jsx: "transform" },
   framework: {
     globals: { react: "React", "react-dom": "ReactDOM" },
-    preload: [
-      "https://esm.sh/react@18",
-      "https://esm.sh/react-dom@18/client",
-    ],
+    preload: ["https://esm.sh/react@18", "https://esm.sh/react-dom@18/client"],
     deps: { react: "18", "react-dom": "18" },
   },
   aliases: {
@@ -59,13 +56,11 @@ describe("cdn-plugin", () => {
   });
 
   describe("getPreloadScripts", () => {
-    it("generates script tags from preload URLs", () => {
+    it("returns raw URLs from preload config", () => {
       const scripts = getPreloadScripts(SHADCN_CONFIG);
       expect(scripts).toHaveLength(2);
-      expect(scripts[0]).toBe('<script src="https://esm.sh/react@18"></script>');
-      expect(scripts[1]).toBe(
-        '<script src="https://esm.sh/react-dom@18/client"></script>',
-      );
+      expect(scripts[0]).toBe("https://esm.sh/react@18");
+      expect(scripts[1]).toBe("https://esm.sh/react-dom@18/client");
     });
 
     it("returns empty array when no preloads", () => {

@@ -10,13 +10,8 @@ import {
   removeNamespaceGlobals,
   extractNamespaces,
 } from "./bridge.js";
-import type {
-  CompiledWidget,
-  LoadedImage,
-  MountedWidget,
-  MountOptions,
-  Proxy,
-} from "../types.js";
+import { toEsmShUrl } from "../cdn-config.js";
+import type { CompiledWidget, LoadedImage, MountedWidget, MountOptions, Proxy } from "../types.js";
 
 let mountCounter = 0;
 let importMapInjected = false;
@@ -29,7 +24,7 @@ let importMapInjected = false;
 function injectImportMap(
   globals: Record<string, string>,
   preloadUrls: string[],
-  deps?: Record<string, string>,
+  deps?: Record<string, string>
 ): void {
   // Only inject once per page (browser limitation)
   if (importMapInjected) return;
@@ -52,9 +47,9 @@ function injectImportMap(
     if (preloadUrls[index]) {
       imports[pkgName] = preloadUrls[index];
     } else if (deps?.[pkgName]) {
-      imports[pkgName] = `https://esm.sh/${pkgName}@${deps[pkgName]}`;
+      imports[pkgName] = toEsmShUrl(pkgName, deps[pkgName]);
     } else {
-      imports[pkgName] = `https://esm.sh/${pkgName}`;
+      imports[pkgName] = toEsmShUrl(pkgName);
     }
   });
 
@@ -86,13 +81,9 @@ type CreateRootFn = (el: HTMLElement) => {
 };
 type RenderFn = (el: unknown, container: HTMLElement) => void;
 
-type Renderer =
-  | { kind: "root"; createRoot: CreateRootFn }
-  | { kind: "render"; render: RenderFn };
+type Renderer = { kind: "root"; createRoot: CreateRootFn } | { kind: "render"; render: RenderFn };
 
-function pickCreateElement(
-  globals: Array<Record<string, unknown>>,
-): CreateElementFn | null {
+function pickCreateElement(globals: Array<Record<string, unknown>>): CreateElementFn | null {
   for (const obj of globals) {
     const ce = obj?.createElement;
     if (typeof ce === "function") return ce as CreateElementFn;
@@ -104,9 +95,7 @@ function pickCreateElement(
   return null;
 }
 
-function pickRenderer(
-  globals: Array<Record<string, unknown>>,
-): Renderer | null {
+function pickRenderer(globals: Array<Record<string, unknown>>): Renderer | null {
   for (const obj of globals) {
     if (obj && typeof obj.createRoot === "function") {
       return { kind: "root", createRoot: obj.createRoot as CreateRootFn };
@@ -132,7 +121,7 @@ export async function mountEmbedded(
   widget: CompiledWidget,
   options: MountOptions,
   image: LoadedImage | null,
-  proxy: Proxy,
+  proxy: Proxy
 ): Promise<MountedWidget> {
   const { target, inputs = {} } = options;
   const mountId = generateMountId();
@@ -175,9 +164,7 @@ export async function mountEmbedded(
   // Pre-load framework modules from image config
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const preloadedModules: any[] = await Promise.all(
-    preloadUrls.map(
-      (url: string) => import(/* webpackIgnore: true */ /* @vite-ignore */ url),
-    ),
+    preloadUrls.map((url: string) => import(/* webpackIgnore: true */ /* @vite-ignore */ url))
   );
 
   // Set framework globals on window based on image config
@@ -200,9 +187,9 @@ export async function mountEmbedded(
   // Import the module
   let moduleCleanup: (() => void) | undefined;
 
-  const globalObjects = globalNames
-    .map((n) => win[n] as unknown)
-    .filter(Boolean) as Array<Record<string, unknown>>;
+  const globalObjects = globalNames.map((n) => win[n] as unknown).filter(Boolean) as Array<
+    Record<string, unknown>
+  >;
 
   try {
     const module = await import(/* webpackIgnore: true */ scriptUrl);
@@ -291,7 +278,7 @@ export async function reloadEmbedded(
   mounted: MountedWidget,
   widget: CompiledWidget,
   image: LoadedImage | null,
-  proxy: Proxy,
+  proxy: Proxy
 ): Promise<MountedWidget> {
   // Unmount existing
   mounted.unmount();
@@ -301,6 +288,6 @@ export async function reloadEmbedded(
     widget,
     { target: mounted.target, mode: "embedded", inputs: mounted.inputs },
     image,
-    proxy,
+    proxy
   );
 }

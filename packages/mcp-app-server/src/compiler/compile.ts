@@ -3,8 +3,9 @@ import { mkdir, writeFile, rm, readFile } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  createCompiler,
   loadImage,
+  getImageRegistry,
+  DEFAULT_IMAGE_CONFIG,
   type Manifest,
   type VirtualProject,
   type ImageConfig,
@@ -21,7 +22,7 @@ import {
   get as cacheGet,
   type CachedWidget,
 } from "./cache.js";
-import { patchworkCdnPlugin, getPreloadScripts } from "./cdn-plugin.js";
+import { patchworkCdnPlugin, getPreloadScripts, getFrameworkGlobals } from "./cdn-plugin.js";
 
 const WIDGET_RESOURCE_PREFIX = "ui://widget/";
 
@@ -29,56 +30,70 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMPILE_TMP_DIR = resolve(__dirname, "..", ".compile-tmp");
 
 const FALLBACK_IMAGE_CONFIG: ImageConfig = {
-  platform: "browser",
-  esbuild: { target: "es2020", format: "esm", jsx: "automatic" },
+  ...DEFAULT_IMAGE_CONFIG,
   framework: {
     globals: { react: "React", "react-dom": "ReactDOM" },
     preload: [
-      "https://esm.sh/react@18",
-      "https://esm.sh/react-dom@18/client",
+      "https://unpkg.com/react@18/umd/react.production.min.js",
+      "https://unpkg.com/react-dom@18/umd/react-dom.production.min.js",
     ],
     deps: { react: "18", "react-dom": "18" },
   },
 };
 
-let loadedImage: LoadedImage | null = null;
-let imageLoadPromise: Promise<LoadedImage> | null = null;
+const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn";
 
 async function getImageConfig(): Promise<ImageConfig> {
-  if (loadedImage) return loadedImage.config;
-  if (imageLoadPromise) return imageLoadPromise.then((img) => img.config);
+  const registry = getImageRegistry();
 
-  imageLoadPromise = (async () => {
-    try {
-      loadedImage = await loadImage("@aprovan/patchwork-image-shadcn");
-      return loadedImage;
-    } catch {
-      const compiler = await createCompiler({
-        image: "@aprovan/patchwork-image-shadcn",
-        proxyUrl: "",
-      });
-      await compiler.preloadImage("@aprovan/patchwork-image-shadcn");
-      const registry = (compiler as unknown as Record<string, unknown>)
-        .registry as Map<string, LoadedImage> | undefined;
-      const img = registry?.get("@aprovan/patchwork-image-shadcn");
-      if (img) {
-        loadedImage = img;
-        return img;
-      }
-      return { config: FALLBACK_IMAGE_CONFIG } as LoadedImage;
-    }
-  })();
+  // Check if already loaded
+  if (registry.has(IMAGE_SPEC)) {
+    return registry.get(IMAGE_SPEC)!.config;
+  }
 
-  return imageLoadPromise.then((img) => img.config);
+  try {
+    const image = await loadImage(IMAGE_SPEC);
+    return image.config;
+  } catch {
+    return FALLBACK_IMAGE_CONFIG;
+  }
 }
 
-function generateHtmlEntry(preloads: string[], cssVars: string): string {
+function generateHtmlEntry(
+  preloads: string[],
+  globals: Record<string, string>,
+  cssVars: string
+): string {
+  // Generate the preload script that dynamically imports modules and assigns to globals
+  // This matches how the patchwork compiler's iframe mount handles it
+  const preloadScript = `
+    // Preload framework modules and assign to globals
+    const preloadUrls = ${JSON.stringify(preloads)};
+    const globalNames = ${JSON.stringify(Object.values(globals))};
+    
+    async function preloadModules() {
+      for (let i = 0; i < preloadUrls.length; i++) {
+        const url = preloadUrls[i];
+        const name = globalNames[i];
+        if (!url || !name) continue;
+        try {
+          const mod = await import(url);
+          window[name] = mod.default || mod;
+        } catch (e) {
+          console.error('[patchwork] Failed to preload:', url, e);
+        }
+      }
+    }
+    
+    // Export the preload promise so the widget module can await it
+    window.__PATCHWORK_PRELOAD__ = preloadModules();
+  `;
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  ${preloads.join("\n  ")}
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     window.tailwind = window.tailwind || {};
@@ -105,6 +120,7 @@ function generateHtmlEntry(preloads: string[], cssVars: string): string {
       },
     };
   </script>
+  <script type="module">${preloadScript}</script>
   <style>
     :root {
       ${cssVars}
@@ -142,21 +158,27 @@ const SHADCN_CSS_VARS = `
 `.trim();
 
 function generateMainTsx(entryModule: string): string {
-  return `import React from 'react';
-import { createRoot } from 'react-dom/client';
-import Widget from './${entryModule}';
+  return `import Widget from './${entryModule}';
 
-const rootEl = document.getElementById('root');
-if (rootEl) {
-  const root = createRoot(rootEl);
-  root.render(React.createElement(Widget));
-}
+(async () => {
+  // Wait for framework preload to complete
+  await window.__PATCHWORK_PRELOAD__;
+
+  const React = window.React;
+  const ReactDOM = window.ReactDOM;
+
+  const rootEl = document.getElementById('root');
+  if (rootEl && ReactDOM?.createRoot) {
+    const root = ReactDOM.createRoot(rootEl);
+    root.render(React.createElement(Widget));
+  }
+})();
 `;
 }
 
 async function writeProjectFiles(
   projectDir: string,
-  source: string | VirtualProject,
+  source: string | VirtualProject
 ): Promise<string> {
   const srcDir = join(projectDir, "src");
   await mkdir(srcDir, { recursive: true });
@@ -177,9 +199,7 @@ async function writeProjectFiles(
 
   const entry = source.entry;
   const entryName = entry.replace(/\.(tsx|ts|jsx|js)$/, "");
-  return entryName.startsWith("src/")
-    ? entryName.slice(4)
-    : entryName;
+  return entryName.startsWith("src/") ? entryName.slice(4) : entryName;
 }
 
 function injectShimIntoHtml(html: string, shimScript: string): string {
@@ -204,7 +224,7 @@ export interface CompileWidgetOptions {
 export async function compileWidget(
   source: string | VirtualProject,
   manifest: Manifest,
-  options: CompileWidgetOptions = {},
+  options: CompileWidgetOptions = {}
 ): Promise<CompileWidgetResult> {
   const liveUpdates = options.liveUpdates ?? true;
 
@@ -233,14 +253,11 @@ export async function compileWidget(
     await mkdir(projectDir, { recursive: true });
 
     const entryModule = await writeProjectFiles(projectDir, source);
-    await writeFile(
-      join(projectDir, "src", "_app.tsx"),
-      generateMainTsx(entryModule),
-      "utf-8",
-    );
+    await writeFile(join(projectDir, "src", "_app.tsx"), generateMainTsx(entryModule), "utf-8");
 
     const preloads = getPreloadScripts(imageConfig);
-    const htmlContent = generateHtmlEntry(preloads, SHADCN_CSS_VARS);
+    const globals = getFrameworkGlobals(imageConfig);
+    const htmlContent = generateHtmlEntry(preloads, globals, SHADCN_CSS_VARS);
     await writeFile(join(projectDir, "index.html"), htmlContent, "utf-8");
 
     const viteConfig: InlineConfig = {
@@ -257,6 +274,7 @@ export async function compileWidget(
         outDir: "dist",
         emptyOutDir: true,
         minify: false,
+        modulePreload: false, // Disable modulepreload polyfill - it doesn't exist on esm.sh
         rollupOptions: {
           input: resolve(projectDir, "index.html"),
         },
@@ -266,10 +284,7 @@ export async function compileWidget(
 
     await build(viteConfig);
 
-    const outputHtml = await readFile(
-      join(projectDir, "dist", "index.html"),
-      "utf-8",
-    );
+    const outputHtml = await readFile(join(projectDir, "dist", "index.html"), "utf-8");
 
     // Build up the shim scripts. The live-update shim is injected first so
     // __patchwork_app is available when the service shim runs. If both are
