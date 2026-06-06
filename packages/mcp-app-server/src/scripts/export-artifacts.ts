@@ -1,42 +1,33 @@
-/**
- * Standalone artifact export script.
- *
- * Compiles all reference widgets and saves the resulting self-contained HTML files
- * to `.artifacts/widgets/<widget-name>.html` without running any Playwright assertions.
- *
- * Usage:
- *   pnpm run artifacts:export
- *
- * The `.artifacts/` directory is created at the repository root if it does not exist.
- * Existing files are overwritten.
- */
-
+import { mkdir, writeFile } from "node:fs/promises";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createProjectFromFiles } from "@aprovan/patchwork-compiler";
-import { saveWidgetArtifact } from "../artifacts.js";
 import { compileWidget } from "../compiler/compile.js";
 import {
   REFERENCE_WIDGET_FILES,
   REFERENCE_WIDGET_MANIFEST,
 } from "../reference-widgets/live-dashboard.js";
 
-const REFERENCE_WIDGETS = [
-  {
-    manifest: REFERENCE_WIDGET_MANIFEST,
-    files: REFERENCE_WIDGET_FILES,
-  },
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ARTIFACTS_DIR = resolve(__dirname, "../../../../.artifacts/widgets");
+
+const WIDGETS = [
+  { manifest: REFERENCE_WIDGET_MANIFEST, files: REFERENCE_WIDGET_FILES },
 ];
 
 async function main(): Promise<void> {
   console.log("Exporting widget HTML artifacts...\n");
+  await mkdir(ARTIFACTS_DIR, { recursive: true });
 
-  for (const { manifest, files } of REFERENCE_WIDGETS) {
+  for (const { manifest, files } of WIDGETS) {
     process.stdout.write(`  Compiling ${manifest.name}...`);
     const project = createProjectFromFiles(files);
-    const result = await compileWidget(project, manifest, {
+    const { html } = await compileWidget(project, manifest, {
       services: manifest.services,
     });
-    const savedPath = await saveWidgetArtifact(manifest.name, result.html);
-    console.log(` saved → ${savedPath}`);
+    const outPath = join(ARTIFACTS_DIR, `${manifest.name}.html`);
+    await writeFile(outPath, html, "utf-8");
+    console.log(` saved → ${outPath}`);
   }
 
   console.log("\nDone. Open any .html file in a browser to inspect the widget.");
