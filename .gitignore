@@ -153,4 +153,5 @@ hardcopy.yaml
 
 # Playwright visual test artifacts (screenshots, traces)
 # E2E visual artifacts
+# Generated widget HTML artifacts
 .artifacts/

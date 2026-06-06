@@ -21,7 +21,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "e2e:visual": "tsx src/e2e-visual.ts"
+    "e2e:visual": "tsx src/e2e-visual.ts",
+    "artifacts:export": "tsx src/scripts/export-artifacts.ts"
   },
   "dependencies": {
     "@aprovan/patchwork-compiler": "workspace:*",
