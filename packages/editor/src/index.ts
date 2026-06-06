@@ -1,15 +1,11 @@
-// Components
-export {
-  CodeBlockExtension,
-  CodePreview,
-  WidgetPreview,
-  MarkdownEditor,
-  MarkdownPreview,
-  ServicesInspector,
-  type ServiceInfo,
-} from "./components";
+export { CodeBlockExtension } from "./components/CodeBlockExtension";
+export { CodePreview } from "./components/CodePreview";
+export { WidgetPreview } from "./components/WidgetPreview";
+export { MarkdownEditor } from "./components/MarkdownEditor";
+export { MarkdownPreview } from "./components/MarkdownPreview";
+export { ServicesInspector, type ServiceInfo } from "./components/ServicesInspector";
 
-// Edit components
+// Edit components — intentional public API boundary (see components/edit/index.ts)
 export {
   EditModal,
   EditHistory,
@@ -18,9 +14,11 @@ export {
   CodeBlockView,
   MediaPreview,
   useEditSession,
+  useProjectState,
   sendEditRequest,
   type EditModalProps,
   type UseEditSessionOptions,
+  type UseProjectStateOptions,
   type EditHistoryEntry,
   type EditSessionState,
   type EditSessionActions,
@@ -50,9 +48,7 @@ export {
   getMimeType,
 } from "./components/edit";
 
-// Lib utilities
 export {
-  // Code extractor
   extractCodeBlocks,
   findFirstCodeBlock,
   hasCodeBlock,
@@ -62,8 +58,9 @@ export {
   type CodePart,
   type ParsedPart,
   type ExtractOptions,
+} from "./lib/code-extractor";
 
-  // Diff utilities
+export {
   parseCodeBlockAttributes,
   parseCodeBlocks,
   findDiffMarkers,
@@ -78,8 +75,9 @@ export {
   type CodeBlock,
   type DiffBlock,
   type ParsedEditResponse,
+} from "./lib/diff";
 
-  // VFS utilities
+export {
   getVFSConfig,
   getVFSStore,
   saveProject,
@@ -87,7 +85,6 @@ export {
   listProjects,
   saveFile,
   isVFSAvailable,
+} from "./lib/vfs";
 
-  // General utilities
-  cn,
-} from "./lib";
+export { cn } from "./lib/utils";

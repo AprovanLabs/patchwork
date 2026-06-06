@@ -1,6 +1,6 @@
-import { createSingleFileProject } from "@aprovan/patchwork-compiler";
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback } from "react";
 import { sendEditRequest } from "./api";
+import { useProjectState } from "./useProjectState";
 import type {
   EditHistoryEntry,
   EditSessionState,
@@ -17,66 +17,19 @@ export interface UseEditSessionOptions {
   apiEndpoint?: string;
 }
 
-function cloneProject(project: VirtualProject): VirtualProject {
-  return {
-    ...project,
-    files: new Map(project.files),
-  };
-}
-
 export function useEditSession(
   options: UseEditSessionOptions,
 ): EditSessionState & EditSessionActions {
   const {
-    originalCode,
-    originalProject: providedProject,
-    initialActiveFile,
     compile,
     apiEndpoint,
   } = options;
 
-  console.log(
-    "[useEditSession] providedProject:",
-    providedProject?.id,
-    "files:",
-    providedProject ? Array.from(providedProject.files.keys()) : "none",
-  );
-
-  const originalProject = useMemo(
-    () => providedProject ?? createSingleFileProject(originalCode ?? ""),
-    [providedProject, originalCode],
-  );
-
-  // Track the last project we synced from to detect reference changes
-  const lastSyncedProjectRef = useRef<VirtualProject>(originalProject);
-
-  const [project, setProject] = useState<VirtualProject>(originalProject);
-  const [activeFile, setActiveFile] = useState(
-    initialActiveFile && originalProject.files.has(initialActiveFile)
-      ? initialActiveFile
-      : originalProject.entry,
-  );
-  const [history, setHistory] = useState<EditHistoryEntry[]>([]);
+  const state = useProjectState(options);
   const [isApplying, setIsApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamingNotes, setStreamingNotes] = useState<string[]>([]);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
-
-  // Sync state when the original project reference changes (new project or files loaded)
-  useEffect(() => {
-    if (originalProject !== lastSyncedProjectRef.current) {
-      lastSyncedProjectRef.current = originalProject;
-      setProject(originalProject);
-      setActiveFile(
-        initialActiveFile && originalProject.files.has(initialActiveFile)
-          ? initialActiveFile
-          : originalProject.entry,
-      );
-      setHistory([]);
-      setError(null);
-      setStreamingNotes([]);
-    }
-  }, [originalProject, initialActiveFile]);
 
   const performEdit = useCallback(
     async (
@@ -122,11 +75,6 @@ export function useEditSession(
     [compile, apiEndpoint],
   );
 
-  const currentCode = useMemo(
-    () => project.files.get(activeFile)?.content ?? "",
-    [project, activeFile],
-  );
-
   const submitEdit = useCallback(
     async (prompt: string) => {
       if (!prompt.trim() || isApplying) return;
@@ -137,16 +85,16 @@ export function useEditSession(
       setPendingPrompt(prompt);
 
       try {
-        const result = await performEdit(currentCode, prompt);
-        setProject((prev) => {
-          const updated = cloneProject(prev);
-          const file = updated.files.get(activeFile);
+        const result = await performEdit(state.currentCode, prompt);
+        state.setProject((prev: VirtualProject) => {
+          const updated = { ...prev, files: new Map(prev.files) };
+          const file = updated.files.get(state.activeFile);
           if (file) {
-            updated.files.set(activeFile, { ...file, content: result.newCode });
+            updated.files.set(state.activeFile, { ...file, content: result.newCode });
           }
           return updated;
         });
-        setHistory((prev) => [...prev, ...result.entries]);
+        state.setHistory((prev: EditHistoryEntry[]) => [...prev, ...result.entries]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Edit failed");
       } finally {
@@ -155,45 +103,7 @@ export function useEditSession(
         setPendingPrompt(null);
       }
     },
-    [currentCode, activeFile, isApplying, performEdit],
-  );
-
-  const revert = useCallback(() => {
-    setProject(originalProject);
-    setActiveFile(originalProject.entry);
-    setHistory([]);
-    setError(null);
-    setStreamingNotes([]);
-  }, [originalProject]);
-
-  const updateActiveFile = useCallback(
-    (content: string) => {
-      setProject((prev) => {
-        const updated = cloneProject(prev);
-        const file = updated.files.get(activeFile);
-        if (file) {
-          updated.files.set(activeFile, { ...file, content });
-        }
-        return updated;
-      });
-    },
-    [activeFile],
-  );
-
-  const replaceFile = useCallback(
-    (path: string, content: string, encoding: "utf8" | "base64" = "utf8") => {
-      setProject((prev) => {
-        const updated = cloneProject(prev);
-        const file = updated.files.get(path);
-        if (file) {
-          updated.files.set(path, { ...file, content, encoding });
-        } else {
-          updated.files.set(path, { path, content, encoding });
-        }
-        return updated;
-      });
-    },
-    [],
+    [state.currentCode, state.activeFile, state.setProject, state.setHistory, isApplying, performEdit],
   );
 
   const clearError = useCallback(() => {
@@ -201,19 +111,19 @@ export function useEditSession(
   }, []);
 
   return {
-    project,
-    originalProject,
-    activeFile,
-    history,
+    project: state.project,
+    originalProject: state.originalProject,
+    activeFile: state.activeFile,
+    history: state.history,
     isApplying,
     error,
     streamingNotes,
     pendingPrompt,
     submitEdit,
-    revert,
-    updateActiveFile,
-    setActiveFile,
+    revert: state.revert,
+    updateActiveFile: state.updateActiveFile,
+    setActiveFile: state.setActiveFile,
     clearError,
-    replaceFile,
+    replaceFile: state.replaceFile,
   };
 }
