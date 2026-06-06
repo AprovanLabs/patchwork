@@ -50,6 +50,7 @@ export function ControlHandles({
   const [isDragging, setIsDragging] = useState(false);
   const [dropTarget, setDropTarget] = useState<HTMLElement | null>(null);
   const [cornerToolbarExpanded, setCornerToolbarExpanded] = useState(false);
+  // @ts-expect-error TS6133
   const _toolbarRef = useRef<HTMLDivElement>(null);
   const { rect } = selectedElement;
 
@@ -59,6 +60,7 @@ export function ControlHandles({
   );
 
   // Check if corner toolbar should collapse
+  // @ts-expect-error TS6133
   const _isNarrowElement = rect.width < MIN_WIDTH_FOR_CORNER_TOOLBAR;
   
   // Check if edge zones need collapsing (based on element dimension perpendicular to edge)
@@ -117,6 +119,7 @@ export function ControlHandles({
     </svg>
   );
 
+  // @ts-expect-error TS6133
   const _MoreIcon = () => (
     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="12" r="1" fill="currentColor" />
@@ -125,6 +128,7 @@ export function ControlHandles({
     </svg>
   );
 
+  // @ts-expect-error TS6133
   const _MoreIconVertical = () => (
     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="5" r="1" fill="currentColor" />
@@ -270,6 +274,7 @@ export function ControlHandles({
   };
 
   // Check if an edge needs collapse based on position
+  // @ts-expect-error TS6133
   const _edgeNeedsCollapse = (position: HandlePosition): boolean => {
     const isHorizontal = position === 'top' || position === 'bottom';
     return isHorizontal ? isShortForHorizontalEdge : isShortForVerticalEdge;
@@ -417,6 +422,7 @@ export function ControlHandles({
   };
 
   // Expanded popup for collapsed edge zones
+  // @ts-expect-error TS6133
   const _EdgeExpandedPopup = ({ position }: { position: HandlePosition }) => {
     const isHorizontal = position === 'top' || position === 'bottom';
     
@@ -518,6 +524,7 @@ export function ControlHandles({
   );
 
   // Toolbar buttons (always the same, rendered conditionally based on narrow state)
+  // @ts-expect-error TS6133
   const _ToolbarButtons = () => (
     <>
       <ActionButton

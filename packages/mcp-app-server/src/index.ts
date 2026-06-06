@@ -88,6 +88,7 @@ function buildVirtualProject(
   return source ?? "export default function Widget() { return <div>Hello Patchwork</div>; }";
 }
 
+// @ts-expect-error TS6133 — kept for future use with persistent widget store
 async function registerStoredWidgetResources(server: McpServer, store: WidgetStore): Promise<void> {
   const widgets = await store.loadAll();
   for (const widget of widgets) {

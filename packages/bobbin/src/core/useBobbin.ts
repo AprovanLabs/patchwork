@@ -62,6 +62,7 @@ export function useBobbin(props: BobbinProps = {}) {
       enableContentEditable(selectedElement.element, true);
       return () => enableContentEditable(selectedElement.element, false);
     }
+    return undefined;
   }, [selectedElement]);
 
   // Notify on changes
