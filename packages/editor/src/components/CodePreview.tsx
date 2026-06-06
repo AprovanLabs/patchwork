@@ -156,8 +156,7 @@ export function CodePreview({
       await saveProject(project);
       setLastSavedCode(currentCode);
       setSaveStatus('saved');
-    } catch (err) {
-      console.warn('[VFS] Failed to save project:', err);
+    } catch {
       setSaveStatus('error');
     }
   }, [currentCode, getProjectId, getEntryFile]);
@@ -339,8 +338,7 @@ export function CodePreview({
                 await saveProject(project);
                 setLastSavedCode(finalCode);
                 setSaveStatus('saved');
-              } catch (err) {
-                console.warn('[VFS] Failed to save project:', err);
+              } catch {
                 setSaveStatus('error');
               }
             })();
