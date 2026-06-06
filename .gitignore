@@ -150,3 +150,6 @@ hardcopy.yaml
 
 # Widget compilation temp files
 .compile-tmp/
+
+# Playwright visual test artifacts (screenshots, traces)
+.artifacts/
