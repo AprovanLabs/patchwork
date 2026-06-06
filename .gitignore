@@ -152,4 +152,5 @@ hardcopy.yaml
 .compile-tmp/
 
 # Playwright visual test artifacts (screenshots, traces)
+# E2E visual artifacts
 .artifacts/
