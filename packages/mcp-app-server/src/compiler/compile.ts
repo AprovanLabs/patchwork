@@ -9,7 +9,6 @@ import {
   type Manifest,
   type VirtualProject,
   type ImageConfig,
-  type LoadedImage,
 } from "@aprovan/patchwork-compiler";
 import react from "@vitejs/plugin-react";
 import { build, type InlineConfig } from "vite";
