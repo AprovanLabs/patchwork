@@ -20,8 +20,8 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "e2e:visual": "tsx src/e2e-visual.ts",
+    "test": "vitest run src/",
+    "e2e:visual": "playwright test --config playwright.config.ts",
     "artifacts:export": "tsx src/scripts/export-artifacts.ts"
   },
   "dependencies": {
@@ -42,7 +42,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.52.0",
+    "@playwright/test": "^1.60.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.2",
     "@types/node": "^22.10.5",
