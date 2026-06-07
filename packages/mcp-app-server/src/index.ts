@@ -63,6 +63,21 @@ const MANIFEST_DEFAULTS: Manifest = {
   image: "@aprovan/patchwork-image-shadcn",
 };
 
+function buildCspConfig(widgetBaseUrl: string): { frameDomains: string[] } | undefined {
+  try {
+    const hostname = new URL(widgetBaseUrl).hostname;
+    if (hostname.endsWith(".trycloudflare.com")) {
+      return { frameDomains: ["*.trycloudflare.com"] };
+    }
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return { frameDomains: ["localhost"] };
+    }
+    return { frameDomains: [hostname] };
+  } catch {
+    return undefined;
+  }
+}
+
 function buildManifest(input?: Record<string, unknown>): Manifest {
   return {
     name: (input?.["name"] as string) ?? MANIFEST_DEFAULTS.name,
@@ -112,7 +127,8 @@ async function registerStoredWidgetResources(server: McpServer, store: WidgetSto
   }
 }
 
-function registerCachedWidgetResources(server: McpServer): void {
+function registerCachedWidgetResources(server: McpServer, widgetBaseUrl: string): void {
+  const csp = buildCspConfig(widgetBaseUrl);
   for (const [, entry] of allEntries()) {
     registerAppResource(
       server,
@@ -127,6 +143,7 @@ function registerCachedWidgetResources(server: McpServer): void {
             uri: entry.resourceUri,
             mimeType: RESOURCE_MIME_TYPE,
             text: entry.html,
+            ...(csp ? { _meta: { ui: { csp } } } : {}),
           },
         ],
       })
@@ -252,6 +269,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
         const storedUri = store.resourceUriFor(manifest.name, result.hash);
         const widgetUrl = getWidgetUrl(manifest.name, result.hash);
         const iframeHtml = generateIframeWrapper(widgetUrl, manifest.name);
+        const csp = buildCspConfig(widgetBaseUrl);
 
         // Return an iframe wrapper that loads the widget from the HTTP server
         // The actual widget HTML is served by the widget server on WIDGET_PORT
@@ -263,6 +281,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
                 uri: storedUri,
                 mimeType: RESOURCE_MIME_TYPE,
                 text: iframeHtml,
+                ...(csp ? { _meta: { ui: { csp } } } : {}),
               },
             },
             {
@@ -421,6 +440,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
 
       const widgetUrl = getWidgetUrl(name, hash);
       const iframeHtml = generateIframeWrapper(widgetUrl, name);
+      const csp = buildCspConfig(widgetBaseUrl);
 
       // Return an iframe wrapper that loads the widget from the HTTP server
       return {
@@ -431,6 +451,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
               uri: widget.resourceUri,
               mimeType: RESOURCE_MIME_TYPE,
               text: iframeHtml,
+              ...(csp ? { _meta: { ui: { csp } } } : {}),
             },
           },
           {
@@ -442,7 +463,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
     }
   );
 
-  registerCachedWidgetResources(server);
+  registerCachedWidgetResources(server, widgetBaseUrl);
   // Note: Stored widget resources are registered on-demand via render_widget tool
   // to avoid async registration after transport connection
   registerLiveUpdateTools(server);
