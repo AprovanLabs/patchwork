@@ -2,11 +2,11 @@
  * Visual regression tests for Patchwork reference widgets.
  *
  * Each test:
- * 1. Reads the pre-compiled widget URL from test-fixtures.json (written by global-setup)
- * 2. Navigates to the widget server's HTTP endpoint
- *    - The server injects React/ReactDOM UMD as blocking <script> tags so
- *      window.React is synchronously available when the module bundle evaluates
- * 3. Waits for React to mount (#root > *) and CDN resources to load (network idle)
+ * 1. Reads the widget runtime URL from test-fixtures.json (written by global-setup)
+ * 2. Navigates to the shared runtime host (/runtime/?widget=name/hash)
+ *    - The runtime fetches the widget's raw source and compiles + mounts it in
+ *      the browser via @aprovan/patchwork-compiler (esbuild-wasm + esm.sh)
+ * 3. Waits for the widget to mount (#root > *) and CDN resources to settle
  * 4. Captures a full-page screenshot saved to .artifacts/screenshots/<widget-name>.png
  * 5. Runs toHaveScreenshot() for visual regression baseline comparison
  */
@@ -52,13 +52,12 @@ test.describe("Widget visual regression", () => {
     });
     page.on("pageerror", (err) => consoleErrors.push(err.message));
 
-    // Navigate — the server injects React UMD as blocking scripts so
-    // window.React is available before the inlined module bundle evaluates
+    // Navigate to the shared runtime host, which compiles the widget in-browser
     await page.goto(widget.url, { waitUntil: "domcontentloaded" });
 
-    // Wait for React to mount into #root
+    // Wait for the widget to mount into #root (cold esbuild-wasm + CDN can be slow)
     await page.waitForSelector("#root > *", {
-      timeout: 60_000,
+      timeout: 90_000,
       state: "attached",
     });
 

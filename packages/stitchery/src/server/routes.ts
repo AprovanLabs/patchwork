@@ -11,11 +11,52 @@ import type { ServiceRegistry } from './services.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 export interface RouteContext {
-  copilotProxyUrl: string;
+  providerUrl: string;
+  providerApiKey?: string;
   tools: Record<string, Tool>;
   registry: ServiceRegistry;
   servicesPrompt: string;
   log: (...args: unknown[]) => void;
+}
+
+// OpenRouter
+// nvidia/nemotron-3-super-120b-a12b:free
+// nvidia/nemotron-3-ultra-550b-a55b:free
+// openai/gpt-oss-20b:free
+
+// Cerebras
+// gpt-oss-120b
+
+// Synthetic
+// nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4
+
+const Models = {
+  Low: 'nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4',
+  High: 'nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4',
+};
+
+export function stripUnsupportedOpenAICompatibleFields(
+  args: Record<string, unknown>,
+): Record<string, unknown> {
+  const body = { ...args };
+
+  if (Array.isArray(body.messages)) {
+    body.messages = body.messages.map((message) => {
+      if (
+        message &&
+        typeof message === 'object' &&
+        'role' in message &&
+        (message as Record<string, unknown>).role === 'assistant' &&
+        'reasoning_content' in (message as Record<string, unknown>)
+      ) {
+        const { reasoning_content, ...rest } = message as Record<string, unknown>;
+        return rest;
+      }
+      return message;
+    });
+  }
+
+  return body;
 }
 
 function parseBody<T>(req: IncomingMessage): Promise<T> {
@@ -52,12 +93,18 @@ export async function handleChat(
   }));
 
   const provider = createOpenAICompatible({
-    name: 'copilot-proxy',
-    baseURL: ctx.copilotProxyUrl,
+    name: 'provider',
+    baseURL: ctx.providerUrl,
+    apiKey: ctx.providerApiKey,
+    ...(
+      ctx.providerUrl.includes('cerebras') && {
+        transformRequestBody: stripUnsupportedOpenAICompatibleFields,
+      }
+    )
   });
 
   const result = streamText({
-    model: provider('claude-sonnet-4'),
+    model: provider(Models.Low),
     system: `---\npatchwork:\n  compilers: ${
       (metadata?.patchwork?.compilers ?? []).join(',') ?? '[]'
     }\n  services: ${ctx.registry
@@ -101,12 +148,13 @@ export async function handleEdit(
   );
 
   const provider = createOpenAICompatible({
-    name: 'copilot-proxy',
-    baseURL: ctx.copilotProxyUrl,
+    name: 'provider',
+    baseURL: ctx.providerUrl,
+    apiKey: ctx.providerApiKey
   });
 
   const result = streamText({
-    model: provider('claude-opus-4.5'),
+    model: provider(Models.Low),
     system: `Current component code:\n\`\`\`tsx\n${code}\n\`\`\`\n\n${EDIT_PROMPT}`,
     messages: [{ role: 'user', content: prompt }],
   });

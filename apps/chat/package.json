@@ -5,12 +5,12 @@
   "scripts": {
     "dev": "tsx scripts/start-dev.ts",
     "dev:client": "vite",
-    "dev:proxy": "pnpm exec copilot-proxy serve",
     "dev:stitchery": "node ../../packages/stitchery/dist/cli.js serve --utcp-config .utcp_config.json --local-package @aprovan/patchwork-image-shadcn:../../packages/images/shadcn -v --vfs-dir ./workspace --vfs-use-paths",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "dotenv": "^16.1.4",
     "@ai-sdk/react": "^3.0.69",
     "@aprovan/devtools": "^0.1.0",
     "@aprovan/bobbin": "workspace:*",
@@ -39,7 +39,6 @@
     "tiptap-markdown": "^0.9.0"
   },
   "devDependencies": {
-    "@aprovan/copilot-proxy": "link:../../../copilot-proxy",
     "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^22.19.7",
     "@types/react": "^18.3.27",

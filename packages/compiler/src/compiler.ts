@@ -23,7 +23,11 @@ import type { VirtualProject } from "./vfs/types.js";
 let esbuildInitialized = false;
 let esbuildInitPromise: Promise<void> | null = null;
 
-const DEFAULT_ESBUILD_WASM_URL = "https://unpkg.com/esbuild-wasm/esbuild.wasm";
+// Pin the wasm binary to the installed host version. An unpinned URL lets
+// unpkg serve a newer "latest" binary than the host JS, which crashes the
+// esbuild service with "Host version does not match binary version" and makes
+// esbuild.build() hang forever (widgets stuck on "Rendering preview...").
+const DEFAULT_ESBUILD_WASM_URL = `https://unpkg.com/esbuild-wasm@${esbuild.version}/esbuild.wasm`;
 
 /**
  * Initialize esbuild-wasm (must be called before using esbuild)

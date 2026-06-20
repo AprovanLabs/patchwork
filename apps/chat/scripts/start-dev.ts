@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 /**
  * Development server starter with dynamic port allocation.
  *
@@ -16,38 +17,22 @@ async function main() {
 
   const { base, ports } = await allocatePorts({
     base: BASE_PORT,
-    count: 3,
+    count: 2,
   });
 
-  const [clientPort, stitcheryPort, proxyPort] = ports;
+  const [clientPort, stitcheryPort] = ports;
 
   console.log(`📍 Allocated port range: ${base}-${base + 2}`);
   console.log(`   Client:     http://127.0.0.1:${clientPort}`);
   console.log(`   Stitchery:  http://127.0.0.1:${stitcheryPort}`);
-  console.log(`   Proxy:      http://127.0.0.1:${proxyPort}\n`);
 
   // Export ports for child processes
   const env = {
     ...process.env,
     CLIENT_PORT: String(clientPort),
     STITCHERY_PORT: String(stitcheryPort),
-    PROXY_PORT: String(proxyPort),
     STITCHERY_URL: `http://127.0.0.1:${stitcheryPort}`,
-    COPILOT_PROXY_URL: `http://127.0.0.1:${proxyPort}/v1`,
   };
-
-  // Start proxy first
-  const proxy = spawn(
-    "pnpm",
-    ["exec", "copilot-proxy", "serve", "-p", String(proxyPort)],
-    {
-      stdio: "inherit",
-      env,
-    },
-  );
-
-  // Give proxy a moment to start
-  await new Promise((resolve) => setTimeout(resolve, 500));
 
   // Start stitchery
   const stitcheryArgs = [
@@ -56,8 +41,6 @@ async function main() {
     "serve",
     "-p",
     String(stitcheryPort),
-    "--copilot-proxy-url",
-    `http://127.0.0.1:${proxyPort}/v1`,
     "--utcp-config",
     ".utcp_config.json",
     "--local-package",
@@ -85,7 +68,6 @@ async function main() {
   // Handle shutdown
   const cleanup = () => {
     console.log("\n🛑 Shutting down...");
-    proxy.kill();
     stitchery.kill();
     vite.kill();
     process.exit(0);

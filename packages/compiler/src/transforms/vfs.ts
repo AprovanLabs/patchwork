@@ -116,7 +116,12 @@ export function vfsPlugin(
       });
 
       build.onResolve({ filter: /^\./ }, (args) => {
-        if (args.namespace !== 'vfs') return null;
+        // Relative imports originate either from a file already in the VFS
+        // namespace, or from the entry itself (provided via esbuild `stdin`,
+        // whose importer is the entry sourcefile in the default namespace).
+        // Route both into the VFS so multi-file projects resolve correctly.
+        const fromEntry = args.namespace !== 'vfs' && args.importer === project.entry;
+        if (args.namespace !== 'vfs' && !fromEntry) return null;
         const resolved = resolveRelativePath(args.importer, args.path);
         return { path: resolved, namespace: 'vfs' };
       });

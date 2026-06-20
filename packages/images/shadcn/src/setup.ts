@@ -87,7 +87,8 @@ export async function setup(
   root: HTMLElement,
   options: SetupOptions = {},
 ): Promise<void> {
-  const { darkMode = "system", cssRuntime = true, cssVariables = {} } = options;
+  // Default to light mode unless explicitly requested otherwise
+  const { darkMode = false, cssRuntime = true, cssVariables = {} } = options;
 
   // Inject Tailwind Play CDN and wait for it to load
   if (cssRuntime) {
@@ -194,7 +195,10 @@ function injectTailwindPlayCdn(): Promise<void> {
     // Tailwind Play CDN reads window.tailwind.config on load
     window.tailwind = {
       config: {
-        darkMode: "class",
+        // Use class strategy so dark: variants only activate with an explicit
+        // .dark ancestor — prevents OS prefers-color-scheme from leaking in.
+        // We never add the .dark class when darkMode option is false (default).
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {

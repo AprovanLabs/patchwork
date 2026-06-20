@@ -1,9 +1,31 @@
 #!/usr/bin/env node
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 import { getAvailablePort } from "@aprovan/devtools";
 import { Command } from "commander";
 import { createStitcheryServer } from "./server/index.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function loadEnv() {
+  const candidates = [
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(__dirname, "../.env"),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      dotenv.config({ path: candidate });
+      console.log(`[stitchery] Loaded env from ${candidate}`);
+      return;
+    }
+  }
+}
+
+loadEnv();
 
 const program = new Command();
 
@@ -22,9 +44,8 @@ program
   )
   .option("-h, --host <host>", "Host to bind to", "127.0.0.1")
   .option(
-    "--copilot-proxy-url <url>",
-    "Copilot proxy URL",
-    "http://127.0.0.1:6433/v1",
+    "--provider-url <url>",
+    "Provider URL"
   )
   .option("--strict", "Fail if the specified port is in use", false)
   .option(
@@ -102,7 +123,8 @@ program
     const server = await createStitcheryServer({
       port,
       host: options.host,
-      copilotProxyUrl: options.copilotProxyUrl,
+      providerUrl: options.providerUrl ?? process.env.PROVIDER_URL,
+      providerApiKey: options.providerApiKey ?? process.env.PROVIDER_API_KEY,
       mcpServers,
       localPackages,
       utcp: utcpConfig,

@@ -1,6 +1,36 @@
 # @aprovan/mcp-app-server
 
-MCP App Server — hosts MCP tools that compile and render interactive widgets in Claude Desktop and Claude web, optionally bridged to third-party APIs via the Aprovan Registry.
+MCP App Server — hosts MCP tools that save and render interactive widgets in Claude Desktop and Claude web, optionally bridged to third-party APIs via the Aprovan Registry.
+
+## Architecture
+
+Widgets are stored as **raw, uncompiled** `.tsx`/`.ts` source files and compiled **in the
+browser** at render time using the shared `@aprovan/patchwork-compiler` runtime — the same
+path the chat app uses. The server does no widget compilation, Tailwind injection, or CDN
+resolution; those concerns belong to the compiler + image packages.
+
+The MCP Apps protocol imposes two constraints that shape the render path:
+
+1. The resource document Claude renders **must itself be the app** that connects to the host
+   (`App.connect()` → `window.parent`), and
+2. it runs under a **strict CSP with no `unsafe-eval`**, so esbuild-wasm cannot run there.
+
+So rendering is split across two pieces (the "bridged" design):
+
+- **Shell** (`/shell/shell.js`) — a small bundle of the ext-apps client that is the resource
+  document. It connects to Claude (handshake + sizing), and embeds the runtime in a nested,
+  **CSP-free** iframe served from the widget host. It relays the widget's
+  service / live-update / `updateContext` calls to the host over the ext-apps `App`.
+- **Runtime** (`/runtime/`) — runs inside that nested iframe (no host CSP), fetches the saved
+  widget's raw source from `/widget/:name/:hash/files`, compiles it with esbuild-wasm, loads
+  the image (Tailwind/React) from the CDN, and mounts it. The widget's `window.patchwork.*` and
+  service-namespace calls are forwarded to the shell via `postMessage`.
+
+Tools:
+
+- `save_widget` persists a widget's raw files (+ manifest) to the widget store and returns the
+  shell resource pointed at it (with startup `inputs`).
+- `render_widget` re-renders any previously saved widget by name/hash.
 
 ## Quick start
 
@@ -76,10 +106,10 @@ export $(grep -v '^#' .env | xargs) && pnpm dev
 
 ### Using Registry tools in a widget
 
-Once the Registry is connected, any tool namespace (e.g. `github`, `stripe`) can be requested in the `compile_widget` `services` parameter:
+Once the Registry is connected, any tool namespace (e.g. `github`, `stripe`) can be requested in the `save_widget` `services` parameter:
 
 ```
-Tool: compile_widget
+Tool: save_widget
 {
   "source": "...",
   "services": ["github", "stripe"]

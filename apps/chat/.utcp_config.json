@@ -11,6 +11,41 @@
       }
     },
     {
+      "name": "synthetic",
+      "call_template_type": "http",
+      "url": "https://raw.githubusercontent.com/AprovanLabs/registry/refs/heads/main/packages/utdk/synthetic.new/openapi.json",
+      "http_method": "GET",
+      "auth_tools": null
+    },
+    {
+      "name": "posthog",
+      "call_template_type": "mcp",
+      "auth_type": "api_key",
+      "api_key": "$POSTHOG_API_KEY",
+      "var_name": "apiToken",
+      "location": "query",
+      "config": {
+        "mcpServers": {
+          "posthog": {
+            "transport": "http",
+            "url": "https://mcp.posthog.com/mcp"
+          }
+        }
+      }
+    }
+    {
+      "name": "cerebras",
+      "call_template_type": "mcp",
+      "config": {
+        "mcpServers": {
+          "cerebras": {
+            "transport": "http",
+            "url": "https://inference-docs.cerebras.ai/mcp"
+          }
+        }
+      }
+    },
+    {
       "name": "hardcopy",
       "call_template_type": "mcp",
       "config": {

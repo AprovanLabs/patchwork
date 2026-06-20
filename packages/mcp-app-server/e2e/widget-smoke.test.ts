@@ -1,28 +1,34 @@
 /**
  * Widget visual smoke test.
  *
- * Compiles a minimal widget in Node, spins up a temporary HTTP server to
- * serve the resulting HTML, then drives a headless Chromium browser to
- * verify the widget renders and captures a screenshot.
+ * Saves a minimal widget's RAW source to an isolated store, serves the shared
+ * browser runtime + raw files over HTTP, then drives a headless Chromium browser
+ * to verify the runtime compiles and mounts the widget in-browser.
  *
- * This test is intentionally self-contained — it does not depend on the
- * running MCP / widget server so it can be executed without any external
- * processes.  Tests that validate the full widget-server pipeline (URL
- * routing, live updates, etc.) should live in separate test files and use
- * the `baseURL` / `webServer` Playwright config.
+ * This exercises the same path as production: no server-side compilation — the
+ * runtime fetches raw files and compiles them with @aprovan/patchwork-compiler.
+ *
+ * NOTE: dist/runtime must be built first (`pnpm build:runtime`).
  */
 
 import { test, expect } from "@playwright/test";
 import { createServer, type Server } from "node:http";
-import { mkdir } from "node:fs/promises";
-import { compileWidget } from "../src/compiler/compile.js";
-import type { Manifest } from "@aprovan/patchwork-compiler";
+import { mkdir, mkdtemp } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import cors from "cors";
+import express from "express";
+import { WidgetStore } from "../src/widget-store/store.js";
+import type { Manifest, VirtualFile } from "@aprovan/patchwork-compiler";
 
-// ---------------------------------------------------------------------------
-// Fixture: a simple widget to compile
-// ---------------------------------------------------------------------------
+const RUNTIME_DIR = fileURLToPath(new URL("../dist/runtime", import.meta.url));
 
-const SIMPLE_WIDGET_SOURCE = `
+const SIMPLE_WIDGET_FILES: VirtualFile[] = [
+  {
+    path: "main.tsx",
+    content: `
 export default function Widget() {
   return (
     <div
@@ -34,7 +40,9 @@ export default function Widget() {
     </div>
   );
 }
-`;
+`,
+  },
+];
 
 const TEST_MANIFEST: Manifest = {
   name: "smoke-test",
@@ -43,34 +51,40 @@ const TEST_MANIFEST: Manifest = {
   image: "@aprovan/patchwork-image-shadcn",
 };
 
-// ---------------------------------------------------------------------------
-// Suite
-// ---------------------------------------------------------------------------
-
 test.describe("widget smoke", () => {
   let httpServer: Server;
   let widgetUrl: string;
 
   test.beforeAll(async () => {
-    // Ensure screenshot output directory exists
     await mkdir(".artifacts/screenshots", { recursive: true });
 
-    // Compile the widget in Node (this is the CPU/I/O-heavy step)
-    const result = await compileWidget(SIMPLE_WIDGET_SOURCE, TEST_MANIFEST);
+    if (!existsSync(RUNTIME_DIR)) {
+      throw new Error(`Runtime bundle missing at ${RUNTIME_DIR}. Run \`pnpm build:runtime\`.`);
+    }
 
-    // Spin up a minimal HTTP server that serves the compiled HTML
-    httpServer = createServer((_req, res) => {
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(result.html);
+    const storeDir = await mkdtemp(join(tmpdir(), "pw-smoke-"));
+    const store = new WidgetStore({ storageDir: storeDir });
+    const hash = "smoke";
+    await store.saveWidget(hash, SIMPLE_WIDGET_FILES, TEST_MANIFEST, "main.tsx");
+
+    const app = express();
+    app.use(cors());
+    app.use("/runtime", express.static(RUNTIME_DIR));
+    app.get("/widget/:name/:hash/files", async (req, res) => {
+      const widget = await store.getWidget(req.params.name, req.params.hash);
+      if (!widget) {
+        res.status(404).json({ error: "not found" });
+        return;
+      }
+      res.json({ files: widget.files, entry: widget.entry, manifest: widget.manifest });
     });
 
-    await new Promise<void>((resolve) =>
-      httpServer.listen(0, "127.0.0.1", resolve)
-    );
+    httpServer = createServer(app);
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
 
     const addr = httpServer.address() as { address: string; port: number };
-    widgetUrl = `http://127.0.0.1:${addr.port}/`;
-  }, 120_000 /* compile can take a while on a cold cache */);
+    widgetUrl = `http://127.0.0.1:${addr.port}/runtime/?widget=${TEST_MANIFEST.name}/${hash}`;
+  }, 120_000);
 
   test.afterAll(async () => {
     await new Promise<void>((resolve, reject) =>
@@ -78,16 +92,15 @@ test.describe("widget smoke", () => {
     );
   });
 
-  test("compiled widget renders in browser", async ({ page }) => {
+  test("widget compiles and renders in browser", async ({ page }) => {
     await page.goto(widgetUrl);
 
-    // The compiled bundle mounts React into #root
-    await expect(page.locator("#root")).toBeVisible({ timeout: 15_000 });
+    // The runtime mounts the compiled widget into #root
+    await expect(page.locator("#root > *")).toBeVisible({ timeout: 90_000 });
 
     // Our widget's inner element should also be visible
     await expect(page.locator("#widget-content")).toBeVisible();
 
-    // Capture a screenshot into .artifacts/screenshots/
     await page.screenshot({
       path: ".artifacts/screenshots/widget-smoke.png",
       fullPage: true,

@@ -1,10 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { createProjectFromFiles, type Manifest } from "@aprovan/patchwork-compiler";
+import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express from "express";
-import { clear as clearCache } from "./compiler/cache.js";
-import { compileWidget } from "./compiler/compile.js";
 import { log, error } from "./logger.js";
 import {
   REFERENCE_WIDGET_FILES,
@@ -15,6 +14,7 @@ import { getWidgetStore, resetWidgetStore } from "./widget-store/index.js";
 
 const WIDGET_PORT = Number(process.env["WIDGET_PORT"] ?? 3002);
 const ARTIFACTS_DIR = resolve(process.cwd(), ".artifacts");
+const RUNTIME_DIR = fileURLToPath(new URL("../dist/runtime", import.meta.url));
 
 interface WidgetPreviewEntry {
   name: string;
@@ -28,53 +28,39 @@ function parseArgs(): { tunnel: boolean } {
   };
 }
 
-async function compileReferenceWidgets(): Promise<
-  Array<{ name: string; hash: string; html: string; manifest: Manifest }>
-> {
-  clearCache();
+async function saveReferenceWidgets(): Promise<Array<{ name: string; hash: string }>> {
   resetWidgetStore();
-
   const store = getWidgetStore();
 
-  const widgets: Array<{ name: string; hash: string; html: string; manifest: Manifest }> = [];
+  const hash = "reference";
+  await store.saveWidget(hash, REFERENCE_WIDGET_FILES, REFERENCE_WIDGET_MANIFEST, "main.tsx");
 
-  const result = await compileWidget(
-    createProjectFromFiles(REFERENCE_WIDGET_FILES),
-    REFERENCE_WIDGET_MANIFEST,
-    { services: REFERENCE_WIDGET_MANIFEST.services }
-  );
-
-  await store.saveWidget(result.hash, result.html, REFERENCE_WIDGET_MANIFEST, "main.tsx");
-
-  widgets.push({
-    name: REFERENCE_WIDGET_MANIFEST.name,
-    hash: result.hash,
-    html: result.html,
-    manifest: REFERENCE_WIDGET_MANIFEST,
-  });
-
-  return widgets;
+  return [{ name: REFERENCE_WIDGET_MANIFEST.name, hash }];
 }
 
 async function startWidgetServer(): Promise<void> {
+  if (!existsSync(RUNTIME_DIR)) {
+    throw new Error(`Runtime bundle missing at ${RUNTIME_DIR}. Run \`pnpm build:runtime\` first.`);
+  }
+
   const app = express();
   app.use(cors());
+  app.use("/runtime", express.static(RUNTIME_DIR));
 
   const store = getWidgetStore();
 
-  app.get("/widget/:name/:hash", async (req, res) => {
+  app.get("/widget/:name/:hash/files", async (req, res) => {
     const { name, hash } = req.params;
     try {
       const widget = await store.getWidget(name, hash);
       if (!widget) {
-        res.status(404).send("Widget not found");
+        res.status(404).json({ error: "Widget not found" });
         return;
       }
-      res.setHeader("Content-Type", "text/html");
-      res.send(widget.html);
+      res.json({ files: widget.files, entry: widget.entry, manifest: widget.manifest });
     } catch (err) {
-      error("e2e-visual", "Error serving widget:", err);
-      res.status(500).send("Internal server error");
+      error("e2e-visual", "Error serving widget files:", err);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -112,9 +98,9 @@ async function savePreviewManifest(entries: WidgetPreviewEntry[]): Promise<void>
 async function main(): Promise<void> {
   const { tunnel } = parseArgs();
 
-  log("e2e-visual", "Compiling reference widgets...");
-  const widgets = await compileReferenceWidgets();
-  log("e2e-visual", `Compiled ${widgets.length} widget(s)`);
+  log("e2e-visual", "Saving reference widgets...");
+  const widgets = await saveReferenceWidgets();
+  log("e2e-visual", `Saved ${widgets.length} widget(s)`);
 
   log("e2e-visual", "Starting widget server...");
   await startWidgetServer();
@@ -134,7 +120,7 @@ async function main(): Promise<void> {
   const entries: WidgetPreviewEntry[] = widgets.map((w) => ({
     name: w.name,
     hash: w.hash,
-    url: `${baseUrl}/widget/${w.name}/${w.hash}`,
+    url: `${baseUrl}/runtime/?widget=${w.name}/${w.hash}`,
   }));
 
   printSummaryTable(entries);

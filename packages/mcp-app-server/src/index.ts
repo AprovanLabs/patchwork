@@ -1,17 +1,16 @@
 import {
   createProjectFromFiles,
+  createSingleFileProject,
   type Manifest,
   type VirtualFile,
   type VirtualProject,
 } from "@aprovan/patchwork-compiler";
 import {
   registerAppTool,
-  registerAppResource,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { compileWidget, allEntries, type CompileWidgetResult } from "./compiler/index.js";
 import {
   subscribeSession,
   unsubscribeSession as _unsubscribeSession,
@@ -27,7 +26,7 @@ import {
   type ServiceToolInfo,
   type ServiceBridgeConfig,
 } from "./services.js";
-import { type WidgetStore, getWidgetStore } from "./widget-store/index.js";
+import { getWidgetStore } from "./widget-store/index.js";
 
 export type { ServiceBackend, ServiceToolInfo, ServiceBridgeConfig };
 export type { StreamEvent };
@@ -37,23 +36,66 @@ const DEFAULT_WIDGET_PORT = Number(process.env["WIDGET_PORT"] ?? 3002);
 const DEFAULT_WIDGET_HOST = process.env["WIDGET_HOST"] ?? "localhost";
 const DEFAULT_WIDGET_BASE_URL = `http://${DEFAULT_WIDGET_HOST}:${DEFAULT_WIDGET_PORT}`;
 
-function generateIframeWrapper(widgetUrl: string, name: string): string {
+interface WidgetRef {
+  name: string;
+  hash: string;
+  entry: string;
+}
+
+/**
+ * Generate the MCP App resource document.
+ *
+ * Per the MCP Apps protocol the resource document itself must be the app that
+ * connects to the host, and it runs under a strict CSP with no `unsafe-eval` —
+ * so esbuild-wasm cannot run here. The resource therefore loads the bundled
+ * ext-apps "shell" (served from the widget host, allow-listed via
+ * `resourceDomains`) which connects to the host and embeds the CSP-free runtime
+ * iframe that actually compiles the widget. The widget + inputs are passed to
+ * the shell via a base64 `data-config` attribute (no inline script → CSP-safe).
+ */
+function generateResourceHtml(
+  shellUrl: string,
+  runtimeUrl: string,
+  widget: WidgetRef,
+  inputs: Record<string, unknown>,
+): string {
+  const config = JSON.stringify({
+    runtime: runtimeUrl,
+    widget: `${widget.name}/${widget.hash}`,
+    inputs,
+  });
+  const configB64 = Buffer.from(config, "utf-8").toString("base64");
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${name}</title>
+  <title>${widget.name}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; }
-    iframe { width: 100%; height: 100%; border: none; }
+    html, body { width: 100%; }
+    #pw-root { width: 100%; }
   </style>
 </head>
 <body>
-  <iframe src="${widgetUrl}" title="${name}" sandbox="allow-scripts allow-same-origin"></iframe>
+  <div id="pw-root"></div>
+  <script src="${shellUrl}" data-config="${configB64}"></script>
 </body>
 </html>`;
+}
+
+/** Stable, non-cryptographic content hash used as the widget store key. */
+function hashFiles(files: VirtualFile[], manifest: Manifest): string {
+  const input = JSON.stringify({
+    name: manifest.name,
+    image: manifest.image,
+    files: files.map((f) => [f.path, f.content]),
+  });
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(16).padStart(8, "0");
 }
 
 const MANIFEST_DEFAULTS: Manifest = {
@@ -63,16 +105,30 @@ const MANIFEST_DEFAULTS: Manifest = {
   image: "@aprovan/patchwork-image-shadcn",
 };
 
-function buildCspConfig(widgetBaseUrl: string): { frameDomains: string[] } | undefined {
+/**
+ * Build the CSP the host applies to the resource document.
+ *
+ * - `resourceDomains` (→ `script-src`) must allow the external shell bundle.
+ * - `frameDomains` (→ `frame-src`) must allow the nested runtime iframe.
+ *
+ * Both live on the widget host origin, so a single allow-listed origin covers
+ * them. Entries are scheme-qualified per the CSP spec.
+ */
+function buildCspConfig(
+  widgetBaseUrl: string,
+): { frameDomains: string[]; resourceDomains: string[] } | undefined {
   try {
-    const hostname = new URL(widgetBaseUrl).hostname;
-    if (hostname.endsWith(".trycloudflare.com")) {
-      return { frameDomains: ["*.trycloudflare.com"] };
-    }
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return { frameDomains: ["localhost"] };
-    }
-    return { frameDomains: [hostname] };
+    const url = new URL(widgetBaseUrl);
+    // Use the exact origin (scheme + host + port). The shell bundle and the
+    // nested runtime iframe both live on this single origin, so one entry covers
+    // script-src (resourceDomains) and frame-src (frameDomains). Hosts enforce
+    // the resource CSP strictly and drop broad wildcard hosts like
+    // `https://*.trycloudflare.com`, which would leave script-src without the
+    // shell origin and block the bootstrap script — so never wildcard.
+    const origin = url.port
+      ? `${url.protocol}//${url.hostname}:${url.port}`
+      : `${url.protocol}//${url.hostname}`;
+    return { frameDomains: [origin], resourceDomains: [origin] };
   } catch {
     return undefined;
   }
@@ -88,67 +144,25 @@ function buildManifest(input?: Record<string, unknown>): Manifest {
   };
 }
 
-function buildVirtualProject(
+const DEFAULT_WIDGET_SOURCE =
+  "export default function Widget() { return <div>Hello Patchwork</div>; }";
+
+function buildProject(
+  name: string,
   source?: string,
   files?: Array<{ path: string; content: string }>,
   entry?: string
-): string | VirtualProject {
+): VirtualProject {
   if (files && files.length > 0) {
     const virtualFiles: VirtualFile[] = files.map((f) => ({
       path: f.path,
       content: f.content,
     }));
-    return createProjectFromFiles(virtualFiles, entry);
+    const project = createProjectFromFiles(virtualFiles, name);
+    if (entry) project.entry = entry;
+    return project;
   }
-  return source ?? "export default function Widget() { return <div>Hello Patchwork</div>; }";
-}
-
-// @ts-expect-error TS6133 — kept for future use with persistent widget store
-async function registerStoredWidgetResources(server: McpServer, store: WidgetStore): Promise<void> {
-  const widgets = await store.loadAll();
-  for (const widget of widgets) {
-    registerAppResource(
-      server,
-      `Widget ${widget.manifest.name}`,
-      widget.resourceUri,
-      {
-        description: widget.manifest.description ?? `Persisted widget: ${widget.manifest.name}`,
-      },
-      async () => ({
-        contents: [
-          {
-            uri: widget.resourceUri,
-            mimeType: RESOURCE_MIME_TYPE,
-            text: widget.html,
-          },
-        ],
-      })
-    );
-  }
-}
-
-function registerCachedWidgetResources(server: McpServer, widgetBaseUrl: string): void {
-  const csp = buildCspConfig(widgetBaseUrl);
-  for (const [, entry] of allEntries()) {
-    registerAppResource(
-      server,
-      `Widget ${entry.manifest.name}`,
-      entry.resourceUri,
-      {
-        description: entry.manifest.description ?? `Compiled widget: ${entry.manifest.name}`,
-      },
-      async () => ({
-        contents: [
-          {
-            uri: entry.resourceUri,
-            mimeType: RESOURCE_MIME_TYPE,
-            text: entry.html,
-            ...(csp ? { _meta: { ui: { csp } } } : {}),
-          },
-        ],
-      })
-    );
-  }
+  return createSingleFileProject(source ?? DEFAULT_WIDGET_SOURCE, entry ?? "main.tsx", name);
 }
 
 export interface McpAppServerOptions {
@@ -166,21 +180,36 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
   const serviceBridge = options.services ? new ServiceBridge(options.services) : null;
   const widgetBaseUrl = options.widgetBaseUrl ?? DEFAULT_WIDGET_BASE_URL;
 
-  // Helper to generate widget URLs with the configured base
-  const getWidgetUrl = (name: string, hash: string): string => {
-    return `${widgetBaseUrl}/widget/${name}/${hash}`;
-  };
+  const runtimeUrl = `${widgetBaseUrl}/runtime/`;
+  const shellUrl = `${widgetBaseUrl}/shell/shell.js`;
+  const directUrl = (name: string, hash: string): string =>
+    `${runtimeUrl}?widget=${encodeURIComponent(name)}/${encodeURIComponent(hash)}`;
 
   const store = getWidgetStore();
 
+  /** Build the MCP App resource document that renders a stored widget. */
+  const renderResource = (ref: WidgetRef, inputs: Record<string, unknown>) => {
+    const csp = buildCspConfig(widgetBaseUrl);
+    return {
+      type: "resource" as const,
+      resource: {
+        uri: store.resourceUriFor(ref.name, ref.hash),
+        mimeType: RESOURCE_MIME_TYPE,
+        text: generateResourceHtml(shellUrl, runtimeUrl, ref, inputs),
+        ...(csp ? { _meta: { ui: { csp } } } : {}),
+      },
+    };
+  };
+
   registerAppTool(
     server,
-    "compile_widget",
+    "save_widget",
     {
       description:
-        "Compile a JSX/TSX widget into a self-contained HTML page served as an MCP App resource. " +
+        "Save a JSX/TSX widget's raw source files for reuse and render it as an MCP App resource. " +
         "Pass source code for a single-file widget, or a files array for a multi-file project. " +
-        "The compiled widget is cached in memory and persisted to the VFS widget store.",
+        "The widget is stored uncompiled and compiled in the browser by the shared Patchwork " +
+        "runtime when rendered — pass `inputs` to supply startup props to the widget.",
       inputSchema: {
         source: z
           .string()
@@ -217,16 +246,13 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
             "Service namespaces the widget calls (e.g., ['weather', 'stripe']). " +
               "A proxy shim is injected so widget code can call namespace.procedure(args) directly."
           ),
-        standalone: z
-          .boolean()
+        inputs: z
+          .record(z.unknown())
           .optional()
-          .describe(
-            "Compile a standalone widget without runtime dependencies (no ext-apps connection). " +
-              "Defaults to true. Set to false only when an HTTP host is available for live updates."
-          ),
+          .describe("Startup props passed to the widget's default export when it is rendered."),
       },
       _meta: {
-        ui: { resourceUri: "ui://widget/{hash}/view.html" },
+        ui: { resourceUri: "ui://widgets/{name}/{hash}/view.html" },
       },
     },
     async (args) => {
@@ -234,59 +260,45 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
       const files = args?.["files"] as Array<{ path: string; content: string }> | undefined;
       const entry = args?.["entry"] as string | undefined;
       const requestedServices = args?.["services"] as string[] | undefined;
-      const standalone = (args?.["standalone"] as boolean | undefined) ?? true;
+      const inputs = (args?.["inputs"] as Record<string, unknown> | undefined) ?? {};
 
       const manifestInput: Record<string, unknown> = {};
       if (args?.["name"]) manifestInput["name"] = args["name"];
       if (args?.["image"]) manifestInput["image"] = args["image"];
-      if (requestedServices) manifestInput["services"] = requestedServices;
 
-      const manifest = buildManifest(manifestInput);
-      const project = buildVirtualProject(source, files, entry);
-
-      let compileServices: string[] | undefined;
-      if (requestedServices && requestedServices.length > 0 && serviceBridge) {
+      // Validate requested services against the connected backend.
+      let services = requestedServices ?? [];
+      if (services.length > 0 && serviceBridge) {
         const availableNamespaces = serviceBridge.getNamespaces();
-        compileServices = requestedServices.filter((ns) => availableNamespaces.includes(ns));
-        const unavailable = requestedServices.filter((ns) => !availableNamespaces.includes(ns));
+        const unavailable = services.filter((ns) => !availableNamespaces.includes(ns));
         if (unavailable.length > 0) {
           warn(
             "mcp-app-server",
             `Requested services not available: ${unavailable.join(", ")}. Available: ${availableNamespaces.join(", ")}`
           );
         }
+        services = services.filter((ns) => availableNamespaces.includes(ns));
       }
+      if (services.length > 0) manifestInput["services"] = services;
+
+      const manifest = buildManifest(manifestInput);
+      const project = buildProject(manifest.name, source, files, entry);
+      const projectFiles = Array.from(project.files.values());
 
       try {
-        const result: CompileWidgetResult = await compileWidget(project, manifest, {
-          services: compileServices,
-          liveUpdates: !standalone,
-        });
+        const hash = hashFiles(projectFiles, manifest);
+        await store.saveWidget(hash, projectFiles, manifest, project.entry);
 
-        const entryPath = typeof project === "string" ? undefined : project.entry;
-        await store.saveWidget(result.hash, result.html, manifest, entryPath);
+        const ref: WidgetRef = { name: manifest.name, hash, entry: project.entry };
 
-        const storedUri = store.resourceUriFor(manifest.name, result.hash);
-        const widgetUrl = getWidgetUrl(manifest.name, result.hash);
-        const iframeHtml = generateIframeWrapper(widgetUrl, manifest.name);
-        const csp = buildCspConfig(widgetBaseUrl);
-
-        // Return an iframe wrapper that loads the widget from the HTTP server
-        // The actual widget HTML is served by the widget server on WIDGET_PORT
         return {
           content: [
-            {
-              type: "resource" as const,
-              resource: {
-                uri: storedUri,
-                mimeType: RESOURCE_MIME_TYPE,
-                text: iframeHtml,
-                ...(csp ? { _meta: { ui: { csp } } } : {}),
-              },
-            },
+            renderResource(ref, inputs),
             {
               type: "text" as const,
-              text: `Widget "${manifest.name}" compiled. Hash: ${result.hash}\nServed at: ${widgetUrl}`,
+              text:
+                `Widget "${manifest.name}" saved. Hash: ${hash}\n` +
+                `Compiled in-browser at: ${directUrl(manifest.name, hash)}`,
             },
           ],
         };
@@ -296,7 +308,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
           content: [
             {
               type: "text" as const,
-              text: `Compilation failed: ${message}`,
+              text: `Failed to save widget: ${message}`,
             },
           ],
           isError: true,
@@ -361,7 +373,8 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
     {
       description:
         "Render a persisted widget by its name and hash. " +
-        "Serves the compiled widget as an MCP App resource rendered inline in the conversation.",
+        "Serves the saved widget as an MCP App resource that compiles in the browser, " +
+        "optionally supplying startup props via `inputs`.",
       inputSchema: {
         name: z.string().describe("Widget name (as stored in the VFS widget store)."),
         hash: z
@@ -370,6 +383,10 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
           .describe(
             "Widget content hash. If omitted, renders the most recent version of the named widget."
           ),
+        inputs: z
+          .record(z.unknown())
+          .optional()
+          .describe("Startup props passed to the widget's default export when it is rendered."),
       },
       _meta: {
         ui: { resourceUri: "ui://widgets/{name}/{hash}/view.html" },
@@ -378,6 +395,7 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
     async (args) => {
       const name = args?.["name"] as string;
       const hashInput = args?.["hash"] as string | undefined;
+      const inputs = (args?.["inputs"] as Record<string, unknown> | undefined) ?? {};
 
       if (!name) {
         return {
@@ -438,34 +456,20 @@ export function createMcpAppServer(options: McpAppServerOptions = {}): McpServer
         };
       }
 
-      const widgetUrl = getWidgetUrl(name, hash);
-      const iframeHtml = generateIframeWrapper(widgetUrl, name);
-      const csp = buildCspConfig(widgetBaseUrl);
+      const ref: WidgetRef = { name, hash, entry: widget.entry };
 
-      // Return an iframe wrapper that loads the widget from the HTTP server
       return {
         content: [
-          {
-            type: "resource" as const,
-            resource: {
-              uri: widget.resourceUri,
-              mimeType: RESOURCE_MIME_TYPE,
-              text: iframeHtml,
-              ...(csp ? { _meta: { ui: { csp } } } : {}),
-            },
-          },
+          renderResource(ref, inputs),
           {
             type: "text" as const,
-            text: `Rendered widget "${name}" (hash: ${hash}).\nServed at: ${widgetUrl}`,
+            text: `Rendered widget "${name}" (hash: ${hash}).\nCompiled in-browser at: ${directUrl(name, hash)}`,
           },
         ],
       };
     }
   );
 
-  registerCachedWidgetResources(server, widgetBaseUrl);
-  // Note: Stored widget resources are registered on-demand via render_widget tool
-  // to avoid async registration after transport connection
   registerLiveUpdateTools(server);
 
   return server;

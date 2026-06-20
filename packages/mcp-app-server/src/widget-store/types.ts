@@ -1,4 +1,4 @@
-import type { Manifest } from "@aprovan/patchwork-compiler";
+import type { Manifest, VirtualFile } from "@aprovan/patchwork-compiler";
 
 export interface FileStats {
   size: number;
@@ -25,11 +25,14 @@ export interface FSProvider {
 }
 
 export interface StoredWidget {
+  /** Storage path of the widget directory (e.g. "widgets/timer/abc123"). */
   path: string;
   resourceUri: string;
-  html: string;
+  /** Raw, uncompiled widget source files. Compilation happens in the browser. */
+  files: VirtualFile[];
+  /** Entry file path within {@link files} (e.g. "main.tsx"). */
+  entry: string;
   manifest: Manifest;
-  entry?: string;
   createdAt: number;
 }
 

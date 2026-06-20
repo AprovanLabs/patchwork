@@ -1,4 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -22,6 +26,88 @@ type SessionEntry = {
   server: ReturnType<typeof createMcpAppServer>;
   transport: StreamableHTTPServerTransport;
 };
+
+/**
+ * Cross-process coordination for the shared widget host.
+ *
+ * Every stdio spawn of this server (Claude Desktop respawns it freely) would
+ * otherwise start its own widget server and its own cloudflared quick tunnel.
+ * Only one can bind {@link WIDGET_PORT}; the rest orphan extra tunnels and, worse,
+ * each render returns a *different* hostname — and any instance whose ephemeral
+ * tunnel has dropped serves a dead URL (Cloudflare 1033) into the widget HTML.
+ *
+ * We elect a single owner via the port bind: whoever binds the port establishes
+ * (and verifies) the tunnel and publishes its base URL to a temp file keyed by
+ * port; every other instance reuses that URL instead of starting a tunnel.
+ */
+interface WidgetHostState {
+  baseUrl: string;
+  pid: number;
+  updatedAt: number;
+}
+
+const WIDGET_STATE_FILE = join(tmpdir(), `patchwork-widget-${WIDGET_PORT}.json`);
+
+function readWidgetHostState(): WidgetHostState | null {
+  try {
+    return JSON.parse(readFileSync(WIDGET_STATE_FILE, "utf8")) as WidgetHostState;
+  } catch {
+    return null;
+  }
+}
+
+function publishWidgetHostState(baseUrl: string): void {
+  try {
+    const state: WidgetHostState = { baseUrl, pid: process.pid, updatedAt: Date.now() };
+    writeFileSync(WIDGET_STATE_FILE, JSON.stringify(state));
+  } catch (err) {
+    error("mcp-app-server", "Failed to publish widget host state:", err);
+  }
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // ESRCH = no such process; EPERM = exists but not ours (still alive).
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/**
+ * Wait for the owning instance to publish its (verified) base URL. Only adopt
+ * state whose owning pid is still alive, so a non-owner never reuses a dead
+ * previous owner's (now-1033) hostname.
+ */
+async function awaitPublishedWidgetBaseUrl(timeoutMs = 35000): Promise<string | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const state = readWidgetHostState();
+    if (state?.baseUrl && isProcessAlive(state.pid)) return state.baseUrl;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return null;
+}
+
+/** Locate a built browser bundle dir (dist/<name>) from either dist or src. */
+function resolveDistDir(name: string): string {
+  const candidates = [
+    fileURLToPath(new URL(`./${name}`, import.meta.url)), // built: dist/<name>
+    fileURLToPath(new URL(`../dist/${name}`, import.meta.url)), // dev via tsx: src → dist
+  ];
+  return candidates.find((dir) => existsSync(dir)) ?? candidates[0]!;
+}
+
+/** Locate the built runtime bundle (dist/runtime). */
+export function resolveRuntimeDir(): string {
+  return resolveDistDir("runtime");
+}
+
+/** Locate the built MCP App shell bundle (dist/shell). */
+export function resolveShellDir(): string {
+  return resolveDistDir("shell");
+}
 
 async function setupRegistryBackend(): Promise<{
   registryBackend: RegistryBackend | null;
@@ -183,35 +269,78 @@ async function startWidgetServer(): Promise<string> {
 
   const store = getWidgetStore();
 
-  // Serve widgets at /widget/:name/:hash
-  widgetApp.get("/widget/:name/:hash", async (req, res) => {
+  // Serve the MCP App shell (resource document's external script) and the shared
+  // browser runtime bundle (compiles widgets in-browser). Both resolve to dist
+  // whether running built (dist/server.js) or via tsx (src).
+  widgetApp.use("/shell", express.static(resolveShellDir()));
+  widgetApp.use("/runtime", express.static(resolveRuntimeDir()));
+
+  // Raw widget source files — fetched by the runtime and compiled in-browser.
+  widgetApp.get("/widget/:name/:hash/files", async (req, res) => {
     const { name, hash } = req.params;
     try {
       const widget = await store.getWidget(name, hash);
       if (!widget) {
-        res.status(404).send("Widget not found");
+        res.status(404).json({ error: "Widget not found" });
         return;
       }
-      res.setHeader("Content-Type", "text/html");
-      res.send(widget.html);
+      res.json({ files: widget.files, entry: widget.entry, manifest: widget.manifest });
     } catch (err) {
-      error("widget-server", "Error serving widget:", err);
-      res.status(500).send("Internal server error");
+      error("widget-server", "Error serving widget files:", err);
+      res.status(500).json({ error: "Internal server error" });
     }
+  });
+
+  // Convenience redirect: /widget/:name/:hash → runtime host with the widget preselected.
+  widgetApp.get("/widget/:name/:hash", (req, res) => {
+    const { name, hash } = req.params;
+    res.redirect(
+      302,
+      `/runtime/?widget=${encodeURIComponent(name)}/${encodeURIComponent(hash)}`,
+    );
   });
 
   widgetApp.get("/health", (_req, res) => {
     res.json({ status: "ok", service: "patchwork-widget-server" });
   });
 
-  await new Promise<void>((resolve) => {
-    widgetApp.listen(WIDGET_PORT, HOST, () => {
+  // Elect the widget-host owner via the port bind. A failed bind (EADDRINUSE)
+  // means another instance already owns the widget server + tunnel.
+  const isOwner = await new Promise<boolean>((resolve) => {
+    const httpServer = widgetApp.listen(WIDGET_PORT, HOST, () => {
       log("mcp-app-server", `Widget server listening on http://${HOST}:${WIDGET_PORT}`);
-      resolve();
+      resolve(true);
+    });
+    httpServer.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        log(
+          "mcp-app-server",
+          `Widget port ${WIDGET_PORT} already owned by another instance; reusing its widget host.`,
+        );
+      } else {
+        error("mcp-app-server", "Widget server failed to bind:", err);
+      }
+      resolve(false);
     });
   });
 
-  // Determine the base URL for widgets
+  if (!isOwner) {
+    // Reuse the owner's verified, published base URL so every instance hands out
+    // the same live hostname instead of orphaning another (possibly dead) tunnel.
+    const shared = await awaitPublishedWidgetBaseUrl();
+    if (shared) {
+      log("mcp-app-server", `Reusing shared widget host: ${shared}`);
+      return shared;
+    }
+    error(
+      "mcp-app-server",
+      "Owner instance never published a base URL; falling back to localhost (widgets may not load in remote hosts).",
+    );
+    return `http://localhost:${WIDGET_PORT}`;
+  }
+
+  // We own the widget server. Establish (and verify) the tunnel, then publish
+  // the base URL for sibling instances.
   let widgetBaseUrl = `http://localhost:${WIDGET_PORT}`;
 
   if (WIDGET_TUNNEL) {
@@ -223,6 +352,7 @@ async function startWidgetServer(): Promise<string> {
     }
   }
 
+  publishWidgetHostState(widgetBaseUrl);
   return widgetBaseUrl;
 }
 

@@ -134,7 +134,8 @@ export async function createStitcheryServer(
   const {
     port = 6434,
     host = "127.0.0.1",
-    copilotProxyUrl = "http://127.0.0.1:6433/v1",
+    providerUrl,
+    providerApiKey,
     localPackages = {},
     mcpServers = [],
     utcp,
@@ -185,7 +186,8 @@ export async function createStitcheryServer(
   const allTools = { ...registry.getTools(), ...internalTools };
 
   const routeCtx: RouteContext = {
-    copilotProxyUrl,
+    providerUrl: providerUrl ?? 'https://openrouter.ai/api/v1',
+    providerApiKey,
     tools: allTools,
     registry,
     servicesPrompt: generateServicesPrompt(registry),

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Patchwork Widget Runtime</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        min-height: 100%;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #root {
+        width: 100%;
+      }
+      #pw-status {
+        padding: 12px 16px;
+        font-size: 13px;
+        color: #6b7280;
+      }
+      #pw-status[data-error] {
+        color: #dc2626;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="pw-status">Loading runtime…</div>
+    <div id="root"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

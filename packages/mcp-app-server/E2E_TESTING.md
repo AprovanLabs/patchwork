@@ -81,7 +81,7 @@ Claude Desktop connects to the MCP App Server via a local MCP server configurati
 ### Testing procedure
 
 1. Start a new conversation
-2. Ask Claude: "Use the compile_widget tool to create a live dashboard widget"
+2. Ask Claude: "Use the save_widget tool to create a live dashboard widget"
 3. Provide widget source code or ask Claude to generate it
 4. Verify the widget renders inline in the conversation
 5. Test service calls by asking: "Call weather.get_forecast for San Francisco"
@@ -91,7 +91,7 @@ Claude Desktop connects to the MCP App Server via a local MCP server configurati
 ### What to verify
 
 - Widget renders as an interactive MCP App resource
-- `compile_widget` returns a resource URI and the widget displays inline
+- `save_widget` returns a resource URI and the widget displays inline
 - `list_widgets` shows persisted widgets
 - `render_widget` re-renders a stored widget
 - Service tool calls (e.g., `weather__get_forecast`) return data
@@ -165,7 +165,7 @@ A reference widget (`live-dashboard`) is included in `src/reference-widgets/live
 In a Claude conversation with the MCP server connected:
 
 ```
-Use compile_widget with:
+Use save_widget with:
 - files: (paste the four file contents from src/reference-widgets/live-dashboard.ts)
 - services: ["weather"]
 - name: "live-dashboard"
@@ -185,8 +185,8 @@ pnpm test
 The `e2e-pipeline.test.ts` file covers:
 
 - Compile → VFS store → retrieve round-trip
-- Service shim injection in compiled HTML
-- Live update shim injection in compiled HTML
+- Service shim wiring (window.<namespace>) in the browser runtime
+- Live update shim wiring (window.patchwork) in the browser runtime
 - CDN preload scripts and Tailwind CSS
 - Cache hit/miss behavior
 - ServiceBridge tool registration and call forwarding
@@ -201,7 +201,7 @@ The `e2e-pipeline.test.ts` file covers:
 ### Widget doesn't render
 
 - Check the MCP server is running: `GET /health` should return `{"status":"ok"}`
-- Check the compile_widget output for error messages
+- Check the save_widget output for error messages
 - Verify the widget source exports a default React component
 
 ### Service calls fail

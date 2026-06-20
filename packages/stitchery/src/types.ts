@@ -20,7 +20,8 @@ export interface UtcpConfig {
 export interface ServerConfig {
   port: number;
   host: string;
-  copilotProxyUrl: string;
+  providerUrl: string;
+  providerApiKey?: string;
   localPackages: Record<string, string>;
   mcpServers: McpServerConfig[];
   /** UTCP configuration for registering services */
