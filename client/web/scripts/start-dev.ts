@@ -20,27 +20,25 @@ async function main() {
     count: 2,
   });
 
-  const [clientPort, stitcheryPort] = ports;
+  const [clientPort, serverPort] = ports;
 
   console.log(`📍 Allocated port range: ${base}-${base + 2}`);
   console.log(`   Client:     http://127.0.0.1:${clientPort}`);
-  console.log(`   Stitchery:  http://127.0.0.1:${stitcheryPort}`);
+  console.log(`   Server:     http://127.0.0.1:${serverPort}`);
 
-  // Export ports for child processes
   const env = {
     ...process.env,
     CLIENT_PORT: String(clientPort),
-    STITCHERY_PORT: String(stitcheryPort),
-    STITCHERY_URL: `http://127.0.0.1:${stitcheryPort}`,
+    SERVER_PORT: String(serverPort),
+    API_URL: `http://127.0.0.1:${serverPort}`,
   };
 
-  // Start stitchery
-  const stitcheryArgs = [
+  const serverArgs = [
     "node",
     "../../packages/stitchery/dist/cli.js",
     "serve",
     "-p",
-    String(stitcheryPort),
+    String(serverPort),
     "--utcp-config",
     ".utcp_config.json",
     "--local-package",
@@ -51,24 +49,21 @@ async function main() {
     "--vfs-use-paths",
   ];
 
-  const stitchery = spawn(stitcheryArgs[0]!, stitcheryArgs.slice(1), {
+  const server = spawn(serverArgs[0]!, serverArgs.slice(1), {
     stdio: "inherit",
     env,
   });
 
-  // Give stitchery a moment to start
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
-  // Start vite client
   const vite = spawn("pnpm", ["exec", "vite", "--port", String(clientPort)], {
     stdio: "inherit",
     env,
   });
 
-  // Handle shutdown
   const cleanup = () => {
     console.log("\n🛑 Shutting down...");
-    stitchery.kill();
+    server.kill();
     vite.kill();
     process.exit(0);
   };

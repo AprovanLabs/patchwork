@@ -1,11 +1,11 @@
 {
-  "name": "@aprovan/patchwork-chat",
+  "name": "@aprovan/patchwork-web",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "tsx scripts/start-dev.ts",
     "dev:client": "vite",
-    "dev:stitchery": "node ../../packages/stitchery/dist/cli.js serve --utcp-config .utcp_config.json --local-package @aprovan/patchwork-image-shadcn:../../packages/images/shadcn -v --vfs-dir ./workspace --vfs-use-paths",
+    "dev:server": "node ../../packages/stitchery/dist/cli.js serve --utcp-config .utcp_config.json --local-package @aprovan/patchwork-image-shadcn:../../packages/images/shadcn -v --vfs-dir ./workspace --vfs-use-paths",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
