@@ -1,0 +1,39 @@
+{
+  "name": "@aprovan/chat-backend",
+  "version": "0.1.0",
+  "description": "Chat backend Lambda — Cognito auth + OpenRouter streaming + plan gate",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "hono": "^4.7.0",
+    "@hono/node-server": "^1.13.0",
+    "@hono/zod-validator": "^0.4.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.2",
+    "vitest": "2.1.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}
