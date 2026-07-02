@@ -2,7 +2,7 @@ import path from "path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-const STITCHERY_URL = process.env.STITCHERY_URL ?? "http://127.0.0.1:6435";
+const API_URL = process.env.API_URL ?? "http://127.0.0.1:8000";
 
 export default defineConfig({
   plugins: [react()],
@@ -10,15 +10,15 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: STITCHERY_URL,
+        target: API_URL,
         changeOrigin: true,
       },
       "/_local-packages": {
-        target: STITCHERY_URL,
+        target: API_URL,
         changeOrigin: true,
       },
       "/vfs": {
-        target: STITCHERY_URL,
+        target: API_URL,
         changeOrigin: true,
       },
     },
