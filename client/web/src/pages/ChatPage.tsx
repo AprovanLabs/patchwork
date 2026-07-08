@@ -702,8 +702,9 @@ export default function ChatPage() {
     () =>
       new DefaultChatTransport({
         body: () => ({
-          metadata: {
-            patchwork: { compilers: [IMAGE_SPEC] },
+          prompt: {
+            id: "chat-patchwork-widget",
+            vars: { compilers: [IMAGE_SPEC] },
           },
         }),
       }),
