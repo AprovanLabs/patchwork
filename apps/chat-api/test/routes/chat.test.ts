@@ -1,27 +1,54 @@
 import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { Hono } from "hono";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { AppVariables, WorkspaceItem } from "../../src/types";
 import type { CognitoAccessTokenPayload } from "aws-jwt-verify/jwt-model";
 
-// hoisted mocks — must be declared before vi.mock calls
-const { mockGetOpenRouterKey, mockCreateOpenRouterProvider, mockProviderFactory } =
-  vi.hoisted(() => {
-    const mockProviderFactory = vi.fn();
-    return {
-      mockGetOpenRouterKey: vi.fn().mockResolvedValue("test-key"),
-      mockCreateOpenRouterProvider: vi.fn().mockReturnValue(mockProviderFactory),
-      mockProviderFactory,
-    };
-  });
+// ── Hoisted mocks — must be declared before vi.mock calls ────────────────────
+
+const {
+  mockGetOpenRouterKey,
+  mockCreateOpenRouterProvider,
+  mockProviderFactory,
+  mockGetGatewaySession,
+  mockEvictGatewaySession,
+} = vi.hoisted(() => {
+  const mockProviderFactory = vi.fn();
+  return {
+    mockGetOpenRouterKey: vi.fn().mockResolvedValue("test-key"),
+    mockCreateOpenRouterProvider: vi.fn().mockReturnValue(mockProviderFactory),
+    mockProviderFactory,
+    mockGetGatewaySession: vi.fn(),
+    mockEvictGatewaySession: vi.fn(),
+  };
+});
 
 vi.mock("../../src/providers/openrouter.js", () => ({
   getOpenRouterKey: mockGetOpenRouterKey,
   createOpenRouterProvider: mockCreateOpenRouterProvider,
 }));
 
+vi.mock("../../src/gateway-session.js", () => ({
+  getGatewaySession: mockGetGatewaySession,
+  evictGatewaySession: mockEvictGatewaySession,
+  GatewaySessionError: class GatewaySessionError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+      super(message);
+      this.status = status;
+    }
+  },
+  resetGatewaySessionCache: vi.fn(),
+}));
+
+// Global fetch stub — reset per-test; not used unless GATEWAY_URL is set.
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
+
 // Import the route AFTER mocks are in place
 const { chatRoute } = await import("../../src/routes/chat.js");
+
+// ── Test fixtures ─────────────────────────────────────────────────────────────
 
 const fakeWorkspace: WorkspaceItem = {
   workspaceId: "ws-test",
@@ -95,16 +122,35 @@ function makePartialThenErrorStream() {
   });
 }
 
+const MOCK_TOOLS_RESPONSE = {
+  tools: [
+    {
+      provider: "github",
+      name: "github.repos_list",
+      operation: "repos_list",
+      description: "List repos",
+      inputSchema: { type: "object", properties: { per_page: { type: "number" } } },
+    },
+  ],
+  workspace_id: "ws-test",
+};
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
 describe("POST /chat", () => {
   let mockDoStream: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetch.mockReset();
+    delete process.env["GATEWAY_URL"];
+
     mockDoStream = vi.fn();
     // Wire: createOpenRouterProvider(key) → providerFactory(modelId) → MockLanguageModelV3
     const mockModel = new MockLanguageModelV3({ doStream: mockDoStream });
     mockProviderFactory.mockReturnValue(mockModel);
     mockCreateOpenRouterProvider.mockReturnValue(mockProviderFactory);
+    mockGetOpenRouterKey.mockResolvedValue("test-key");
   });
 
   it("returns 400 for invalid request body", async () => {
@@ -228,5 +274,71 @@ describe("POST /chat", () => {
 
     // The provider factory should have been called with the plan's first model
     expect(mockProviderFactory).toHaveBeenCalledWith("anthropic/claude-opus-4");
+  });
+
+  // ── Gateway tool wiring ────────────────────────────────────────────────────
+
+  describe("when GATEWAY_URL is configured", () => {
+    beforeEach(() => {
+      process.env["GATEWAY_URL"] = "https://gateway.test";
+      mockGetGatewaySession.mockResolvedValue({
+        token: "session-bearer",
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+      });
+    });
+
+    afterEach(() => {
+      delete process.env["GATEWAY_URL"];
+    });
+
+    it("fetches gateway tools and passes them to the model", async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(MOCK_TOOLS_RESPONSE), { status: 200 }),
+      );
+      mockDoStream.mockResolvedValueOnce({
+        stream: makeSuccessStream(),
+        rawResponse: { headers: {} },
+      });
+
+      const app = buildApp();
+      const res = await app.request("/chat", {
+        method: "POST",
+        headers: validHeaders,
+        body: validBody,
+      });
+
+      expect(res.status).toBe(200);
+      // Gateway tools endpoint was called with the session bearer
+      const [toolsUrl, toolsOpts] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(toolsUrl).toBe("https://gateway.test/tools");
+      expect((toolsOpts.headers as Record<string, string>)["Authorization"]).toBe(
+        "Bearer session-bearer",
+      );
+    });
+
+    it("requests a gateway session with the correct claims and workspace ID", async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(MOCK_TOOLS_RESPONSE), { status: 200 }),
+      );
+      mockDoStream.mockResolvedValueOnce({
+        stream: makeSuccessStream(),
+        rawResponse: { headers: {} },
+      });
+
+      const app = buildApp();
+      const res = await app.request("/chat", {
+        method: "POST",
+        headers: validHeaders,
+        body: validBody,
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockGetGatewaySession).toHaveBeenCalledOnce();
+      expect(mockGetGatewaySession).toHaveBeenCalledWith(
+        fakeClaims,
+        fakeWorkspace.workspaceId,
+        expect.any(String),
+      );
+    });
   });
 });
