@@ -1,67 +1,57 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { zValidator } from "@hono/zod-validator";
 import { withTracing } from "@posthog/ai";
 import { streamText } from "ai";
 import { Hono } from "hono";
 import { z } from "zod";
 import { EDIT_PROMPT_ID } from "../fallback-prompts.js";
 import { getPrompt, compilePrompt, getPostHogClient } from "../posthog.js";
+import {
+  getOpenRouterKey,
+  createOpenRouterProvider,
+} from "../providers/openrouter.js";
+import type { AppVariables } from "../types.js";
 
 const editBodySchema = z.object({
   code: z.string(),
   prompt: z.string(),
 });
 
-const MODEL_ID = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4";
+const MODEL_ID = "openrouter/auto";
 
-export function createEditRoute(
-  providerUrl: string,
-  providerApiKey: string | undefined,
-): Hono {
-  const edit = new Hono();
+export const editRoute = new Hono<{ Variables: AppVariables }>();
 
-  edit.post(
-    "/api/edit",
-    zValidator("json", editBodySchema, (result, c) => {
-      if (!result.success) return c.json({ error: "Invalid request" }, 400);
-      return undefined;
-    }),
-    async (c) => {
-      const body = c.req.valid("json");
+editRoute.post("/", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = editBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "Invalid request body" }, 400);
+  }
 
-      const promptResult = await getPrompt(EDIT_PROMPT_ID);
-      const systemPrompt = compilePrompt(promptResult.prompt, {
-        code: body.code,
-      });
+  const promptResult = await getPrompt(EDIT_PROMPT_ID);
+  const systemPrompt = compilePrompt(promptResult.prompt, {
+    code: parsed.data.code,
+  });
 
-      const provider = createOpenAICompatible({
-        name: "provider",
-        baseURL: providerUrl,
-        apiKey: providerApiKey,
-      });
+  const apiKey = await getOpenRouterKey();
+  const provider = createOpenRouterProvider(apiKey);
+  const baseModel = provider(MODEL_ID);
 
-      const baseModel = provider(MODEL_ID);
-      const phClient = getPostHogClient();
-      const model =
-        phClient && promptResult.source !== "code_fallback"
-          ? withTracing(baseModel, phClient, {
-              posthogDistinctId: "chat-api",
-              posthogProperties: {
-                $ai_prompt_name: promptResult.name,
-                $ai_prompt_version: promptResult.version,
-              },
-            })
-          : baseModel;
+  const phClient = getPostHogClient();
+  const model =
+    phClient && promptResult.source !== "code_fallback"
+      ? withTracing(baseModel, phClient, {
+          posthogDistinctId: "chat-api",
+          posthogProperties: {
+            $ai_prompt_name: promptResult.name,
+            $ai_prompt_version: promptResult.version,
+          },
+        })
+      : baseModel;
 
-      const result = streamText({
-        model,
-        system: systemPrompt,
-        messages: [{ role: "user", content: body.prompt }],
-      });
+  const result = streamText({
+    model,
+    system: systemPrompt,
+    messages: [{ role: "user", content: parsed.data.prompt }],
+  });
 
-      return result.toTextStreamResponse();
-    },
-  );
-
-  return edit;
-}
+  return result.toTextStreamResponse();
+});

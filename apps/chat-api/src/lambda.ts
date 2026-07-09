@@ -8,7 +8,7 @@ const env = parseEnv(process.env);
 // Initialize module-scope PostHog singletons once per cold start
 initPostHog(env);
 
-const app = createChatApp(env);
+const app = createChatApp();
 
 export const handler = streamHandle(app) as (
   event: LambdaEvent,

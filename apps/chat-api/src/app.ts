@@ -1,27 +1,31 @@
 import { Hono } from "hono";
-import { initPostHog } from "./posthog.js";
-import { createChatRoute } from "./routes/chat.js";
-import { createEditRoute } from "./routes/edit.js";
+import { authMiddleware } from "./middleware/auth.js";
+import { workspaceMiddleware } from "./middleware/workspace.js";
+import { planMiddleware } from "./middleware/plan.js";
 import { health } from "./routes/health.js";
-import { makeHttpGatewayClient, type GatewayClient } from "./tool-docs.js";
-import type { Env } from "./env.js";
+import { chatRoute } from "./routes/chat.js";
+import { editRoute } from "./routes/edit.js";
+import { services } from "./routes/services.js";
+import { proxy } from "./routes/proxy.js";
+import type { AppVariables } from "./types.js";
 
-export function createChatApp(env?: Partial<Env>) {
-  const providerUrl = env?.PROVIDER_URL ?? "https://openrouter.ai/api/v1";
-  const providerApiKey = env?.PROVIDER_API_KEY;
+export { initPostHog } from "./posthog.js";
 
-  const gateway: GatewayClient | null = env?.GATEWAY_URL
-    ? makeHttpGatewayClient(env.GATEWAY_URL)
-    : null;
+export function createChatApp() {
+  const app = new Hono<{ Variables: AppVariables }>();
 
-  const app = new Hono();
+  // Unauthenticated routes
   app.route("/", health);
-  app.route("/", createChatRoute(providerUrl, providerApiKey, gateway));
-  app.route("/", createEditRoute(providerUrl, providerApiKey));
+
+  // Protected route group: auth → workspace → plan
+  const api = app.basePath("/api");
+  api.use(authMiddleware, workspaceMiddleware, planMiddleware);
+  api.route("/chat", chatRoute);
+  api.route("/edit", editRoute);
+  api.route("/services", services);
+  api.route("/proxy", proxy);
 
   return app;
 }
 
 export type ChatApp = ReturnType<typeof createChatApp>;
-
-export { initPostHog };
