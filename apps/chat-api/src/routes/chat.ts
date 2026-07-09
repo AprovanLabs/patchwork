@@ -1,3 +1,4 @@
+import { withTracing } from "@posthog/ai";
 import {
   streamText,
   convertToModelMessages,
@@ -10,11 +11,14 @@ import {
 } from "ai";
 import { Hono } from "hono";
 import { z } from "zod";
+import { CHAT_PROMPT_ALLOWLIST } from "../fallback-prompts.js";
+import { evictGatewaySession, getGatewaySession } from "../gateway-session.js";
+import { getPrompt, compilePrompt, getPostHogClient } from "../posthog.js";
 import {
   getOpenRouterKey,
   createOpenRouterProvider,
 } from "../providers/openrouter.js";
-import { evictGatewaySession, getGatewaySession } from "../gateway-session.js";
+import { getToolDocs, makeHttpGatewayClient } from "../tool-docs.js";
 import type { AppVariables } from "../types.js";
 
 const chatBodySchema = z.object({
@@ -22,6 +26,16 @@ const chatBodySchema = z.object({
   messages: z.array(z.any()),
   trigger: z.string(),
   metadata: z.unknown().optional(),
+  prompt: z
+    .object({
+      id: z.string(),
+      vars: z
+        .object({
+          compilers: z.array(z.string()).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 // Retry once (200 ms backoff) if the provider rejects before the first
@@ -114,10 +128,15 @@ chatRoute.post("/", async (c) => {
     return c.json({ error: "Invalid request body" }, 400);
   }
 
-  const { messages } = parsed.data;
+  const { messages, prompt: promptBody } = parsed.data;
   const claims = c.get("claims");
   const workspaceId = c.get("workspaceId");
   const workspace = c.get("workspace");
+
+  const promptId = promptBody?.id ?? "chat-patchwork-widget";
+  if (!CHAT_PROMPT_ALLOWLIST.has(promptId)) {
+    return c.json({ error: "Unknown prompt id" }, 400);
+  }
 
   // Gateway tools are additive — chat works without them.
   const gatewayUrl = process.env["GATEWAY_URL"]?.replace(/\/$/, "");
@@ -149,17 +168,43 @@ chatRoute.post("/", async (c) => {
       ? buildTools(gatewayTools, gatewayUrl, sessionToken)
       : {};
 
+  // Load system prompt from PostHog (cached, with fallback to bundled copy)
+  const gatewayClient = gatewayUrl ? makeHttpGatewayClient(gatewayUrl) : null;
+  const [promptResult, toolDocs] = await Promise.all([
+    getPrompt(promptId),
+    getToolDocs(gatewayClient).catch(() => ""),
+  ]);
+  const compilers = (promptBody?.vars?.compilers ?? []).join(", ");
+  const systemPrompt = compilePrompt(promptResult.prompt, {
+    compilers,
+    tool_docs: toolDocs,
+  });
+
   const apiKey = await getOpenRouterKey();
   const provider = createOpenRouterProvider(apiKey);
   const modelId = workspace.limits.maxModels[0] ?? "openrouter/auto";
+  const baseModel = provider(modelId);
+
+  const phClient = getPostHogClient();
+  const tracedModel =
+    phClient && promptResult.source !== "code_fallback"
+      ? withTracing(baseModel, phClient, {
+          posthogDistinctId: claims.sub,
+          posthogProperties: {
+            $ai_prompt_name: promptResult.name,
+            $ai_prompt_version: promptResult.version,
+          },
+        })
+      : baseModel;
 
   const model = wrapLanguageModel({
-    model: provider(modelId),
+    model: tracedModel,
     middleware: retryAtStartMiddleware,
   });
 
   const result = streamText({
     model,
+    system: systemPrompt,
     messages: await convertToModelMessages(messages as UIMessage[]),
     stopWhen: stepCountIs(workspace.limits.maxToolSteps),
     maxOutputTokens: workspace.limits.maxTokensPerRequest,
