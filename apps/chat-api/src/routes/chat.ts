@@ -3,8 +3,10 @@ import {
   convertToModelMessages,
   wrapLanguageModel,
   stepCountIs,
+  jsonSchema,
   type LanguageModelMiddleware,
   type UIMessage,
+  type Tool,
 } from "ai";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -12,6 +14,7 @@ import {
   getOpenRouterKey,
   createOpenRouterProvider,
 } from "../providers/openrouter.js";
+import { evictGatewaySession, getGatewaySession } from "../gateway-session.js";
 import type { AppVariables } from "../types.js";
 
 const chatBodySchema = z.object({
@@ -38,6 +41,72 @@ const retryAtStartMiddleware: LanguageModelMiddleware = {
 
 export const chatRoute = new Hono<{ Variables: AppVariables }>();
 
+interface GatewayToolEntry {
+  provider: string;
+  name: string;
+  operation: string;
+  description?: string;
+  inputSchema?: unknown;
+}
+
+async function fetchGatewayTools(
+  gatewayUrl: string,
+  bearerToken: string,
+): Promise<GatewayToolEntry[]> {
+  const res = await fetch(`${gatewayUrl}/tools`, {
+    headers: { Authorization: `Bearer ${bearerToken}` },
+  });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { tools: GatewayToolEntry[] };
+  return data.tools ?? [];
+}
+
+function buildTools(
+  gatewayTools: GatewayToolEntry[],
+  gatewayUrl: string,
+  bearerToken: string,
+): Record<string, Tool> {
+  const tools: Record<string, Tool> = {};
+
+  for (const t of gatewayTools) {
+    // Replace dots with underscores — some models reject dots in function names.
+    const toolKey = t.name.replace(/\./g, "_");
+
+    const rawSchema =
+      t.inputSchema && typeof t.inputSchema === "object"
+        ? t.inputSchema
+        : { type: "object", properties: {} };
+
+    const parameters = jsonSchema<Record<string, unknown>>(
+      rawSchema as Parameters<typeof jsonSchema>[0],
+    );
+
+    const execute = async (args: Record<string, unknown>): Promise<unknown> => {
+      const res = await fetch(`${gatewayUrl}/tools/${t.provider}/${t.operation}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${bearerToken}`,
+        },
+        body: JSON.stringify(args),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        return { error: (err as { error?: string }).error ?? res.statusText };
+      }
+      return res.json();
+    };
+
+    tools[toolKey] = {
+      description: t.description ?? `Call ${t.name}`,
+      parameters,
+      execute,
+    } as unknown as Tool;
+  }
+
+  return tools;
+}
+
 chatRoute.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = chatBodySchema.safeParse(body);
@@ -46,7 +115,39 @@ chatRoute.post("/", async (c) => {
   }
 
   const { messages } = parsed.data;
+  const claims = c.get("claims");
+  const workspaceId = c.get("workspaceId");
   const workspace = c.get("workspace");
+
+  // Gateway tools are additive — chat works without them.
+  const gatewayUrl = process.env["GATEWAY_URL"]?.replace(/\/$/, "");
+  let sessionToken: string | null = null;
+
+  if (gatewayUrl) {
+    const authHeader = c.req.header("Authorization") ?? "";
+    const cognitoToken = authHeader.replace(/^Bearer /, "");
+    try {
+      const session = await getGatewaySession(claims, workspaceId, cognitoToken);
+      sessionToken = session.token;
+    } catch {
+      // Non-fatal — continue without gateway tools
+    }
+  }
+
+  let gatewayTools: GatewayToolEntry[] = [];
+  if (sessionToken && gatewayUrl) {
+    gatewayTools = await fetchGatewayTools(gatewayUrl, sessionToken).catch(
+      () => [] as GatewayToolEntry[],
+    );
+    if (gatewayTools.length === 0) {
+      evictGatewaySession(claims.sub);
+    }
+  }
+
+  const tools =
+    sessionToken && gatewayUrl
+      ? buildTools(gatewayTools, gatewayUrl, sessionToken)
+      : {};
 
   const apiKey = await getOpenRouterKey();
   const provider = createOpenRouterProvider(apiKey);
@@ -62,7 +163,7 @@ chatRoute.post("/", async (c) => {
     messages: await convertToModelMessages(messages as UIMessage[]),
     stopWhen: stepCountIs(workspace.limits.maxToolSteps),
     maxOutputTokens: workspace.limits.maxTokensPerRequest,
-    // tools: {} — stub; real gateway wiring in APR-298
+    tools,
   });
 
   return result.toUIMessageStreamResponse();

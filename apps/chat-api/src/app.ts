@@ -4,6 +4,8 @@ import { workspaceMiddleware } from "./middleware/workspace";
 import { planMiddleware } from "./middleware/plan";
 import { health } from "./routes/health";
 import { chatRoute } from "./routes/chat";
+import { services } from "./routes/services";
+import { proxy } from "./routes/proxy";
 import type { AppVariables } from "./types";
 
 export function createChatApp() {
@@ -16,6 +18,8 @@ export function createChatApp() {
   const api = app.basePath("/api");
   api.use(authMiddleware, workspaceMiddleware, planMiddleware);
   api.route("/chat", chatRoute);
+  api.route("/services", services);
+  api.route("/proxy", proxy);
 
   return app;
 }

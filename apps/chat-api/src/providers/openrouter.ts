@@ -25,7 +25,7 @@ export async function getOpenRouterKey(): Promise<string> {
     }),
   );
   cachedKey = result.SecretString!;
-  return cachedKey;
+  return cachedKey!;
 }
 
 export function createOpenRouterProvider(apiKey: string) {
