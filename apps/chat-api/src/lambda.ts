@@ -1,8 +1,14 @@
 import { streamHandle } from "hono/aws-lambda";
+import { createChatApp, initPostHog } from "./app.js";
+import { parseEnv } from "./env.js";
 import type { LambdaEvent } from "hono/aws-lambda";
-import { createChatApp } from "./app";
 
-const app = createChatApp();
+const env = parseEnv(process.env);
+
+// Initialize module-scope PostHog singletons once per cold start
+initPostHog(env);
+
+const app = createChatApp(env);
 
 export const handler = streamHandle(app) as (
   event: LambdaEvent,
