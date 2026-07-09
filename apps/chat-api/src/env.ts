@@ -10,6 +10,7 @@ const envSchema = z.object({
   AWS_REGION: z.string().default("us-east-1"),
   WORKSPACE_TABLE_NAME: z.string().min(1),
   MEMBERSHIPS_TABLE_NAME: z.string().min(1),
+  OPENROUTER_SECRET_ARN: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;
