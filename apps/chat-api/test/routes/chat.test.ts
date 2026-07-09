@@ -12,6 +12,11 @@ const {
   mockProviderFactory,
   mockGetGatewaySession,
   mockEvictGatewaySession,
+  mockGetPrompt,
+  mockCompilePrompt,
+  mockGetPostHogClient,
+  mockGetToolDocs,
+  mockMakeHttpGatewayClient,
 } = vi.hoisted(() => {
   const mockProviderFactory = vi.fn();
   return {
@@ -20,6 +25,21 @@ const {
     mockProviderFactory,
     mockGetGatewaySession: vi.fn(),
     mockEvictGatewaySession: vi.fn(),
+    mockGetPrompt: vi.fn().mockResolvedValue({
+      source: "code_fallback",
+      prompt: "System: {{compilers}} {{tool_docs}}",
+      name: undefined,
+      version: undefined,
+    }),
+    mockCompilePrompt: vi
+      .fn()
+      .mockImplementation(
+        (template: string, vars: Record<string, string>) =>
+          template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => vars[k] ?? ""),
+      ),
+    mockGetPostHogClient: vi.fn().mockReturnValue(null),
+    mockGetToolDocs: vi.fn().mockResolvedValue(""),
+    mockMakeHttpGatewayClient: vi.fn().mockReturnValue(null),
   };
 });
 
@@ -39,6 +59,17 @@ vi.mock("../../src/gateway-session.js", () => ({
     }
   },
   resetGatewaySessionCache: vi.fn(),
+}));
+
+vi.mock("../../src/posthog.js", () => ({
+  getPrompt: mockGetPrompt,
+  compilePrompt: mockCompilePrompt,
+  getPostHogClient: mockGetPostHogClient,
+}));
+
+vi.mock("../../src/tool-docs.js", () => ({
+  getToolDocs: mockGetToolDocs,
+  makeHttpGatewayClient: mockMakeHttpGatewayClient,
 }));
 
 // Global fetch stub — reset per-test; not used unless GATEWAY_URL is set.
@@ -151,6 +182,21 @@ describe("POST /chat", () => {
     mockProviderFactory.mockReturnValue(mockModel);
     mockCreateOpenRouterProvider.mockReturnValue(mockProviderFactory);
     mockGetOpenRouterKey.mockResolvedValue("test-key");
+
+    // Reset prompt + tool-docs mocks to defaults
+    mockGetPrompt.mockResolvedValue({
+      source: "code_fallback",
+      prompt: "System: {{compilers}} {{tool_docs}}",
+      name: undefined,
+      version: undefined,
+    });
+    mockCompilePrompt.mockImplementation(
+      (template: string, vars: Record<string, string>) =>
+        template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => vars[k] ?? ""),
+    );
+    mockGetPostHogClient.mockReturnValue(null);
+    mockGetToolDocs.mockResolvedValue("");
+    mockMakeHttpGatewayClient.mockReturnValue(null);
   });
 
   it("returns 400 for invalid request body", async () => {
@@ -274,6 +320,104 @@ describe("POST /chat", () => {
 
     // The provider factory should have been called with the plan's first model
     expect(mockProviderFactory).toHaveBeenCalledWith("anthropic/claude-opus-4");
+  });
+
+  // ── Prompt loading ──────────────────────────────────────────────────────────
+
+  it("defaults to chat-patchwork-widget when prompt field is omitted", async () => {
+    mockDoStream.mockResolvedValueOnce({
+      stream: makeSuccessStream(),
+      rawResponse: { headers: {} },
+    });
+
+    const app = buildApp();
+    const res = await app.request("/chat", {
+      method: "POST",
+      headers: validHeaders,
+      body: validBody,
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockGetPrompt).toHaveBeenCalledWith("chat-patchwork-widget");
+  });
+
+  it("loads the correct prompt and compiles with compilers + tool_docs", async () => {
+    mockGetPrompt.mockResolvedValue({
+      source: "code_fallback",
+      prompt: "---\ncompilers: {{compilers}}\n---\n{{tool_docs}}",
+      name: undefined,
+      version: undefined,
+    });
+    mockGetToolDocs.mockResolvedValue("## Services\n- weather");
+    mockDoStream.mockResolvedValueOnce({
+      stream: makeSuccessStream(),
+      rawResponse: { headers: {} },
+    });
+
+    const app = buildApp();
+    const res = await app.request("/chat", {
+      method: "POST",
+      headers: validHeaders,
+      body: JSON.stringify({
+        id: "chat-1",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hi" }], id: "m1" }],
+        trigger: "submit-message",
+        prompt: {
+          id: "chat-patchwork-widget",
+          vars: { compilers: ["@aprovan/patchwork-image-shadcn"] },
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockGetPrompt).toHaveBeenCalledWith("chat-patchwork-widget");
+    expect(mockCompilePrompt).toHaveBeenCalledWith(
+      "---\ncompilers: {{compilers}}\n---\n{{tool_docs}}",
+      expect.objectContaining({
+        compilers: "@aprovan/patchwork-image-shadcn",
+        tool_docs: "## Services\n- weather",
+      }),
+    );
+  });
+
+  it("returns 400 for an unknown promptId", async () => {
+    const app = buildApp();
+    const res = await app.request("/chat", {
+      method: "POST",
+      headers: validHeaders,
+      body: JSON.stringify({
+        id: "chat-1",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hi" }], id: "m1" }],
+        trigger: "submit-message",
+        prompt: { id: "unknown-prompt-id" },
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json).toMatchObject({ error: "Unknown prompt id" });
+  });
+
+  it("accepts chat-plain as a valid promptId", async () => {
+    mockDoStream.mockResolvedValueOnce({
+      stream: makeSuccessStream(),
+      rawResponse: { headers: {} },
+    });
+
+    const app = buildApp();
+    const res = await app.request("/chat", {
+      method: "POST",
+      headers: validHeaders,
+      body: JSON.stringify({
+        id: "chat-1",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hi" }], id: "m1" }],
+        trigger: "submit-message",
+        prompt: { id: "chat-plain" },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockGetPrompt).toHaveBeenCalledWith("chat-plain");
   });
 
   // ── Gateway tool wiring ────────────────────────────────────────────────────
