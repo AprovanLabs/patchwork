@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import {
   streamText,
   convertToModelMessages,
@@ -7,6 +6,7 @@ import {
   type LanguageModelMiddleware,
   type UIMessage,
 } from "ai";
+import { Hono } from "hono";
 import { z } from "zod";
 import {
   getOpenRouterKey,
