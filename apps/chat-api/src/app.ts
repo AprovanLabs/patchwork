@@ -3,6 +3,7 @@ import { authMiddleware } from "./middleware/auth";
 import { workspaceMiddleware } from "./middleware/workspace";
 import { planMiddleware } from "./middleware/plan";
 import { health } from "./routes/health";
+import { chatRoute } from "./routes/chat";
 import type { AppVariables } from "./types";
 
 export function createChatApp() {
@@ -14,6 +15,7 @@ export function createChatApp() {
   // Protected route group: auth → workspace → plan
   const api = app.basePath("/api");
   api.use(authMiddleware, workspaceMiddleware, planMiddleware);
+  api.route("/chat", chatRoute);
 
   return app;
 }
