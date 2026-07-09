@@ -12,6 +12,11 @@ const envSchema = z.object({
   MEMBERSHIPS_TABLE_NAME: z.string().min(1),
   OPENROUTER_SECRET_ARN: z.string().min(1),
   GATEWAY_URL: z.string().url(),
+
+  // PostHog prompt management (optional — falls back to code prompts when absent)
+  POSTHOG_PROJECT_API_KEY: z.string().optional(),
+  POSTHOG_PERSONAL_API_KEY: z.string().optional(),
+  POSTHOG_HOST: z.string().default("https://us.posthog.com"),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -1,12 +1,15 @@
 import { Hono } from "hono";
-import { authMiddleware } from "./middleware/auth";
-import { workspaceMiddleware } from "./middleware/workspace";
-import { planMiddleware } from "./middleware/plan";
-import { health } from "./routes/health";
-import { chatRoute } from "./routes/chat";
-import { services } from "./routes/services";
-import { proxy } from "./routes/proxy";
-import type { AppVariables } from "./types";
+import { authMiddleware } from "./middleware/auth.js";
+import { workspaceMiddleware } from "./middleware/workspace.js";
+import { planMiddleware } from "./middleware/plan.js";
+import { health } from "./routes/health.js";
+import { chatRoute } from "./routes/chat.js";
+import { editRoute } from "./routes/edit.js";
+import { services } from "./routes/services.js";
+import { proxy } from "./routes/proxy.js";
+import type { AppVariables } from "./types.js";
+
+export { initPostHog } from "./posthog.js";
 
 export function createChatApp() {
   const app = new Hono<{ Variables: AppVariables }>();
@@ -18,6 +21,7 @@ export function createChatApp() {
   const api = app.basePath("/api");
   api.use(authMiddleware, workspaceMiddleware, planMiddleware);
   api.route("/chat", chatRoute);
+  api.route("/edit", editRoute);
   api.route("/services", services);
   api.route("/proxy", proxy);
 

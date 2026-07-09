@@ -1,13 +1,15 @@
 import { serve } from "@hono/node-server";
-import { createChatApp } from "./app";
-import { parseEnv } from "./env";
+import { createChatApp, initPostHog } from "./app.js";
+import { parseEnv } from "./env.js";
 
-export { createChatApp } from "./app";
-export type { ChatApp } from "./app";
-export { handler } from "./lambda";
+export { createChatApp, initPostHog } from "./app.js";
+export type { ChatApp } from "./app.js";
+export { handler } from "./lambda.js";
 export type { LambdaEvent, LambdaContext } from "hono/aws-lambda";
 
 const env = parseEnv(process.env);
+
+initPostHog(env);
 
 if (env.NODE_ENV !== "test") {
   const app = createChatApp();
