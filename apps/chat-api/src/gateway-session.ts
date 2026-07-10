@@ -22,6 +22,24 @@ interface SessionEntry {
 
 const sessionCache = new Map<string, SessionEntry>();
 
+/**
+ * Per-session tool-list cache. Keyed by userSub, parallel to sessionCache.
+ * Cleared on session eviction so a fresh session always re-fetches tools.
+ */
+const toolsCache = new Map<string, unknown[]>();
+
+export function getCachedTools(sub: string): unknown[] | undefined {
+  return toolsCache.get(sub);
+}
+
+export function setCachedTools(sub: string, tools: unknown[]): void {
+  toolsCache.set(sub, tools);
+}
+
+export function evictCachedTools(sub: string): void {
+  toolsCache.delete(sub);
+}
+
 function gatewayUrl(): string {
   const url = process.env["GATEWAY_URL"];
   if (!url) throw new Error("GATEWAY_URL is not set");
@@ -60,10 +78,27 @@ async function exchangeSession(
   workspaceId: string,
   exp: number,
 ): Promise<SessionEntry> {
-  const res = await callAuthSessions(cognitoToken, workspaceId);
+  let res: Response;
+  try {
+    res = await callAuthSessions(cognitoToken, workspaceId);
+  } catch {
+    // Network error — retry once after 200ms.
+    await new Promise<void>((r) => setTimeout(r, 200));
+    res = await callAuthSessions(cognitoToken, workspaceId);
+  }
 
   if (res.status === 401) {
     // Retry once — token may have just been refreshed by the caller.
+    const retryRes = await callAuthSessions(cognitoToken, workspaceId);
+    if (!retryRes.ok) {
+      throw new GatewaySessionError(retryRes.status, await retryRes.text());
+    }
+    return { token: cognitoToken, expires_at: exp };
+  }
+
+  if (res.status >= 500) {
+    // 5xx — retry once after 200ms.
+    await new Promise<void>((r) => setTimeout(r, 200));
     const retryRes = await callAuthSessions(cognitoToken, workspaceId);
     if (!retryRes.ok) {
       throw new GatewaySessionError(retryRes.status, await retryRes.text());
@@ -94,10 +129,12 @@ async function callAuthSessions(
 
 export function evictGatewaySession(sub: string): void {
   sessionCache.delete(sub);
+  toolsCache.delete(sub);
 }
 
 export function resetGatewaySessionCache(): void {
   sessionCache.clear();
+  toolsCache.clear();
 }
 
 export class GatewaySessionError extends Error {

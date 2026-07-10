@@ -12,6 +12,8 @@ const {
   mockProviderFactory,
   mockGetGatewaySession,
   mockEvictGatewaySession,
+  mockGetCachedTools,
+  mockSetCachedTools,
   mockGetPrompt,
   mockCompilePrompt,
   mockGetPostHogClient,
@@ -25,6 +27,8 @@ const {
     mockProviderFactory,
     mockGetGatewaySession: vi.fn(),
     mockEvictGatewaySession: vi.fn(),
+    mockGetCachedTools: vi.fn().mockReturnValue(undefined),
+    mockSetCachedTools: vi.fn(),
     mockGetPrompt: vi.fn().mockResolvedValue({
       source: "code_fallback",
       prompt: "System: {{compilers}} {{tool_docs}}",
@@ -51,6 +55,8 @@ vi.mock("../../src/providers/openrouter.js", () => ({
 vi.mock("../../src/gateway-session.js", () => ({
   getGatewaySession: mockGetGatewaySession,
   evictGatewaySession: mockEvictGatewaySession,
+  getCachedTools: mockGetCachedTools,
+  setCachedTools: mockSetCachedTools,
   GatewaySessionError: class GatewaySessionError extends Error {
     status: number;
     constructor(status: number, message: string) {
@@ -182,6 +188,8 @@ describe("POST /chat", () => {
     mockProviderFactory.mockReturnValue(mockModel);
     mockCreateOpenRouterProvider.mockReturnValue(mockProviderFactory);
     mockGetOpenRouterKey.mockResolvedValue("test-key");
+    mockGetCachedTools.mockReturnValue(undefined);
+    mockSetCachedTools.mockReset();
 
     // Reset prompt + tool-docs mocks to defaults
     mockGetPrompt.mockResolvedValue({
@@ -482,6 +490,48 @@ describe("POST /chat", () => {
         fakeClaims,
         fakeWorkspace.workspaceId,
         expect.any(String),
+      );
+    });
+
+    it("uses cached tools when available — skips gateway fetch", async () => {
+      mockGetCachedTools.mockReturnValue(MOCK_TOOLS_RESPONSE.tools);
+      mockDoStream.mockResolvedValueOnce({
+        stream: makeSuccessStream(),
+        rawResponse: { headers: {} },
+      });
+
+      const app = buildApp();
+      const res = await app.request("/chat", {
+        method: "POST",
+        headers: validHeaders,
+        body: validBody,
+      });
+
+      expect(res.status).toBe(200);
+      // No gateway tools fetch should have occurred
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("caches fetched tools via setCachedTools", async () => {
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(MOCK_TOOLS_RESPONSE), { status: 200 }),
+      );
+      mockDoStream.mockResolvedValueOnce({
+        stream: makeSuccessStream(),
+        rawResponse: { headers: {} },
+      });
+
+      const app = buildApp();
+      await app.request("/chat", {
+        method: "POST",
+        headers: validHeaders,
+        body: validBody,
+      });
+
+      expect(mockSetCachedTools).toHaveBeenCalledOnce();
+      expect(mockSetCachedTools).toHaveBeenCalledWith(
+        fakeClaims.sub,
+        MOCK_TOOLS_RESPONSE.tools,
       );
     });
   });
