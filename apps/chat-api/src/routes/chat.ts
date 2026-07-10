@@ -12,7 +12,12 @@ import {
 import { Hono } from "hono";
 import { z } from "zod";
 import { CHAT_PROMPT_ALLOWLIST } from "../fallback-prompts.js";
-import { evictGatewaySession, getGatewaySession } from "../gateway-session.js";
+import {
+  evictGatewaySession,
+  getGatewaySession,
+  getCachedTools,
+  setCachedTools,
+} from "../gateway-session.js";
 import { getPrompt, compilePrompt, getPostHogClient } from "../posthog.js";
 import {
   getOpenRouterKey,
@@ -155,11 +160,18 @@ chatRoute.post("/", async (c) => {
 
   let gatewayTools: GatewayToolEntry[] = [];
   if (sessionToken && gatewayUrl) {
-    gatewayTools = await fetchGatewayTools(gatewayUrl, sessionToken).catch(
-      () => [] as GatewayToolEntry[],
-    );
-    if (gatewayTools.length === 0) {
-      evictGatewaySession(claims.sub);
+    const cached = getCachedTools(claims.sub) as GatewayToolEntry[] | undefined;
+    if (cached) {
+      gatewayTools = cached;
+    } else {
+      gatewayTools = await fetchGatewayTools(gatewayUrl, sessionToken).catch(
+        () => [] as GatewayToolEntry[],
+      );
+      if (gatewayTools.length === 0) {
+        evictGatewaySession(claims.sub);
+      } else {
+        setCachedTools(claims.sub, gatewayTools);
+      }
     }
   }
 
