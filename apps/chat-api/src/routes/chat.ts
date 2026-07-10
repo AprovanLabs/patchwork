@@ -30,6 +30,7 @@ const chatBodySchema = z.object({
   id: z.string(),
   messages: z.array(z.any()),
   trigger: z.string(),
+  model: z.string().optional(),
   metadata: z.unknown().optional(),
   prompt: z
     .object({
@@ -133,10 +134,17 @@ chatRoute.post("/", async (c) => {
     return c.json({ error: "Invalid request body" }, 400);
   }
 
-  const { messages, prompt: promptBody } = parsed.data;
+  const { messages, model: requestedModel, prompt: promptBody } = parsed.data;
   const claims = c.get("claims");
   const workspaceId = c.get("workspaceId");
   const workspace = c.get("workspace");
+
+  if (requestedModel !== undefined && !workspace.limits.maxModels.includes(requestedModel)) {
+    return c.json(
+      { error: "Model not allowed on your current plan", model: requestedModel },
+      403,
+    );
+  }
 
   const promptId = promptBody?.id ?? "chat-patchwork-widget";
   if (!CHAT_PROMPT_ALLOWLIST.has(promptId)) {
@@ -194,7 +202,7 @@ chatRoute.post("/", async (c) => {
 
   const apiKey = await getOpenRouterKey();
   const provider = createOpenRouterProvider(apiKey);
-  const modelId = workspace.limits.maxModels[0] ?? "openrouter/auto";
+  const modelId = requestedModel ?? workspace.limits.maxModels[0] ?? "openrouter/auto";
   const baseModel = provider(modelId);
 
   const phClient = getPostHogClient();
