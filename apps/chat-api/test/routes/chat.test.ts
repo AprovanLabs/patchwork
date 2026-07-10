@@ -307,6 +307,55 @@ describe("POST /chat", () => {
     expect(mockDoStream).toHaveBeenCalledTimes(1);
   });
 
+  it("returns 403 when requested model is not in workspace.limits.maxModels", async () => {
+    const app = buildApp();
+    const res = await app.request("/chat", {
+      method: "POST",
+      headers: validHeaders,
+      body: JSON.stringify({
+        id: "chat-1",
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }], id: "msg-1" }],
+        trigger: "submit-message",
+        model: "anthropic/claude-opus-4",
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ error: expect.stringContaining("Model not allowed") });
+    expect(mockDoStream).not.toHaveBeenCalled();
+  });
+
+  it("uses the requested model when it is in workspace.limits.maxModels", async () => {
+    mockDoStream.mockResolvedValueOnce({
+      stream: makeSuccessStream(),
+      rawResponse: { headers: {} },
+    });
+
+    const proWorkspace: WorkspaceItem = {
+      ...fakeWorkspace,
+      plan: "pro",
+      limits: {
+        ...fakeWorkspace.limits,
+        maxModels: ["openrouter/auto", "anthropic/claude-opus-4"],
+      },
+    };
+
+    const app = buildApp(proWorkspace);
+    const res = await app.request("/chat", {
+      method: "POST",
+      headers: validHeaders,
+      body: JSON.stringify({
+        id: "chat-1",
+        messages: [{ role: "user", parts: [{ type: "text", text: "Hello" }], id: "msg-1" }],
+        trigger: "submit-message",
+        model: "anthropic/claude-opus-4",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockProviderFactory).toHaveBeenCalledWith("anthropic/claude-opus-4");
+  });
+
   it("selects model from workspace.limits.maxModels[0]", async () => {
     mockDoStream.mockResolvedValueOnce({
       stream: makeSuccessStream(),
