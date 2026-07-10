@@ -6,8 +6,12 @@ import "dotenv/config";
  * Allocates consecutive ports for all services and starts them together.
  */
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { allocatePorts } from "@aprovan/devtools";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PROJECT = process.env.PROJECT ?? "patchwork";
 const BASE_PORT = process.env.PORT ? parseInt(process.env.PORT) : 3700;
@@ -33,25 +37,11 @@ async function main() {
     API_URL: `http://127.0.0.1:${serverPort}`,
   };
 
-  const serverArgs = [
-    "node",
-    "../../packages/stitchery/dist/cli.js",
-    "serve",
-    "-p",
-    String(serverPort),
-    "--utcp-config",
-    ".utcp_config.json",
-    "--local-package",
-    "@aprovan/patchwork-image-shadcn:../../packages/images/shadcn",
-    "-v",
-    "--vfs-dir",
-    "./workspace",
-    "--vfs-use-paths",
-  ];
-
-  const server = spawn(serverArgs[0]!, serverArgs.slice(1), {
+  const chatApiDir = path.resolve(__dirname, "../../../apps/chat-api");
+  const server = spawn("pnpm", ["run", "dev"], {
     stdio: "inherit",
-    env,
+    env: { ...env, PORT: String(serverPort) },
+    cwd: chatApiDir,
   });
 
   await new Promise((resolve) => setTimeout(resolve, 1000));

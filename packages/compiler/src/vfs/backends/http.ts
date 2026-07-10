@@ -25,7 +25,7 @@ interface WatchEvent {
 }
 
 /**
- * HTTP-based FSProvider for connecting to remote servers (e.g., stitchery)
+ * HTTP-based FSProvider for connecting to remote VFS servers
  */
 export class HttpBackend implements FSProvider {
   constructor(private config: HttpBackendConfig) {}
