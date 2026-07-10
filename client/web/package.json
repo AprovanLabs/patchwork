@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx scripts/start-dev.ts",
     "dev:client": "vite",
-    "dev:server": "node ../../packages/stitchery/dist/cli.js serve --utcp-config .utcp_config.json --local-package @aprovan/patchwork-image-shadcn:../../packages/images/shadcn -v --vfs-dir ./workspace --vfs-use-paths",
+    "dev:server": "pnpm --filter @aprovan/chat-backend dev",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
@@ -16,7 +16,6 @@
     "@aprovan/bobbin": "workspace:*",
     "@aprovan/patchwork-compiler": "workspace:*",
     "@aprovan/patchwork-editor": "workspace:*",
-    "@aprovan/stitchery": "workspace:*",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-scroll-area": "^1.2.10",

@@ -6,11 +6,11 @@ import {
 } from '@aprovan/patchwork-compiler';
 
 /**
- * VFS client for persisting virtual projects to the stitchery server.
+ * VFS client for persisting virtual projects via HTTP.
  * Uses HttpBackend which makes HTTP requests to /vfs routes.
  */
 
-// VFS base URL - points to stitchery server's VFS routes
+// VFS base URL - points to a backend server's /vfs routes
 const VFS_BASE_URL = '/vfs';
 
 // Cached VFS config
@@ -41,7 +41,6 @@ let storeInstance: VFSStore | null = null;
 
 /**
  * Get the VFS store instance (creates one if needed).
- * Store uses HttpBackend to persist to the stitchery server.
  */
 export function getVFSStore(): VFSStore {
   if (!storeInstance) {
@@ -55,7 +54,7 @@ export function getVFSStore(): VFSStore {
 }
 
 /**
- * Save a virtual project to disk via the stitchery server.
+ * Save a virtual project to disk via the VFS server.
  * Projects are saved under their ID in the VFS directory.
  */
 export async function saveProject(project: VirtualProject): Promise<void> {
@@ -112,7 +111,7 @@ export function subscribeToChanges(
 }
 
 /**
- * Check if VFS is available (stitchery server is running with vfs-dir enabled).
+ * Check if VFS is available (backend server has /vfs routes enabled).
  */
 export async function isVFSAvailable(): Promise<boolean> {
   try {

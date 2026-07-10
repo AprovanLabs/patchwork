@@ -13,14 +13,6 @@ export default defineConfig({
         target: API_URL,
         changeOrigin: true,
       },
-      "/_local-packages": {
-        target: API_URL,
-        changeOrigin: true,
-      },
-      "/vfs": {
-        target: API_URL,
-        changeOrigin: true,
-      },
     },
   },
 });
