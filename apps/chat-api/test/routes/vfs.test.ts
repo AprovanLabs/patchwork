@@ -12,6 +12,9 @@ vi.mock("aws-jwt-verify", () => {
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
   DynamoDBClient: vi.fn(() => ({})),
+  ConditionalCheckFailedException: class ConditionalCheckFailedException extends Error {
+    name = "ConditionalCheckFailedException";
+  },
 }));
 
 const mockDdbSend = vi.fn();
@@ -22,6 +25,15 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
   UpdateCommand: vi.fn((input) => input),
   GetCommand: vi.fn((input) => input),
   QueryCommand: vi.fn((input) => input),
+  DeleteCommand: vi.fn((input) => input),
+}));
+
+const mockS3Send = vi.fn();
+vi.mock("@aws-sdk/client-s3", () => ({
+  S3Client: vi.fn(() => ({ send: mockS3Send })),
+  GetObjectCommand: vi.fn((input) => input),
+  PutObjectCommand: vi.fn((input) => input),
+  DeleteObjectCommand: vi.fn((input) => input),
 }));
 
 beforeAll(() => {
@@ -31,6 +43,7 @@ beforeAll(() => {
   process.env["WORKSPACE_TABLE_NAME"] = "test-workspaces";
   process.env["MEMBERSHIPS_TABLE_NAME"] = "test-memberships";
   process.env["USERS_TABLE_NAME"] = "test-users";
+  process.env["USER_SESSIONS_TABLE_NAME"] = "test-sessions";
 });
 
 const { createChatApp } = await import("../../src/app");
@@ -165,5 +178,259 @@ describe("GET /vfs?since=", () => {
 
     const body = await res.json() as Array<{ path: string }>;
     expect(body[0]?.path).toBe("components/Button.tsx");
+  });
+});
+
+describe("GET /vfs/config", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    await setupAuth();
+    setupDdbRouter();
+  });
+
+  it("returns { usePaths: true }", async () => {
+    const app = createChatApp();
+    const res = await app.request("/vfs/config", {
+      headers: { Authorization: BEARER },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { usePaths: boolean };
+    expect(body.usePaths).toBe(true);
+  });
+});
+
+describe("HEAD /vfs/:path", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    await setupAuth();
+    process.env["VFS_TABLE_NAME"] = "test-vfs";
+  });
+
+  it("returns 404 when VFS_TABLE_NAME is not set", async () => {
+    delete process.env["VFS_TABLE_NAME"];
+    setupDdbRouter();
+    const app = createChatApp();
+    const res = await app.request("/vfs/src/index.ts", { method: "HEAD", headers: { Authorization: BEARER } });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 200 when item exists in DDB", async () => {
+    mockDdbSend.mockImplementation((cmd: { TableName?: string; Key?: unknown }) => {
+      if (cmd.TableName === "test-users") return Promise.resolve({ Item: { activeWorkspaceId: WORKSPACE_ID } });
+      if (cmd.TableName === "test-vfs") return Promise.resolve({ Item: { SK: "file#src/index.ts" } });
+      return Promise.resolve({});
+    });
+
+    const app = createChatApp();
+    const res = await app.request("/vfs/src/index.ts", { method: "HEAD", headers: { Authorization: BEARER } });
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 404 when item not found in DDB", async () => {
+    mockDdbSend.mockImplementation((cmd: { TableName?: string }) => {
+      if (cmd.TableName === "test-users") return Promise.resolve({ Item: { activeWorkspaceId: WORKSPACE_ID } });
+      if (cmd.TableName === "test-vfs") return Promise.resolve({ Item: undefined });
+      return Promise.resolve({});
+    });
+
+    const app = createChatApp();
+    const res = await app.request("/vfs/missing.ts", { method: "HEAD", headers: { Authorization: BEARER } });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /vfs/:path?stat=true", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    await setupAuth();
+    process.env["VFS_TABLE_NAME"] = "test-vfs";
+  });
+
+  it("returns file metadata from DDB", async () => {
+    mockDdbSend.mockImplementation((cmd: { TableName?: string }) => {
+      if (cmd.TableName === "test-users") return Promise.resolve({ Item: { activeWorkspaceId: WORKSPACE_ID } });
+      if (cmd.TableName === "test-vfs") return Promise.resolve({
+        Item: { size: 1024, mtime: "2026-07-11T00:00:00.000Z", version: 5 },
+      });
+      return Promise.resolve({});
+    });
+
+    const app = createChatApp();
+    const res = await app.request("/vfs/src/index.ts?stat=true", { headers: { Authorization: BEARER } });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { size: number; mtime: string; isFile: boolean; isDirectory: boolean };
+    expect(body.size).toBe(1024);
+    expect(body.isFile).toBe(true);
+    expect(body.isDirectory).toBe(false);
+  });
+
+  it("returns 404 when file not in DDB", async () => {
+    mockDdbSend.mockImplementation((cmd: { TableName?: string }) => {
+      if (cmd.TableName === "test-users") return Promise.resolve({ Item: { activeWorkspaceId: WORKSPACE_ID } });
+      if (cmd.TableName === "test-vfs") return Promise.resolve({ Item: undefined });
+      return Promise.resolve({});
+    });
+
+    const app = createChatApp();
+    const res = await app.request("/vfs/nope.ts?stat=true", { headers: { Authorization: BEARER } });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /vfs/:path?readdir=true", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    await setupAuth();
+    process.env["VFS_TABLE_NAME"] = "test-vfs";
+  });
+
+  it("collapses DDB items to one-level directory entries", async () => {
+    // Mock returns only items that DDB's begins_with(SK, "file#src/") would select.
+    mockDdbSend.mockImplementation((cmd: { TableName?: string }) => {
+      if (cmd.TableName === "test-users") return Promise.resolve({ Item: { activeWorkspaceId: WORKSPACE_ID } });
+      if (cmd.TableName === "test-vfs") return Promise.resolve({
+        Items: [
+          { SK: "file#src/index.ts" },
+          { SK: "file#src/app.tsx" },
+          { SK: "file#src/lib/utils.ts" },
+        ],
+      });
+      return Promise.resolve({});
+    });
+
+    const app = createChatApp();
+    const res = await app.request("/vfs/src?readdir=true", { headers: { Authorization: BEARER } });
+    expect(res.status).toBe(200);
+    const body = await res.json() as Array<{ name: string; isDirectory: boolean }>;
+    const names = body.map((e) => e.name).sort();
+    expect(names).toEqual(["app.tsx", "index.ts", "lib"]);
+    expect(body.find((e) => e.name === "lib")?.isDirectory).toBe(true);
+    expect(body.find((e) => e.name === "index.ts")?.isDirectory).toBe(false);
+  });
+});
+
+describe("PUT /vfs/:path", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    await setupAuth();
+    process.env["VFS_TABLE_NAME"] = "test-vfs";
+    process.env["VFS_BUCKET_NAME"] = "test-vfs-bucket";
+  });
+
+  it("returns 503 when VFS not configured", async () => {
+    delete process.env["VFS_TABLE_NAME"];
+    delete process.env["VFS_BUCKET_NAME"];
+    setupDdbRouter();
+
+    const app = createChatApp();
+    const res = await app.request("/vfs/src/index.ts", {
+      method: "PUT",
+      headers: { Authorization: BEARER, "Content-Type": "text/plain" },
+      body: "const x = 1;",
+    });
+    expect(res.status).toBe(503);
+  });
+
+  it("writes to S3 and DDB, returns ok+version", async () => {
+    mockS3Send.mockResolvedValue({});
+    mockDdbSend.mockImplementation((cmd: { TableName?: string }) => {
+      if (cmd.TableName === "test-users") return Promise.resolve({ Item: { activeWorkspaceId: WORKSPACE_ID } });
+      if (cmd.TableName === "test-vfs") return Promise.resolve({ Attributes: { version: 1 } });
+      return Promise.resolve({});
+    });
+
+    const app = createChatApp();
+    const res = await app.request("/vfs/src/index.ts", {
+      method: "PUT",
+      headers: { Authorization: BEARER, "Content-Type": "text/plain" },
+      body: "const x = 1;",
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; version: number };
+    expect(body.ok).toBe(true);
+    expect(body.version).toBe(1);
+    expect(mockS3Send).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 409 on concurrent write conflict", async () => {
+    const { ConditionalCheckFailedException } = await import("@aws-sdk/client-dynamodb");
+    mockS3Send.mockResolvedValue({});
+    mockDdbSend.mockImplementation((cmd: { TableName?: string }) => {
+      if (cmd.TableName === "test-users") return Promise.resolve({ Item: { activeWorkspaceId: WORKSPACE_ID } });
+      if (cmd.TableName === "test-vfs") {
+        // First call (UpdateCommand) throws; second call (GetCommand for conflict metadata) succeeds
+        if (mockDdbSend.mock.calls.filter((c) => (c[0] as { TableName?: string }).TableName === "test-vfs").length === 1) {
+          throw new ConditionalCheckFailedException("conflict");
+        }
+        return Promise.resolve({ Item: { version: 3 } });
+      }
+      return Promise.resolve({});
+    });
+
+    const app = createChatApp();
+    const res = await app.request("/vfs/src/index.ts", {
+      method: "PUT",
+      headers: {
+        Authorization: BEARER,
+        "Content-Type": "text/plain",
+        "X-Vfs-Expected-Version": "2",
+      },
+      body: "conflict",
+    });
+    expect(res.status).toBe(409);
+    const body = await res.json() as { ok: boolean; conflict: { serverVersion: number } };
+    expect(body.ok).toBe(false);
+    expect(body.conflict.serverVersion).toBe(3);
+  });
+});
+
+describe("DELETE /vfs/:path", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    await setupAuth();
+    process.env["VFS_TABLE_NAME"] = "test-vfs";
+    process.env["VFS_BUCKET_NAME"] = "test-vfs-bucket";
+  });
+
+  it("deletes from DDB and S3, returns 204", async () => {
+    mockS3Send.mockResolvedValue({});
+    mockDdbSend.mockImplementation((cmd: { TableName?: string }) => {
+      if (cmd.TableName === "test-users") return Promise.resolve({ Item: { activeWorkspaceId: WORKSPACE_ID } });
+      return Promise.resolve({});
+    });
+
+    const app = createChatApp();
+    const res = await app.request("/vfs/src/old.ts", {
+      method: "DELETE",
+      headers: { Authorization: BEARER },
+    });
+    expect(res.status).toBe(204);
+    expect(mockS3Send).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("POST /vfs/:path?mkdir=true", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    await setupAuth();
+    setupDdbRouter();
+  });
+
+  it("returns 204 (no-op)", async () => {
+    const app = createChatApp();
+    const res = await app.request("/vfs/src/components?mkdir=true", {
+      method: "POST",
+      headers: { Authorization: BEARER },
+    });
+    expect(res.status).toBe(204);
+  });
+
+  it("returns 400 for unknown POST operations", async () => {
+    const app = createChatApp();
+    const res = await app.request("/vfs/src/something", {
+      method: "POST",
+      headers: { Authorization: BEARER },
+    });
+    expect(res.status).toBe(400);
   });
 });
