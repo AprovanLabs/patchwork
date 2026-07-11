@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import WorkspaceSwitcher from "@/components/WorkspaceSwitcher";
 import {
   listWorkspaceEntries,
   listWorkspacePaths,
@@ -61,6 +62,7 @@ import {
   createSingleWorkspaceFileProject,
   saveWorkspaceProject,
   subscribeToWorkspaceChanges,
+  resetStore,
 } from "@/lib/workspace-vfs";
 
 const APROVAN_LOGO =
@@ -361,11 +363,16 @@ function toProjectRelativePath(projectId: string, path: string): string {
   return normalizedPath;
 }
 
-const TABS_STORAGE_KEY = 'patchwork:open-tabs';
+const TABS_KEY_PREFIX = 'patchwork:open-tabs';
+const ACTIVE_WORKSPACE_KEY = 'patchwork:active-workspace';
 
-function loadPersistedTabState(): { paths: string[]; activePath: string | null } {
+function getTabsStorageKey(workspaceId: string | null): string {
+  return workspaceId ? `${TABS_KEY_PREFIX}:${workspaceId}` : TABS_KEY_PREFIX;
+}
+
+function loadPersistedTabState(workspaceId: string | null): { paths: string[]; activePath: string | null } {
   try {
-    const raw = localStorage.getItem(TABS_STORAGE_KEY);
+    const raw = localStorage.getItem(getTabsStorageKey(workspaceId));
     if (!raw) return { paths: [], activePath: null };
     const parsed = JSON.parse(raw);
     return {
@@ -377,8 +384,8 @@ function loadPersistedTabState(): { paths: string[]; activePath: string | null }
   }
 }
 
-function persistTabState(paths: string[], activePath: string | null) {
-  localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify({ paths, activePath }));
+function persistTabState(paths: string[], activePath: string | null, workspaceId: string | null) {
+  localStorage.setItem(getTabsStorageKey(workspaceId), JSON.stringify({ paths, activePath }));
 }
 
 export default function ChatPage() {
@@ -394,6 +401,9 @@ export default function ChatPage() {
   const [workspaceTreeVersion, setWorkspaceTreeVersion] = useState(0);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(
+    () => localStorage.getItem(ACTIVE_WORKSPACE_KEY),
+  );
   const [chatContainer, setChatContainer] = useState<HTMLDivElement | null>(
     null,
   );
@@ -405,11 +415,13 @@ export default function ChatPage() {
   const [openTabs, setOpenTabs] = useState<
     Map<string, { code: string; loading: boolean; error: string | null }>
   >(() => {
-    const { paths } = loadPersistedTabState();
+    const wsId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
+    const { paths } = loadPersistedTabState(wsId);
     return new Map(paths.map((p) => [p, { code: '', loading: true, error: null }]));
   });
   const [activeTabPath, setActiveTabPath] = useState<string | null>(() => {
-    const { paths, activePath } = loadPersistedTabState();
+    const wsId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
+    const { paths, activePath } = loadPersistedTabState(wsId);
     if (activePath && paths.includes(activePath)) return activePath;
     return paths[0] ?? null;
   });
@@ -551,10 +563,10 @@ export default function ChatPage() {
     });
   }, []);
 
-  // Persist open tabs to localStorage
+  // Persist open tabs to localStorage (scoped by active workspace)
   useEffect(() => {
-    persistTabState([...openTabs.keys()], activeTabPath);
-  }, [openTabs, activeTabPath]);
+    persistTabState([...openTabs.keys()], activeTabPath, activeWorkspaceId);
+  }, [openTabs, activeTabPath, activeWorkspaceId]);
 
   // Fix activeTabPath when its tab is removed
   useEffect(() => {
@@ -687,6 +699,37 @@ export default function ChatPage() {
     setActiveTabPath(null);
   }, []);
 
+  const handleWorkspaceSwitch = useCallback(
+    (newWorkspaceId: string) => {
+      localStorage.setItem(ACTIVE_WORKSPACE_KEY, newWorkspaceId);
+      setActiveWorkspaceId(newWorkspaceId);
+      setOpenTabs(new Map());
+      setActiveTabPath(null);
+      setPinnedPaths(new Map());
+      setEditSession(null);
+      resetStore();
+      void refreshWorkspace();
+    },
+    [refreshWorkspace],
+  );
+
+  const handleWorkspaceLoad = useCallback(
+    (serverActiveId: string | null) => {
+      if (!serverActiveId) return;
+      const storedId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
+      if (serverActiveId === storedId) return;
+      // Server and localStorage disagree — trust the server
+      localStorage.setItem(ACTIVE_WORKSPACE_KEY, serverActiveId);
+      setActiveWorkspaceId(serverActiveId);
+      setOpenTabs(new Map());
+      setActiveTabPath(null);
+      setPinnedPaths(new Map());
+      resetStore();
+      void refreshWorkspace();
+    },
+    [refreshWorkspace],
+  );
+
   const filteredWorkspaceFiles = useMemo(() => {
     const query = workspaceFilter.trim().toLowerCase();
     if (!query) return workspaceFiles;
@@ -748,6 +791,10 @@ export default function ChatPage() {
                   className="h-8 w-8 rounded-full"
                 />
                 <span className="text-lg">patchwork</span>
+                <WorkspaceSwitcher
+                  onLoad={handleWorkspaceLoad}
+                  onSwitch={handleWorkspaceSwitch}
+                />
                 <ServicesInspector
                   namespaces={namespaces}
                   services={services}

@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import type { AppVariables } from "../../src/types";
 import type { CognitoAccessTokenPayload } from "aws-jwt-verify/jwt-model";
 
-// Mock the DDB client before importing the middleware
 vi.mock("@aws-sdk/client-dynamodb", () => ({
   DynamoDBClient: vi.fn(() => ({})),
 }));
@@ -17,24 +16,24 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
   GetCommand: vi.fn((input) => input),
 }));
 
-const { workspaceMiddleware, resolveWorkspaceId, evictWorkspaceCache } = await import(
+const { workspaceMiddleware, resolveWorkspaceId, evictWorkspaceCache, resetMembershipCache } = await import(
   "../../src/middleware/workspace"
 );
 
-const fakeClaims = {
-  sub: "user-sub-123",
-} as unknown as CognitoAccessTokenPayload;
+const MEMBERSHIPS_TABLE = "gateway-prd-use1-memberships";
+const SESSIONS_TABLE = "test-user-sessions";
 
-function buildApp() {
+type MockCommand = { TableName?: string };
+
+function buildApp(userSub: string) {
+  const fakeClaims = { sub: userSub } as unknown as CognitoAccessTokenPayload;
   const app = new Hono<{ Variables: AppVariables }>();
   app.use("/protected", async (c, next) => {
     c.set("claims", fakeClaims);
     await next();
   });
   app.use("/protected", workspaceMiddleware);
-  app.get("/protected", (c) =>
-    c.json({ workspaceId: c.get("workspaceId") }),
-  );
+  app.get("/protected", (c) => c.json({ workspaceId: c.get("workspaceId") }));
   return app;
 }
 
@@ -45,12 +44,7 @@ describe("workspaceMiddleware", () => {
     process.env["USERS_TABLE_NAME"] = "gateway-prd-use1-users";
     process.env["AWS_REGION"] = "us-east-1";
     // Clear module-level cache between tests
-    evictWorkspaceCache("user-sub-123");
-    evictWorkspaceCache("user-sub-456");
-    evictWorkspaceCache("user-no-ws");
-    evictWorkspaceCache("user-cached");
-    evictWorkspaceCache("user-users-table");
-    evictWorkspaceCache("user-fallback");
+    resetMembershipCache();
   });
 
   it("uses activeWorkspaceId from Users table when present", async () => {
@@ -107,19 +101,11 @@ describe("workspaceMiddleware", () => {
         Items: [{ workspaceId: "ws-abc", userSub: "user-sub-456" }],
       });
 
-    const app = new Hono<{ Variables: AppVariables }>();
-    const localClaims = { sub: "user-sub-456" } as unknown as CognitoAccessTokenPayload;
-    app.use("/protected", async (c, next) => {
-      c.set("claims", localClaims);
-      await next();
-    });
-    app.use("/protected", workspaceMiddleware);
-    app.get("/protected", (c) => c.json({ workspaceId: c.get("workspaceId") }));
-
+    const app = buildApp("user-session");
     const res = await app.request("/protected");
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ workspaceId: "ws-abc" });
+    expect(body.workspaceId).toBe("ws-abc");
   });
 
   it("returns 403 when no membership exists and Users table has no activeWorkspaceId", async () => {
@@ -144,17 +130,17 @@ describe("workspaceMiddleware", () => {
     expect(body).toMatchObject({ error: "No workspace membership" });
   });
 
-  it("uses cache on subsequent calls for the same sub", async () => {
-    mockSend.mockResolvedValueOnce({
-      Item: { activeWorkspaceId: "ws-cached" },
-    });
+  it("uses membership cache on subsequent calls for the same sub", async () => {
+    mockSend
+      .mockResolvedValueOnce({}) // Users GetCommand → no item
+      .mockResolvedValueOnce({ Items: [{ workspaceId: "ws-cached" }] }); // First Memberships query
 
     // First call — hits DDB
-    await resolveWorkspaceId("user-cached");
-    // Second call — should use cache
-    await resolveWorkspaceId("user-cached");
-
-    expect(mockSend).toHaveBeenCalledTimes(1);
+    await resolveWorkspaceId("user-cached-q");
+    // Second call — should use cache for Memberships
+    await resolveWorkspaceId("user-cached-q");
+    // Only two DDB sends: Users Get (both times) + one Memberships query (cached on second)
+    expect(mockSend).toHaveBeenCalledTimes(3);
   });
 
   it("evictWorkspaceCache clears the cache so next call re-fetches", async () => {
