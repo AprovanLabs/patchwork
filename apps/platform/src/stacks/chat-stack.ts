@@ -1,6 +1,7 @@
 import { Construct } from "constructs";
 import * as cdk from "aws-cdk-lib";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import { ChatLambda } from "../lambdas/chat-lambda";
@@ -49,6 +50,15 @@ export class ChatStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ChatStackProps) {
     super(scope, id, props);
 
+    // --- User sessions DDB table -----------------------------------------
+    const userSessionsTable = new dynamodb.Table(this, "UserSessionsTable", {
+      tableName: `${id}-user-sessions`,
+      partitionKey: { name: "userSub", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      pointInTimeRecovery: true,
+    });
+
     // --- Lambda + Function URL -------------------------------------------
     const chat = new ChatLambda(this, "ChatLambda", {
       cognitoUserPoolId: props.cognitoUserPoolId,
@@ -57,6 +67,8 @@ export class ChatStack extends cdk.Stack {
       workspaceTableArn: props.workspaceTableArn,
       membershipsTableName: props.membershipsTableName,
       membershipsTableArn: props.membershipsTableArn,
+      userSessionsTableName: userSessionsTable.tableName,
+      userSessionsTableArn: userSessionsTable.tableArn,
       openRouterSecretArn: props.openRouterSecretArn,
       gatewayBaseUrl: props.gatewayBaseUrl,
       corsOrigins: props.corsOrigins,

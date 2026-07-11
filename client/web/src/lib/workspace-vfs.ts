@@ -21,6 +21,11 @@ function getStore(): VFSStore {
   return storeInstance;
 }
 
+/** Tear down the current VFS store instance so the next call to getStore() creates a fresh one. */
+export function resetStore(): void {
+  storeInstance = null;
+}
+
 function normalizePath(path: string): string {
   return path.replace(/^\/+|\/+$/g, '');
 }
