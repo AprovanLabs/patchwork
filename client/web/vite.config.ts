@@ -13,6 +13,10 @@ export default defineConfig({
         target: API_URL,
         changeOrigin: true,
       },
+      "/vfs": {
+        target: API_URL,
+        changeOrigin: true,
+      },
     },
   },
 });

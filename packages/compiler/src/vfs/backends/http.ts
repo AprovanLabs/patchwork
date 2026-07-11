@@ -4,11 +4,12 @@ import type {
   FileStats,
   FSProvider,
   WatchCallback,
-  WatchEventType,
 } from "../core/types.js";
 
 export interface HttpBackendConfig {
   baseUrl: string;
+  /** How often to poll for external changes, in milliseconds. Default: 7000. */
+  pollIntervalMs?: number;
 }
 
 interface StatResponse {
@@ -18,10 +19,11 @@ interface StatResponse {
   isDirectory: boolean;
 }
 
-interface WatchEvent {
-  type: WatchEventType;
+interface ChangeEntry {
   path: string;
   mtime: string;
+  version: number;
+  size: number;
 }
 
 /**
@@ -84,48 +86,64 @@ export class HttpBackend implements FSProvider {
     return res.ok;
   }
 
-  watch(path: string, callback: WatchCallback): () => void {
+  watch(_path: string, callback: WatchCallback): () => void {
     const controller = new AbortController();
-    this.startWatch(path, callback, controller.signal);
+    this.startPoll(callback, controller.signal);
     return () => controller.abort();
   }
 
-  private async startWatch(
-    path: string,
+  private async startPoll(
     callback: WatchCallback,
     signal: AbortSignal,
   ): Promise<void> {
-    try {
-      const res = await fetch(this.url("", { watch: path }), { signal });
-      if (!res.ok) return;
-      const reader = res.body?.getReader();
-      if (!reader) return;
+    const intervalMs = this.config.pollIntervalMs ?? 7_000;
+    // Start `since` at subscription time so we only surface writes that happen
+    // after the caller registered. Captured before each request so any write
+    // that arrives while the request is in-flight is not skipped.
+    let since = new Date().toISOString();
 
-      const decoder = new TextDecoder();
-      let buffer = "";
+    const poll = async () => {
+      if (signal.aborted) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
 
-      while (!signal.aborted) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const event: WatchEvent = JSON.parse(line.slice(6));
-              callback(event.type, event.path);
-            } catch {
-              // Ignore parse errors
-            }
-          }
+      const pollStart = new Date().toISOString();
+      try {
+        const res = await fetch(this.url("", { since }), { signal });
+        if (!res.ok) return;
+        const changes: ChangeEntry[] = await res.json();
+        // Advance the cursor regardless of whether changes were returned so
+        // the next poll does not re-examine the same window.
+        since = pollStart;
+        for (const change of changes) {
+          callback("update", change.path);
         }
+      } catch {
+        // Network error or abort — leave `since` unchanged and retry next tick.
       }
-    } catch {
-      // Connection closed or aborted
+    };
+
+    // Immediate first poll to catch any writes that happened just before mount.
+    await poll();
+    if (signal.aborted) return;
+
+    const timer = setInterval(() => void poll(), intervalMs);
+
+    // Poll immediately when the tab regains focus.
+    const onVisibilityChange = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        void poll();
+      }
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibilityChange);
     }
+
+    signal.addEventListener("abort", () => {
+      clearInterval(timer);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      }
+    });
   }
 
   private url(path: string, params?: Record<string, string>): string {

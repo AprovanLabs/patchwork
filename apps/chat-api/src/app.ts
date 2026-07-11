@@ -6,6 +6,7 @@ import { chatRoute } from "./routes/chat.js";
 import { editRoute } from "./routes/edit.js";
 import { health } from "./routes/health.js";
 import { proxy } from "./routes/proxy.js";
+import { vfsRoute } from "./routes/vfs.js";
 import { workspaceRoute } from "./routes/workspace.js";
 import { services } from "./routes/services.js";
 import { workspacesRoute } from "./routes/workspaces.js";
@@ -24,6 +25,12 @@ export function createChatApp() {
   authOnly.use("/*", authMiddleware);
   authOnly.route("/workspace", workspaceRoute);
   app.route("/api", authOnly);
+
+  // VFS routes: auth + workspace (no plan gate — polling must not consume chat budget)
+  const vfs = new Hono<{ Variables: AppVariables }>();
+  vfs.use("/*", authMiddleware, workspaceMiddleware);
+  vfs.route("/", vfsRoute);
+  app.route("/vfs", vfs);
 
   // Protected routes: auth → workspace → plan
   const api = new Hono<{ Variables: AppVariables }>();
