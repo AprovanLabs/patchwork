@@ -12,6 +12,8 @@ export interface ChatLambdaProps {
   workspaceTableArn: string;
   membershipsTableName: string;
   membershipsTableArn: string;
+  userSessionsTableName: string;
+  userSessionsTableArn: string;
   openRouterSecretArn: string;
   gatewayBaseUrl: string;
   corsOrigins: string[];
@@ -61,6 +63,7 @@ export class ChatLambda extends Construct {
         COGNITO_CLIENT_ID: props.cognitoClientId,
         WORKSPACE_TABLE_NAME: props.workspaceTableName,
         MEMBERSHIPS_TABLE_NAME: props.membershipsTableName,
+        USER_SESSIONS_TABLE_NAME: props.userSessionsTableName,
         OPENROUTER_SECRET_ARN: props.openRouterSecretArn,
         GATEWAY_URL: props.gatewayBaseUrl,
         ...(props.posthogProjectApiKey !== undefined && {
@@ -101,6 +104,15 @@ export class ChatLambda extends Construct {
           props.membershipsTableArn,
           `${props.membershipsTableArn}/index/ByUserSub`,
         ],
+      }),
+    );
+
+    // dynamodb:GetItem + PutItem on user sessions table (active workspace session)
+    this.fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["dynamodb:GetItem", "dynamodb:PutItem"],
+        resources: [props.userSessionsTableArn],
       }),
     );
 

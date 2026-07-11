@@ -1,12 +1,13 @@
 import { Hono } from "hono";
 import { authMiddleware } from "./middleware/auth.js";
-import { workspaceMiddleware } from "./middleware/workspace.js";
 import { planMiddleware } from "./middleware/plan.js";
-import { health } from "./routes/health.js";
+import { workspaceMiddleware } from "./middleware/workspace.js";
 import { chatRoute } from "./routes/chat.js";
 import { editRoute } from "./routes/edit.js";
-import { services } from "./routes/services.js";
+import { health } from "./routes/health.js";
 import { proxy } from "./routes/proxy.js";
+import { services } from "./routes/services.js";
+import { workspacesRoute } from "./routes/workspaces.js";
 import type { AppVariables } from "./types.js";
 
 export { initPostHog } from "./posthog.js";
@@ -24,6 +25,7 @@ export function createChatApp() {
   api.route("/edit", editRoute);
   api.route("/services", services);
   api.route("/proxy", proxy);
+  api.route("/workspaces", workspacesRoute);
 
   return app;
 }

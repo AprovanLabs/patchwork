@@ -20,6 +20,8 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
   },
   QueryCommand: vi.fn((input) => input),
   GetCommand: vi.fn((input) => input),
+  PutCommand: vi.fn((input) => input),
+  BatchGetCommand: vi.fn((input) => input),
 }));
 
 beforeAll(() => {
@@ -28,6 +30,7 @@ beforeAll(() => {
   process.env["AWS_REGION"] = "us-east-1";
   process.env["WORKSPACE_TABLE_NAME"] = "test-workspaces";
   process.env["MEMBERSHIPS_TABLE_NAME"] = "test-memberships";
+  process.env["USER_SESSIONS_TABLE_NAME"] = "test-user-sessions";
 });
 
 describe("chat app", () => {
