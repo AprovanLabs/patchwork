@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import type { MiddlewareHandler } from "hono";
 import type { AppVariables } from "../types";
 
@@ -23,11 +23,30 @@ function getDdb() {
   return ddbClient;
 }
 
+/** Remove a user's cached workspace so the next request re-derives it. */
+export function evictWorkspaceCache(userSub: string): void {
+  membershipCache.delete(userSub);
+}
+
 export async function resolveWorkspaceId(userSub: string): Promise<string | null> {
   const now = Date.now();
   const cached = membershipCache.get(userSub);
   if (cached && now - cached.fetchedAt < MEMBERSHIP_CACHE_TTL_MS) {
     return cached.workspaceId;
+  }
+
+  // Prefer the durable Users table (activeWorkspaceId); fall back to first Membership.
+  const usersResult = await getDdb().send(
+    new GetCommand({
+      TableName: process.env["USERS_TABLE_NAME"]!,
+      Key: { sub: userSub },
+      ProjectionExpression: "activeWorkspaceId",
+    }),
+  );
+  const userItem = usersResult.Item as { activeWorkspaceId?: string } | undefined;
+  if (userItem?.activeWorkspaceId) {
+    membershipCache.set(userSub, { workspaceId: userItem.activeWorkspaceId, fetchedAt: now });
+    return userItem.activeWorkspaceId;
   }
 
   const result = await getDdb().send(

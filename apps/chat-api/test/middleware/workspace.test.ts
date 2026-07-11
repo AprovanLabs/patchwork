@@ -14,9 +14,10 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
     from: vi.fn(() => ({ send: mockSend })),
   },
   QueryCommand: vi.fn((input) => input),
+  GetCommand: vi.fn((input) => input),
 }));
 
-const { workspaceMiddleware, resolveWorkspaceId } = await import(
+const { workspaceMiddleware, resolveWorkspaceId, evictWorkspaceCache } = await import(
   "../../src/middleware/workspace"
 );
 
@@ -41,15 +42,70 @@ describe("workspaceMiddleware", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env["MEMBERSHIPS_TABLE_NAME"] = "gateway-prd-use1-memberships";
+    process.env["USERS_TABLE_NAME"] = "gateway-prd-use1-users";
     process.env["AWS_REGION"] = "us-east-1";
-    // Clear the module-level cache between tests by resetting the module state.
-    // resolveWorkspaceId memoizes per sub; tests use unique subs or clear cache.
+    // Clear module-level cache between tests
+    evictWorkspaceCache("user-sub-123");
+    evictWorkspaceCache("user-sub-456");
+    evictWorkspaceCache("user-no-ws");
+    evictWorkspaceCache("user-cached");
+    evictWorkspaceCache("user-users-table");
+    evictWorkspaceCache("user-fallback");
+  });
+
+  it("uses activeWorkspaceId from Users table when present", async () => {
+    // Users table returns activeWorkspaceId — no Memberships query needed
+    mockSend.mockResolvedValueOnce({
+      Item: { sub: "user-users-table", activeWorkspaceId: "ws-from-users" },
+    });
+
+    const app = new Hono<{ Variables: AppVariables }>();
+    const localClaims = { sub: "user-users-table" } as unknown as CognitoAccessTokenPayload;
+    app.use("/protected", async (c, next) => {
+      c.set("claims", localClaims);
+      await next();
+    });
+    app.use("/protected", workspaceMiddleware);
+    app.get("/protected", (c) => c.json({ workspaceId: c.get("workspaceId") }));
+
+    const res = await app.request("/protected");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ workspaceId: "ws-from-users" });
+    // Only one DDB call (Users Get), no Memberships query
+    expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to Memberships when Users table has no activeWorkspaceId", async () => {
+    // Users Get returns no item; Memberships query returns ws-from-memberships
+    mockSend
+      .mockResolvedValueOnce({}) // Users GetCommand → no item
+      .mockResolvedValueOnce({
+        Items: [{ workspaceId: "ws-from-memberships", userSub: "user-fallback" }],
+      }); // Memberships QueryCommand
+
+    const app = new Hono<{ Variables: AppVariables }>();
+    const localClaims = { sub: "user-fallback" } as unknown as CognitoAccessTokenPayload;
+    app.use("/protected", async (c, next) => {
+      c.set("claims", localClaims);
+      await next();
+    });
+    app.use("/protected", workspaceMiddleware);
+    app.get("/protected", (c) => c.json({ workspaceId: c.get("workspaceId") }));
+
+    const res = await app.request("/protected");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ workspaceId: "ws-from-memberships" });
+    expect(mockSend).toHaveBeenCalledTimes(2);
   });
 
   it("resolves workspaceId from DDB and sets it on context", async () => {
-    mockSend.mockResolvedValueOnce({
-      Items: [{ workspaceId: "ws-abc", userSub: "user-sub-456" }],
-    });
+    mockSend
+      .mockResolvedValueOnce({}) // Users GetCommand → no item
+      .mockResolvedValueOnce({
+        Items: [{ workspaceId: "ws-abc", userSub: "user-sub-456" }],
+      });
 
     const app = new Hono<{ Variables: AppVariables }>();
     const localClaims = { sub: "user-sub-456" } as unknown as CognitoAccessTokenPayload;
@@ -66,8 +122,10 @@ describe("workspaceMiddleware", () => {
     expect(body).toEqual({ workspaceId: "ws-abc" });
   });
 
-  it("returns 403 when no membership exists", async () => {
-    mockSend.mockResolvedValueOnce({ Items: [] });
+  it("returns 403 when no membership exists and Users table has no activeWorkspaceId", async () => {
+    mockSend
+      .mockResolvedValueOnce({}) // Users GetCommand → no item
+      .mockResolvedValueOnce({ Items: [] }); // Memberships QueryCommand → empty
 
     const app = new Hono<{ Variables: AppVariables }>();
     const localClaims = {
@@ -88,7 +146,7 @@ describe("workspaceMiddleware", () => {
 
   it("uses cache on subsequent calls for the same sub", async () => {
     mockSend.mockResolvedValueOnce({
-      Items: [{ workspaceId: "ws-cached", userSub: "user-cached" }],
+      Item: { activeWorkspaceId: "ws-cached" },
     });
 
     // First call — hits DDB
@@ -97,5 +155,18 @@ describe("workspaceMiddleware", () => {
     await resolveWorkspaceId("user-cached");
 
     expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
+  it("evictWorkspaceCache clears the cache so next call re-fetches", async () => {
+    mockSend
+      .mockResolvedValueOnce({ Item: { activeWorkspaceId: "ws-v1" } })
+      .mockResolvedValueOnce({ Item: { activeWorkspaceId: "ws-v2" } });
+
+    await resolveWorkspaceId("user-cached");
+    evictWorkspaceCache("user-cached");
+    const result = await resolveWorkspaceId("user-cached");
+
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    expect(result).toBe("ws-v2");
   });
 });
