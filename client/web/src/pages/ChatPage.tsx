@@ -344,13 +344,39 @@ function TextPartWithSession({
   );
 }
 
-const PROXY_URL = "/api/proxy";
+// Gateway base URL for direct browser-to-gateway calls.
+// In production, VITE_GATEWAY_URL is injected at build time via the platform CDK stack.
+// In dev, requests go through the Vite dev server proxy at /gateway (→ GATEWAY_URL).
+const GATEWAY_BASE = (import.meta.env["VITE_GATEWAY_URL"] as string | undefined) || (import.meta.env.DEV ? "/gateway" : "");
+
+// The compiler calls POST ${PROXY_URL}/:provider/:operation for widget tool calls.
+// Map to the gateway's /tools/:provider/:operation path.
+const PROXY_URL = GATEWAY_BASE ? `${GATEWAY_BASE}/tools` : "";
+
 const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn";
 // Local proxy for loading image packages, esm.sh for widget imports
 const IMAGE_CDN_URL = import.meta.env.DEV
   ? "/_local-packages"
   : "https://esm.sh";
 const WIDGET_CDN_URL = "https://esm.sh"; // Widget imports need esm.sh bundles like @packagedcn
+
+interface GatewayToolEntry {
+  provider: string;
+  name: string;
+  operation: string;
+  description?: string;
+  inputSchema?: unknown;
+}
+
+// Returns the Cognito access token stored by the platform auth flow at login.
+// Returns null in dev shells that have not wired up auth (calls are skipped).
+function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem("patchwork:authToken");
+  } catch {
+    return null;
+  }
+}
 
 function toProjectRelativePath(projectId: string, path: string): string {
   const normalizedProjectId = projectId.replace(/^\/+|\/+$/g, "");
@@ -508,20 +534,53 @@ export default function ChatPage() {
   }, [workspaceFilter]);
 
   useEffect(() => {
-    // Fetch available services
-    fetch("/api/services")
-      .then((res) => res.json())
-      .then((data) => {
-        setNamespaces(data.namespaces ?? []);
-        // In dev mode, also store full service details for inspection
-        if (import.meta.env.DEV && data.services) {
-          setServices(data.services);
+    // Fetch available services directly from the gateway.
+    // Requires the platform auth flow to have stored a Cognito token and an
+    // active workspace id. Gracefully skips when either is absent.
+    const fetchGatewayTools = async () => {
+      const token = getAuthToken();
+      const wsId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
+      if (!token || !wsId || !GATEWAY_BASE) return;
+
+      // Register the active workspace with the gateway (idempotent; non-fatal).
+      try {
+        await fetch(`${GATEWAY_BASE}/auth/sessions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ workspace_id: wsId }),
+        });
+      } catch {
+        // Non-fatal — session may already be established from a prior chat request.
+      }
+
+      try {
+        const res = await fetch(`${GATEWAY_BASE}/tools`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { tools?: GatewayToolEntry[] };
+        const tools = data.tools ?? [];
+        setNamespaces(Array.from(new Set(tools.map((t) => t.provider))));
+        if (import.meta.env.DEV) {
+          setServices(
+            tools.map((t) => ({
+              namespace: t.provider,
+              name: t.name,
+              procedure: t.operation,
+              description: t.description ?? "",
+              parameters: t.inputSchema as Record<string, unknown> | undefined,
+            })),
+          );
         }
-      })
-      .catch(() => {
+      } catch {
         setNamespaces([]);
         setServices([]);
-      });
+      }
+    };
+    void fetchGatewayTools();
 
     // Initialize compiler
     createCompiler({
