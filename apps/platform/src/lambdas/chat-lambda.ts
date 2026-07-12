@@ -14,6 +14,10 @@ export interface ChatLambdaProps {
   membershipsTableArn: string;
   userSessionsTableName: string;
   userSessionsTableArn: string;
+  vfsTableName: string;
+  vfsTableArn: string;
+  vfsBucketName: string;
+  vfsBucketArn: string;
   openRouterSecretArn: string;
   gatewayBaseUrl: string;
   corsOrigins: string[];
@@ -64,6 +68,8 @@ export class ChatLambda extends Construct {
         WORKSPACE_TABLE_NAME: props.workspaceTableName,
         MEMBERSHIPS_TABLE_NAME: props.membershipsTableName,
         USER_SESSIONS_TABLE_NAME: props.userSessionsTableName,
+        VFS_TABLE_NAME: props.vfsTableName,
+        VFS_BUCKET_NAME: props.vfsBucketName,
         OPENROUTER_SECRET_ARN: props.openRouterSecretArn,
         GATEWAY_URL: props.gatewayBaseUrl,
         ...(props.posthogProjectApiKey !== undefined && {
@@ -113,6 +119,29 @@ export class ChatLambda extends Construct {
         effect: iam.Effect.ALLOW,
         actions: ["dynamodb:GetItem", "dynamodb:PutItem"],
         resources: [props.userSessionsTableArn],
+      }),
+    );
+
+    // dynamodb:GetItem + Query + UpdateItem + DeleteItem on VFS table
+    this.fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "dynamodb:GetItem",
+          "dynamodb:Query",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+        ],
+        resources: [props.vfsTableArn],
+      }),
+    );
+
+    // s3:GetObject + PutObject + DeleteObject on VFS bucket
+    this.fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+        resources: [`${props.vfsBucketArn}/*`],
       }),
     );
 

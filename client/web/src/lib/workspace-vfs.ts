@@ -7,7 +7,25 @@ import {
   type WatchCallback,
 } from '@aprovan/patchwork-compiler';
 
-const VFS_BASE_URL = '/vfs';
+/**
+ * VFS_BACKEND controls which backend the client uses.
+ *   stitchery (default) — relative /vfs, proxied by Vite to the local chat-api in dev.
+ *   aws                 — absolute AWS URL (VITE_VFS_AWS_URL + /vfs), used in prod.
+ *
+ * Set VITE_VFS_BACKEND=aws and VITE_VFS_AWS_URL=https://chat.api.yourenv.com to
+ * flip a dev environment onto the AWS backend without a rebuild.
+ */
+const VFS_BACKEND = import.meta.env.VITE_VFS_BACKEND ?? 'stitchery';
+const VFS_AWS_URL = import.meta.env.VITE_VFS_AWS_URL ?? '';
+
+function resolveBaseUrl(): string {
+  if (VFS_BACKEND === 'aws') {
+    return `${VFS_AWS_URL}/vfs`;
+  }
+  return '/vfs';
+}
+
+const VFS_BASE_URL = resolveBaseUrl();
 
 let storeInstance: VFSStore | null = null;
 

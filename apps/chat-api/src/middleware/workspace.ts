@@ -28,6 +28,11 @@ export function evictWorkspaceCache(userSub: string): void {
   membershipCache.delete(userSub);
 }
 
+/** Clear the entire membership cache (test helper). */
+export function resetMembershipCache(): void {
+  membershipCache.clear();
+}
+
 export async function resolveWorkspaceId(userSub: string): Promise<string | null> {
   const now = Date.now();
   const cached = membershipCache.get(userSub);
@@ -64,6 +69,19 @@ export async function resolveWorkspaceId(userSub: string): Promise<string | null
 
   membershipCache.set(userSub, { workspaceId: item.workspaceId, fetchedAt: now });
   return item.workspaceId;
+}
+
+/** Return all workspace IDs the user is a member of (used by the workspaces listing route). */
+export async function listWorkspaceMemberships(userSub: string): Promise<string[]> {
+  const result = await getDdb().send(
+    new QueryCommand({
+      TableName: process.env["MEMBERSHIPS_TABLE_NAME"]!,
+      IndexName: "ByUserSub",
+      KeyConditionExpression: "userSub = :sub",
+      ExpressionAttributeValues: { ":sub": userSub },
+    }),
+  );
+  return ((result.Items ?? []) as Array<{ workspaceId: string }>).map((item) => item.workspaceId);
 }
 
 export const workspaceMiddleware: MiddlewareHandler<{ Variables: AppVariables }> =

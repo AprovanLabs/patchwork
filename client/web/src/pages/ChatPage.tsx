@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Minus,
   RefreshCw,
+  RotateCcw,
   X,
 } from "lucide-react";
 import {
@@ -439,7 +440,7 @@ export default function ChatPage() {
     initialActiveFile?: string;
   } | null>(null);
   const [openTabs, setOpenTabs] = useState<
-    Map<string, { code: string; loading: boolean; error: string | null }>
+    Map<string, { code: string; loading: boolean; error: string | null; stale?: boolean }>
   >(() => {
     const wsId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
     const { paths } = loadPersistedTabState(wsId);
@@ -454,6 +455,8 @@ export default function ChatPage() {
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const tabRequestRefs = useRef<Map<string, number>>(new Map());
+  // Deduplicate listWorkspacePaths() calls when multiple files change in the same poll batch.
+  const pendingTreeRefreshRef = useRef(false);
 
   const [pinnedPaths, setPinnedPaths] = useState<Map<string, boolean>>(() => {
     try {
@@ -498,10 +501,27 @@ export default function ChatPage() {
   }, [workspaceFilter]);
 
   useEffect(() => {
-    return subscribeToWorkspaceChanges(() => {
+    return subscribeToWorkspaceChanges((_event, changedPath) => {
+      // Mark the specific open tab stale so the user sees a reload prompt.
+      if (changedPath) {
+        setOpenTabs((prev) => {
+          if (!prev.has(changedPath)) return prev;
+          const tab = prev.get(changedPath)!;
+          if (tab.stale) return prev;
+          const next = new Map(prev);
+          next.set(changedPath, { ...tab, stale: true });
+          return next;
+        });
+      }
+
+      // Debounce the full tree refresh — all files from a single poll batch
+      // fire callbacks synchronously, so only the first one triggers a fetch.
+      if (pendingTreeRefreshRef.current) return;
+      pendingTreeRefreshRef.current = true;
       setWorkspaceTreeVersion((prev) => prev + 1);
       listWorkspacePaths()
         .then((allPaths) => {
+          pendingTreeRefreshRef.current = false;
           if (workspaceFilter.trim()) setWorkspaceFiles(allPaths);
           const existing = new Set(allPaths);
           setOpenTabs((prev) => {
@@ -513,7 +533,7 @@ export default function ChatPage() {
             return changed ? next : prev;
           });
         })
-        .catch(() => {});
+        .catch(() => { pendingTreeRefreshRef.current = false; });
     });
   }, [workspaceFilter]);
 
@@ -758,6 +778,44 @@ export default function ChatPage() {
     setActiveTabPath(null);
   }, []);
 
+  const reloadStaleTab = useCallback((path: string) => {
+    setOpenTabs((prev) => {
+      const next = new Map(prev);
+      next.set(path, { code: '', loading: true, error: null, stale: false });
+      return next;
+    });
+
+    const requestId = (tabRequestRefs.current.get(path) ?? 0) + 1;
+    tabRequestRefs.current.set(path, requestId);
+
+    void loadWorkspaceFileProject(path)
+      .then((project) => {
+        if (tabRequestRefs.current.get(path) !== requestId) return;
+        if (!project) {
+          setOpenTabs((prev) => {
+            const next = new Map(prev);
+            next.set(path, { code: '', loading: false, error: 'Failed to reload file', stale: false });
+            return next;
+          });
+          return;
+        }
+        const file = project.files.get(project.entry);
+        setOpenTabs((prev) => {
+          const next = new Map(prev);
+          next.set(path, { code: file?.content ?? '', loading: false, error: null, stale: false });
+          return next;
+        });
+      })
+      .catch(() => {
+        if (tabRequestRefs.current.get(path) !== requestId) return;
+        setOpenTabs((prev) => {
+          const next = new Map(prev);
+          next.set(path, { code: '', loading: false, error: 'Failed to reload file', stale: false });
+          return next;
+        });
+      });
+  }, []);
+
   const handleWorkspaceSwitch = useCallback(
     (newWorkspaceId: string) => {
       localStorage.setItem(ACTIVE_WORKSPACE_KEY, newWorkspaceId);
@@ -939,9 +997,10 @@ export default function ChatPage() {
                     {/* Tab bar */}
                     <div className="flex items-center border-b bg-muted/30">
                       <div className="flex-1 flex items-center overflow-x-auto min-w-0">
-                        {[...openTabs.entries()].map(([path]) => {
+                        {[...openTabs.entries()].map(([path, tab]) => {
                           const fileName = path.split("/").pop() ?? path;
                           const isActive = path === activeTabPath;
+                          const isStale = tab.stale ?? false;
                           return (
                             <button
                               key={path}
@@ -950,14 +1009,30 @@ export default function ChatPage() {
                                 setWorkspaceActivePath(path);
                                 setPreviewCollapsed(false);
                               }}
-                              className={`group relative flex items-center gap-1.5 px-3 py-1.5 text-xs border-r shrink-0 max-w-[180px] ${
+                              className={`group relative flex items-center gap-1.5 px-3 py-1.5 text-xs border-r shrink-0 max-w-[200px] ${
                                 isActive
                                   ? "bg-background text-foreground border-b-2 border-b-primary"
                                   : "text-muted-foreground hover:bg-muted/50"
                               }`}
-                              title={path}
+                              title={isStale ? `${path} — modified externally` : path}
                             >
-                              <span className="truncate">{fileName}</span>
+                              {isStale && (
+                                <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-orange-400" title="Modified externally" />
+                              )}
+                              <span className={`truncate ${isStale ? "text-orange-600 dark:text-orange-400" : ""}`}>{fileName}</span>
+                              {isStale && (
+                                <span
+                                  role="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    reloadStaleTab(path);
+                                  }}
+                                  className="shrink-0 p-0.5 rounded hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Reload from server"
+                                >
+                                  <RotateCcw className="h-3 w-3" />
+                                </span>
+                              )}
                               <span
                                 role="button"
                                 onClick={(e) => {
@@ -1000,6 +1075,30 @@ export default function ChatPage() {
                       const tab = openTabs.get(activeTabPath)!;
                       return (
                         <div key={activeTabPath} className="bg-white min-h-24">
+                          {tab.stale && !tab.loading && (
+                            <div className="px-3 py-1.5 text-xs bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                              <span>This file was modified externally.</span>
+                              <button
+                                onClick={() => reloadStaleTab(activeTabPath)}
+                                className="ml-auto underline hover:no-underline"
+                              >
+                                Reload
+                              </button>
+                              <button
+                                onClick={() => setOpenTabs((prev) => {
+                                  const t = prev.get(activeTabPath);
+                                  if (!t) return prev;
+                                  const next = new Map(prev);
+                                  next.set(activeTabPath, { ...t, stale: false });
+                                  return next;
+                                })}
+                                className="underline hover:no-underline"
+                              >
+                                Keep local
+                              </button>
+                            </div>
+                          )}
                           {tab.loading ? (
                             <div className="p-3 flex items-center gap-2 text-muted-foreground">
                               <Loader2 className="h-4 w-4 animate-spin" />

@@ -4,6 +4,7 @@ import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import { ChatLambda } from "../lambdas/chat-lambda";
 
 export interface ChatStackProps extends cdk.StackProps {
@@ -59,6 +60,37 @@ export class ChatStack extends cdk.Stack {
       pointInTimeRecovery: true,
     });
 
+    // --- VFS DDB table ---------------------------------------------------
+    // PK = workspace#<wsId>, SK = file#<path>
+    const vfsTable = new dynamodb.Table(this, "VfsTable", {
+      tableName: `${id}-vfs`,
+      partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "SK", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      pointInTimeRecovery: true,
+    });
+
+    // --- VFS S3 bucket ---------------------------------------------------
+    const vfsBucket = new s3.Bucket(this, "VfsBucket", {
+      bucketName: `${id}-vfs`,
+      versioned: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      lifecycleRules: [
+        {
+          noncurrentVersionTransitions: [
+            {
+              storageClass: s3.StorageClass.INFREQUENT_ACCESS,
+              transitionAfter: cdk.Duration.days(30),
+            },
+          ],
+          noncurrentVersionExpiration: cdk.Duration.days(365),
+        },
+      ],
+    });
+
     // --- Lambda + Function URL -------------------------------------------
     const chat = new ChatLambda(this, "ChatLambda", {
       cognitoUserPoolId: props.cognitoUserPoolId,
@@ -69,6 +101,10 @@ export class ChatStack extends cdk.Stack {
       membershipsTableArn: props.membershipsTableArn,
       userSessionsTableName: userSessionsTable.tableName,
       userSessionsTableArn: userSessionsTable.tableArn,
+      vfsTableName: vfsTable.tableName,
+      vfsTableArn: vfsTable.tableArn,
+      vfsBucketName: vfsBucket.bucketName,
+      vfsBucketArn: vfsBucket.bucketArn,
       openRouterSecretArn: props.openRouterSecretArn,
       gatewayBaseUrl: props.gatewayBaseUrl,
       corsOrigins: props.corsOrigins,
