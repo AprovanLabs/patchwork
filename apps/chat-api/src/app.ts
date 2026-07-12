@@ -5,10 +5,8 @@ import { workspaceMiddleware } from "./middleware/workspace.js";
 import { chatRoute } from "./routes/chat.js";
 import { editRoute } from "./routes/edit.js";
 import { health } from "./routes/health.js";
-import { proxy } from "./routes/proxy.js";
 import { vfsRoute } from "./routes/vfs.js";
 import { workspaceRoute } from "./routes/workspace.js";
-import { services } from "./routes/services.js";
 import { workspacesRoute } from "./routes/workspaces.js";
 import type { AppVariables } from "./types.js";
 
@@ -37,8 +35,6 @@ export function createChatApp() {
   api.use("/*", authMiddleware, workspaceMiddleware, planMiddleware);
   api.route("/chat", chatRoute);
   api.route("/edit", editRoute);
-  api.route("/services", services);
-  api.route("/proxy", proxy);
   api.route("/workspaces", workspacesRoute);
   app.route("/api", api);
 
