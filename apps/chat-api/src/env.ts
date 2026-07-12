@@ -14,6 +14,10 @@ const envSchema = z.object({
   OPENROUTER_SECRET_ARN: z.string().min(1),
   GATEWAY_URL: z.string().url(),
 
+  // VFS backing store (optional — routes degrade gracefully when unset)
+  VFS_TABLE_NAME: z.string().optional(),
+  VFS_BUCKET_NAME: z.string().optional(),
+
   // PostHog prompt management (optional — falls back to code prompts when absent)
   POSTHOG_PROJECT_API_KEY: z.string().optional(),
   POSTHOG_PERSONAL_API_KEY: z.string().optional(),
