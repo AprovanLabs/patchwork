@@ -14,6 +14,21 @@
 
 Platform for building generative UI experiences
 
+## Architecture
+
+- `@aprovan/patchwork-main` is the MCP-only runtime client.
+- `@aprovan/patchwork-mcp` publishes Patchwork widgets as MCP Apps and forwards
+  toolbox calls to the configured Streamable HTTP MCP endpoint.
+- `@aprovan/patchwork-web` is the static `/chat/` browser shell. It calls the
+  gateway directly and stores workspace files in OPFS.
+- Compiler, editor, image, and Bobbin packages remain framework-neutral.
+
+Local development requires only the web shell and a gateway:
+
+```bash
+GATEWAY_URL=http://localhost:4000 pnpm --filter @aprovan/patchwork-web dev
+```
+
 ## Cicadas
 
 Install Cicadas

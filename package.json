@@ -1,5 +1,6 @@
 {
-  "name": "@aprovan/patchwork",
+  "name": "@aprovan/patchwork-workspace",
+  "private": true,
   "version": "0.1.1",
   "description": "Platform for building generative UI experiences",
   "type": "module",

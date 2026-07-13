@@ -1,12 +1,12 @@
 {
-  "name": "@aprovan/mcp-app-server",
+  "name": "@aprovan/patchwork-mcp",
   "version": "0.1.0",
   "description": "MCP App Server — hosts MCP tools that render interactive UIs in Claude Desktop and Claude web.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "mcp-app-server": "./dist/server.js"
+    "patchwork-mcp": "./dist/server.js"
   },
   "exports": {
     ".": {
@@ -27,6 +27,7 @@
     "artifacts:export": "tsx src/scripts/export-artifacts.ts"
   },
   "dependencies": {
+    "@aprovan/patchwork-main": "workspace:*",
     "@aprovan/patchwork-compiler": "workspace:*",
     "@aprovan/patchwork-image-shadcn": "workspace:*",
     "@modelcontextprotocol/ext-apps": "^1.7.3",
@@ -47,5 +48,8 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

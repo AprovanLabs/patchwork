@@ -1,5 +1,5 @@
 {
-  "name": "@aprovan/patchwork",
+  "name": "@aprovan/patchwork-main",
   "version": "0.1.0",
   "description": "Patchwork, a platform for building LLM-powered applications with pluggable UI components and a flexible compiler.",
   "type": "module",
@@ -21,7 +21,13 @@
     "tsup": "^8.3.5",
     "typescript": "^5.7.3"
   },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

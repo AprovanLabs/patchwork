@@ -1,6 +1,18 @@
 import { ChevronDown, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+const gatewayBase = (
+  (import.meta.env["VITE_MCP_URL"] as string | undefined) ||
+  (import.meta.env.DEV
+    ? "/gateway/mcp"
+    : "https://aprovan.com/api/gateway/mcp")
+).replace(/\/mcp\/?$/, "");
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("patchwork:authToken");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export interface Workspace {
   workspaceId: string;
   name: string;
@@ -24,10 +36,20 @@ export default function WorkspaceSwitcher({ onLoad, onSwitch }: WorkspaceSwitche
   onLoadRef.current = onLoad;
 
   useEffect(() => {
-    void fetch("/api/workspaces")
+    void fetch(`${gatewayBase}/session`, { headers: authHeaders() })
       .then((r) => r.json())
-      .then((data: { workspaces: Workspace[]; activeWorkspaceId: string | null }) => {
-        setWorkspaces(data.workspaces ?? []);
+      .then((data: {
+        workspaces: Array<{ id: string; name: string; role: string }>;
+        activeWorkspaceId: string | null;
+      }) => {
+        setWorkspaces(
+          (data.workspaces ?? []).map((workspace) => ({
+            workspaceId: workspace.id,
+            name: workspace.name,
+            plan: workspace.role,
+            active: workspace.id === data.activeWorkspaceId,
+          })),
+        );
         setActiveId(data.activeWorkspaceId);
         onLoadRef.current?.(data.activeWorkspaceId);
       })
@@ -52,9 +74,9 @@ export default function WorkspaceSwitcher({ onLoad, onSwitch }: WorkspaceSwitche
     setOpen(false);
     setSwitching(true);
     try {
-      await fetch("/api/workspaces/active", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+      await fetch(`${gatewayBase}/session/workspace`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ workspaceId }),
       });
       setActiveId(workspaceId);

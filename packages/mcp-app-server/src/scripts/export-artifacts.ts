@@ -1,11 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Manifest, VirtualFile } from "@aprovan/patchwork-compiler";
 import {
   REFERENCE_WIDGET_FILES,
   REFERENCE_WIDGET_MANIFEST,
 } from "../reference-widgets/live-dashboard.js";
+import type { Manifest, VirtualFile } from "@aprovan/patchwork-compiler";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ARTIFACTS_DIR = resolve(__dirname, "../../../../.artifacts/widgets");

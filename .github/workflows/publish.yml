@@ -32,15 +32,14 @@ jobs:
         run: pnpm install
 
       - name: Build packages
-        run: pnpx turbo run build
+        run: pnpm --filter @aprovan/patchwork-main --filter @aprovan/patchwork-mcp build
 
       - name: Append dev SHA to versions
         run: |
           SHORT_SHA=$(git rev-parse --short=7 HEAD)
-          pnpm -r exec -- sh -c 'npm pkg set version="$(npm pkg get version | tr -d \")-dev.'"$SHORT_SHA"'"'
+          pnpm --filter @aprovan/patchwork-main --filter @aprovan/patchwork-mcp exec -- sh -c 'npm pkg set version="$(npm pkg get version | tr -d \")-dev.'"$SHORT_SHA"'"'
 
       - name: Publish packages
-        run: pnpm -r publish --no-git-checks --access public --tag dev
+        run: pnpm --filter @aprovan/patchwork-main --filter @aprovan/patchwork-mcp publish --no-git-checks --access public --tag dev
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        continue-on-error: true

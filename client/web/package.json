@@ -3,9 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx scripts/start-dev.ts",
-    "dev:client": "vite",
-    "dev:server": "pnpm --filter @aprovan/chat-backend dev",
+    "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
@@ -13,6 +11,10 @@
     "dotenv": "^16.1.4",
     "@ai-sdk/react": "^3.0.69",
     "@aprovan/devtools": "^0.1.0",
+    "@aprovan/patchwork-main": "workspace:*",
+    "@aprovan/registry-main": "0.1.0-dev.7343775",
+    "@aprovan/registry-ui": "0.1.0-dev.7343775",
+    "@aprovan/ui": "^0.1.0",
     "@aprovan/bobbin": "workspace:*",
     "@aprovan/patchwork-compiler": "workspace:*",
     "@aprovan/patchwork-editor": "workspace:*",
@@ -46,7 +48,8 @@
     "autoprefixer": "^10.4.24",
     "concurrently": "^9.2.1",
     "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.19",
+    "tailwindcss": "^4.2.2",
+    "@tailwindcss/vite": "^4.2.2",
     "tsx": "^4.19.0",
     "typescript": "^5.9.3",
     "vite": "^6.4.1"

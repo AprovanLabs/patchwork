@@ -345,10 +345,12 @@ function TextPartWithSession({
   );
 }
 
-// Gateway base URL for direct browser-to-gateway calls.
-// In production, VITE_GATEWAY_URL is injected at build time via the platform CDK stack.
-// In dev, requests go through the Vite dev server proxy at /gateway (→ GATEWAY_URL).
-const GATEWAY_BASE = (import.meta.env["VITE_GATEWAY_URL"] as string | undefined) || (import.meta.env.DEV ? "/gateway" : "");
+const MCP_URL =
+  (import.meta.env["VITE_MCP_URL"] as string | undefined) ||
+  (import.meta.env.DEV
+    ? "/gateway/mcp"
+    : "https://aprovan.com/api/gateway/mcp");
+const GATEWAY_BASE = MCP_URL.replace(/\/mcp\/?$/, "");
 
 // The compiler calls POST ${PROXY_URL}/:provider/:operation for widget tool calls.
 // Map to the gateway's /tools/:provider/:operation path.
@@ -861,10 +863,21 @@ export default function ChatPage() {
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
-        body: () => ({
-          prompt: {
-            id: "chat-patchwork-widget",
-            vars: { compilers: [IMAGE_SPEC] },
+        api: `${GATEWAY_BASE}/tools/openai/chat.completions.create`,
+        headers: (): Record<string, string> => {
+          const token = getAuthToken();
+          return token ? { Authorization: `Bearer ${token}` } : {};
+        },
+        prepareSendMessagesRequest: ({ messages }) => ({
+          body: {
+            args: {
+              messages,
+              stream: true,
+              prompt: {
+                id: "chat-patchwork-widget",
+                vars: { compilers: [IMAGE_SPEC] },
+              },
+            },
           },
         }),
       }),

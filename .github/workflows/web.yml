@@ -1,0 +1,51 @@
+name: Web
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: pnpm --filter @aprovan/patchwork-web build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: patchwork-web
+          path: client/web/dist
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: patchwork-web
+          path: dist
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: aws s3 sync dist "s3://${PATCHWORK_WEB_BUCKET}" --delete
+        env:
+          PATCHWORK_WEB_BUCKET: ${{ vars.PATCHWORK_WEB_BUCKET }}
+      - run: aws cloudfront create-invalidation --distribution-id "$PATCHWORK_DISTRIBUTION_ID" --paths '/chat/*'
+        env:
+          PATCHWORK_DISTRIBUTION_ID: ${{ vars.PATCHWORK_DISTRIBUTION_ID }}

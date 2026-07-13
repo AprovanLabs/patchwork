@@ -1,5 +1,5 @@
-import { join, resolve } from "node:path";
 import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { LocalFileBackend } from "./local-backend.js";
 import type { FSProvider, StoredWidget, StoredWidgetInfo, WidgetStoreOptions } from "./types.js";
 import type { Manifest, VirtualFile } from "@aprovan/patchwork-compiler";

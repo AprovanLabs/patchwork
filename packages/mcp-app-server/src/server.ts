@@ -3,17 +3,17 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import express from "express";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import cors from "cors";
+import express from "express";
 import { registerSession, unregisterSession } from "./live-update.js";
 import { log, error } from "./logger.js";
 import { createRegistryBackend, type RegistryBackend } from "./registry-backend.js";
-import { createMcpAppServer, type McpAppServerOptions } from "./index.js";
-import { getWidgetStore } from "./widget-store/index.js";
 import { startTunnel, stopTunnel } from "./tunnel.js";
+import { getWidgetStore } from "./widget-store/index.js";
+import { createMcpAppServer, type McpAppServerOptions } from "./index.js";
 import type { Request, Response } from "express";
 
 const PORT = Number(process.env["PORT"] ?? 3000);
@@ -113,29 +113,30 @@ async function setupRegistryBackend(): Promise<{
   registryBackend: RegistryBackend | null;
   serverOptions: McpAppServerOptions;
 }> {
-  const REGISTRY_PROVIDERS = process.env["REGISTRY_PROVIDERS"];
+  const toolboxUrl = process.env["TOOLBOX_MCP_URL"];
 
-  if (!REGISTRY_PROVIDERS) {
+  if (!toolboxUrl) {
     return { registryBackend: null, serverOptions: {} };
   }
 
-  const command = process.env["REGISTRY_COMMAND"] ?? "npx";
-  const extraArgs = process.env["REGISTRY_ARGS"]?.split(" ").filter(Boolean) ?? [];
-  const args = ["@utdk/mcp", ...extraArgs];
-
-  log("mcp-app-server", `Connecting to Registry MCP server (providers: ${REGISTRY_PROVIDERS})...`);
+  log("patchwork-mcp", `Connecting to toolbox at ${toolboxUrl}`);
 
   try {
     const registryBackend = await createRegistryBackend({
-      command,
-      args,
-      providers: REGISTRY_PROVIDERS,
+      name: "toolbox",
+      url: toolboxUrl,
+      headers: process.env["APROVAN_WORKSPACE_ID"]
+        ? { "X-Aprovan-Workspace": process.env["APROVAN_WORKSPACE_ID"] }
+        : undefined,
+      auth: process.env["TOOLBOX_TOKEN"]
+        ? { type: "bearer", token: process.env["TOOLBOX_TOKEN"] }
+        : { type: "none" },
     });
 
     const toolInfos = registryBackend.getToolInfos();
     const namespaces = [...new Set(toolInfos.map((t) => t.namespace))];
     log(
-      "mcp-app-server",
+      "patchwork-mcp",
       `Registry ready: ${toolInfos.length} tools across namespaces: ${namespaces.join(", ")}`
     );
 
@@ -149,8 +150,8 @@ async function setupRegistryBackend(): Promise<{
       },
     };
   } catch (err) {
-    error("mcp-app-server", "Failed to connect to Registry MCP server:", err);
-    error("mcp-app-server", "Starting without Registry service backend.");
+    error("patchwork-mcp", "Failed to connect to toolbox:", err);
+    error("patchwork-mcp", "Starting without toolbox services.");
     return { registryBackend: null, serverOptions: {} };
   }
 }
