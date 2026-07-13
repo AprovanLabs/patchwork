@@ -27,7 +27,7 @@
     "artifacts:export": "tsx src/scripts/export-artifacts.ts"
   },
   "dependencies": {
-    "@aprovan/patchwork-main": "workspace:*",
+    "@aprovan/patchwork": "workspace:*",
     "@aprovan/patchwork-compiler": "workspace:*",
     "@aprovan/patchwork-image-shadcn": "workspace:*",
     "@modelcontextprotocol/ext-apps": "^1.7.3",

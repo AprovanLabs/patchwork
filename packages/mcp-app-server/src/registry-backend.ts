@@ -2,7 +2,7 @@ import {
   PatchworkMcpClient,
   type McpServerConfig,
   type PatchworkTool,
-} from "@aprovan/patchwork-main";
+} from "@aprovan/patchwork";
 import type { ServiceBackend, ServiceToolInfo } from "./services.js";
 
 export type RegistryBackendOptions = Omit<McpServerConfig, "mode">;

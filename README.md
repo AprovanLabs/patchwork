@@ -16,7 +16,7 @@ Platform for building generative UI experiences
 
 ## Architecture
 
-- `@aprovan/patchwork-main` is the MCP-only runtime client.
+- `@aprovan/patchwork` is the MCP-only runtime client.
 - `@aprovan/patchwork-mcp` publishes Patchwork widgets as MCP Apps and forwards
   toolbox calls to the configured Streamable HTTP MCP endpoint.
 - `@aprovan/patchwork-web` is the static `/chat/` browser shell. It calls the

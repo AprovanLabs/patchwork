@@ -31,7 +31,7 @@ export class PatchworkMcpClient {
       headers.set("Authorization", `Bearer ${this.config.auth.token}`);
     }
     this.client = new Client(
-      { name: "@aprovan/patchwork-main", version: "0.1.0" },
+      { name: "@aprovan/patchwork", version: "0.1.0" },
       { capabilities: {} },
     );
     await this.client.connect(

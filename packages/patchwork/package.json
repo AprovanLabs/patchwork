@@ -1,5 +1,5 @@
 {
-  "name": "@aprovan/patchwork-main",
+  "name": "@aprovan/patchwork",
   "version": "0.1.0",
   "description": "Patchwork, a platform for building LLM-powered applications with pluggable UI components and a flexible compiler.",
   "type": "module",

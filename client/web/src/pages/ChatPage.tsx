@@ -863,7 +863,7 @@ export default function ChatPage() {
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
-        api: `${GATEWAY_BASE}/tools/openai/chat.completions.create`,
+        api: `${GATEWAY_BASE}/tools/openai/createChatCompletion`,
         headers: (): Record<string, string> => {
           const token = getAuthToken();
           return token ? { Authorization: `Bearer ${token}` } : {};
