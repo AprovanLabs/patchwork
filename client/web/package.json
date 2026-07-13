@@ -14,7 +14,7 @@
     "@aprovan/patchwork": "workspace:*",
     "@aprovan/registry-main": "0.1.0-dev.7343775",
     "@aprovan/registry-ui": "0.1.0-dev.7343775",
-    "@aprovan/ui": "^0.1.0",
+    "@aprovan/ui": "@aprovan/ui",
     "@aprovan/bobbin": "workspace:*",
     "@aprovan/patchwork-compiler": "workspace:*",
     "@aprovan/patchwork-editor": "workspace:*",
@@ -40,6 +40,7 @@
     "tiptap-markdown": "^0.9.0"
   },
   "devDependencies": {
+    "@aprovan/node": "@aprovan/node",
     "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^22.19.7",
     "@types/react": "^18.3.27",
