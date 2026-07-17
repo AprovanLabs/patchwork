@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @import "@aprovan/ui/theme.css";
 
+/* Tailwind does not scan node_modules by default, but the prebuilt @aprovan
+   packages ship components as class-name-bearing JS — without these sources
+   their utilities (size-8, bg-popover, …) are never generated, which is how
+   the workspace switcher ended up unsized with a transparent dropdown. */
+@source "../node_modules/@aprovan/ui/dist";
+@source "../node_modules/@aprovan/registry-ui/dist";
+
+/* `dark:` utilities follow the `.dark` root class (synced with the OS scheme
+   in index.html) so they agree with the theme tokens, which are class-driven.
+   Tailwind's default media-query variant would let the two drift. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   * {
     @apply border-border;

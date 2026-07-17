@@ -304,7 +304,7 @@ export function EditModal({
           )}
           <div className="flex-1 overflow-auto" ref={setPillContainer}>
             {fileType.category === 'compilable' && showPreview ? (
-              <div className="bg-white h-full relative" ref={setPreviewContainer}>
+              <div className="bg-card h-full relative" ref={setPreviewContainer}>
                 {previewError && renderError ? (
                   renderError(previewError)
                 ) : previewError ? (

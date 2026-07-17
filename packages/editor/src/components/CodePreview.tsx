@@ -307,7 +307,7 @@ export function CodePreview({
         </div>
 
         {showPreview ? (
-          <div className="bg-white overflow-y-auto overflow-x-hidden max-h-[60vh]">
+          <div className="bg-card overflow-y-auto overflow-x-hidden max-h-[60vh]">
             {previewBody}
           </div>
         ) : (

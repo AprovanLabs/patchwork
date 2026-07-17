@@ -36,7 +36,18 @@ import {
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { UIMessage } from "ai";
-import SessionControls, { CREDENTIALS_URL } from "@/components/SessionControls";
+import {
+  CHAT_PROVIDERS,
+  ProviderModelControls,
+} from "@/components/ProviderPicker";
+import {
+  fetchLlmModels,
+  fetchLlmProviders,
+  loadModelPreference,
+  saveModelPreference,
+  type LlmProviderInfo,
+} from "@/lib/llm";
+import SessionControls from "@/components/SessionControls";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,6 +68,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { getAccessTokenSync } from "@/lib/auth";
 import { GATEWAY_BASE } from "@/lib/gateway";
 import { gatewayFetch } from "@/lib/gateway-fetch";
+import { credentialsUrl } from "@/lib/registry";
 import {
   listWorkspaceEntries,
   listWorkspacePaths,
@@ -163,7 +175,7 @@ function ToolPart({
         <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform [[data-state=open]>&]:rotate-180" />
       </CollapsibleTrigger>
 
-      <CollapsibleContent className="mt-2 p-3 rounded-lg border bg-white space-y-2">
+      <CollapsibleContent className="mt-2 p-3 rounded-lg border bg-card space-y-2">
         {input !== undefined && (
           <div>
             <span className="text-xs font-medium text-muted-foreground">
@@ -352,18 +364,9 @@ function TextPartWithSession({
 // Map to the gateway's /tools/:provider/:operation path.
 const PROXY_URL = GATEWAY_BASE ? `${GATEWAY_BASE}/tools` : "";
 
-/**
- * LLM providers patchwork chat can talk to, via the gateway's
- * `tools/:provider/createChatCompletion` operation. A provider is usable once
- * a credential for it exists in the active workspace (the gateway's GET /tools
- * only lists credentialed providers).
- */
-const CHAT_PROVIDERS = [
-  { id: "openai", label: "OpenAI" },
-  { id: "anthropic", label: "Anthropic" },
-  { id: "google", label: "Gemini" },
-  { id: "synthetic.new", label: "Synthetic.new" },
-] as const;
+// Chat rides the gateway's `tools/:provider/createChatCompletion` operation.
+// A provider is usable once a credential for it exists in the active
+// workspace (the gateway's GET /tools only lists credentialed providers).
 const CHAT_PROVIDER_KEY = "patchwork:chat-provider";
 
 const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn";
@@ -435,6 +438,14 @@ export default function ChatPage() {
   );
   const [chatProvider, setChatProvider] = useState<string>(
     () => localStorage.getItem(CHAT_PROVIDER_KEY) ?? "openai",
+  );
+  const [chatModel, setChatModel] = useState<string>(() =>
+    loadModelPreference(localStorage.getItem(CHAT_PROVIDER_KEY) ?? "openai"),
+  );
+  // Gateway chat provider list (connected state + default models); null while
+  // loading or when the gateway is unreachable (static fallback list).
+  const [llmProviders, setLlmProviders] = useState<LlmProviderInfo[] | null>(
+    null,
   );
   // Providers with a credential in the active workspace; null until the
   // gateway tool list has loaded (unknown → don't block sending).
@@ -590,7 +601,6 @@ export default function ChatPage() {
         const tools = data.tools ?? [];
         const providers = Array.from(new Set(tools.map((t) => t.provider)));
         setNamespaces(providers);
-        setConnectedProviders(providers);
         if (import.meta.env.DEV) {
           setServices(
             tools.map((t) => ({
@@ -608,6 +618,16 @@ export default function ChatPage() {
       }
     };
     void fetchGatewayTools();
+
+    // Chat provider list — connected flags drive the provider picker.
+    void fetchLlmProviders().then((providers) => {
+      setLlmProviders(providers);
+      if (providers) {
+        setConnectedProviders(
+          providers.filter((provider) => provider.connected).map((provider) => provider.id),
+        );
+      }
+    });
 
     // Initialize compiler
     createCompiler({
@@ -866,28 +886,32 @@ export default function ChatPage() {
     [compiler, namespaces],
   );
 
-  // Read via ref inside prepareSendMessagesRequest so provider switches apply
-  // to the next send even though useChat holds on to the transport instance.
+  // Read via refs inside prepareSendMessagesRequest so provider/model
+  // switches apply to the next send even though useChat holds on to the
+  // transport instance.
   const chatProviderRef = useRef(chatProvider);
   chatProviderRef.current = chatProvider;
+  const chatModelRef = useRef(chatModel);
+  chatModelRef.current = chatModel;
 
+  // Chat rides the gateway's /llm/:provider/chat — provider aliases resolve
+  // to OpenAI-compatible UTDK modules server-side, and the response is the
+  // AI SDK UI message stream DefaultChatTransport expects.
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
-        api: `${GATEWAY_BASE}/tools/${chatProviderRef.current}/createChatCompletion`,
+        api: `${GATEWAY_BASE}/llm/${chatProviderRef.current}/chat`,
         // gatewayFetch carries the bearer token (X-Aprovan-Authorization) and
         // the CloudFront OAC payload hash (x-amz-content-sha256).
         fetch: gatewayFetch,
         prepareSendMessagesRequest: ({ messages }) => ({
-          api: `${GATEWAY_BASE}/tools/${chatProviderRef.current}/createChatCompletion`,
+          api: `${GATEWAY_BASE}/llm/${chatProviderRef.current}/chat`,
           body: {
-            args: {
-              messages,
-              stream: true,
-              prompt: {
-                id: "chat-patchwork-widget",
-                vars: { compilers: [IMAGE_SPEC] },
-              },
+            messages,
+            ...(chatModelRef.current ? { model: chatModelRef.current } : {}),
+            prompt: {
+              id: "chat-patchwork-widget",
+              vars: { compilers: [IMAGE_SPEC] },
             },
           },
         }),
@@ -905,7 +929,16 @@ export default function ChatPage() {
   const handleProviderChange = useCallback((provider: string) => {
     localStorage.setItem(CHAT_PROVIDER_KEY, provider);
     setChatProvider(provider);
+    setChatModel(loadModelPreference(provider));
   }, []);
+
+  const handleModelChange = useCallback(
+    (model: string) => {
+      saveModelPreference(chatProvider, model);
+      setChatModel(model);
+    },
+    [chatProvider],
+  );
 
   const isLoading = status === "submitted" || status === "streaming";
 
@@ -1110,7 +1143,7 @@ export default function ChatPage() {
                     {!previewCollapsed && activeTabPath && openTabs.has(activeTabPath) && (() => {
                       const tab = openTabs.get(activeTabPath)!;
                       return (
-                        <div key={activeTabPath} className="bg-white min-h-24">
+                        <div key={activeTabPath} className="bg-card min-h-24">
                           {tab.stale && !tab.loading && (
                             <div className="px-3 py-1.5 text-xs bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 flex items-center gap-2 text-orange-700 dark:text-orange-400">
                               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -1208,35 +1241,14 @@ export default function ChatPage() {
             )}
 
             <div className="p-4 border-t space-y-2">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <label htmlFor="chat-provider" className="shrink-0">
-                  LLM provider
-                </label>
-                <select
-                  id="chat-provider"
-                  value={chatProvider}
-                  onChange={(e) => handleProviderChange(e.target.value)}
-                  className="h-7 rounded-md border bg-background px-2 text-xs text-foreground"
-                >
-                  {CHAT_PROVIDERS.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.label}
-                      {connectedProviders !== null &&
-                      !connectedProviders.includes(p.id)
-                        ? " (not connected)"
-                        : ""}
-                    </option>
-                  ))}
-                </select>
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    providerConnected ? "bg-emerald-500" : "bg-amber-500"
-                  }`}
-                  title={
-                    providerConnected
-                      ? `${chatProviderLabel} connected`
-                      : `${chatProviderLabel} not connected`
-                  }
+              <div className="flex items-center">
+                <ProviderModelControls
+                  providers={llmProviders}
+                  active={chatProvider}
+                  onSelectProvider={handleProviderChange}
+                  model={chatModel}
+                  onSelectModel={handleModelChange}
+                  loadModels={fetchLlmModels}
                 />
               </div>
 
@@ -1247,7 +1259,7 @@ export default function ChatPage() {
                     Chat requires an LLM provider credential. {chatProviderLabel}{" "}
                     is not connected to this workspace —{" "}
                     <a
-                      href={CREDENTIALS_URL}
+                      href={credentialsUrl(chatProvider)}
                       target="_blank"
                       rel="noreferrer"
                       className="underline hover:no-underline font-medium"
@@ -1291,7 +1303,9 @@ export default function ChatPage() {
             </div>
           </Card>
 
-          {!editSession && (
+          {/* The edit pill only makes sense while a widget surface is on
+              screen — an open preview tab — never on a bare chat. */}
+          {!editSession && openTabs.size > 0 && !previewCollapsed && (
             <Bobbin
               container={chatContainer}
               pillContainer={chatContainer}

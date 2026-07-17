@@ -13,9 +13,7 @@ import { useGatewaySession } from "@aprovan/ui/gateway";
 import { SessionArea, type SessionAreaStatus } from "@aprovan/ui/shell";
 import { useEffect, useRef, useState } from "react";
 import { gateway } from "../lib/gateway";
-
-/** Registry app page where workspace credentials (integrations) are managed. */
-export const CREDENTIALS_URL = "https://aprovan.com/registry/account/credentials/";
+import { credentialsUrl } from "../lib/registry";
 
 interface SessionControlsProps {
   /** Called once with the server's active workspace id (null if unknown). */
@@ -75,7 +73,7 @@ export default function SessionControls({ onLoad, onSwitch }: SessionControlsPro
         void auth.signIn(`${window.location.pathname}${window.location.search}`)
       }
       onSignOut={() => void auth.signOut()}
-      links={[{ label: "Credentials", href: CREDENTIALS_URL }]}
+      links={[{ label: "Credentials", href: credentialsUrl() }]}
     />
   );
 }

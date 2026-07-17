@@ -9,6 +9,15 @@
       href="https://raw.githubusercontent.com/AprovanLabs/aprovan.com/main/docs/assets/social-labs.png"
     />
     <title>Patchwork</title>
+    <script>
+      // Theme tokens (@aprovan/ui/theme.css) switch on a `.dark` root class;
+      // sync it with the OS scheme before first paint to avoid a flash.
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      const apply = () =>
+        document.documentElement.classList.toggle("dark", media.matches);
+      apply();
+      media.addEventListener("change", apply);
+    </script>
   </head>
   <body class="min-h-screen bg-background font-sans antialiased">
     <div id="root"></div>
