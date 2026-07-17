@@ -17,9 +17,16 @@ function generateMessageId(): string {
 }
 
 /**
- * Create a service proxy that calls the backend via HTTP
+ * Create a service proxy that calls the backend via HTTP.
+ *
+ * `fetchImpl` lets the host app supply an authorizing fetch (e.g. patchwork's
+ * gateway fetch, which attaches the bearer token and CloudFront OAC payload
+ * hash); defaults to the global `fetch`.
  */
-export function createHttpProxy(proxyUrl: string): Proxy {
+export function createHttpProxy(
+  proxyUrl: string,
+  fetchImpl: typeof fetch = fetch,
+): Proxy {
   return {
     async call(
       namespace: string,
@@ -27,7 +34,7 @@ export function createHttpProxy(proxyUrl: string): Proxy {
       args: unknown[],
     ): Promise<unknown> {
       const url = `${proxyUrl}/${namespace}/${procedure}`;
-      const response = await fetch(url, {
+      const response = await fetchImpl(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ args: args[0] ?? {} }),

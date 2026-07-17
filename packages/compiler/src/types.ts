@@ -144,6 +144,12 @@ export interface CompilerOptions {
   image: string;
   /** Backend proxy URL for service calls */
   proxyUrl: string;
+  /**
+   * Fetch implementation for service-proxy calls. Lets the host app attach
+   * auth (e.g. gateway bearer token + CloudFront OAC payload hash).
+   * Defaults to the global `fetch`.
+   */
+  proxyFetch?: typeof fetch;
   /** Base URL for CDN (default: 'https://esm.sh'). Used for loading image packages. */
   cdnBaseUrl?: string;
   /** Base URL for widget imports (default: same as cdnBaseUrl). Used for transforming imports in widget code. */

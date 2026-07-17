@@ -13,8 +13,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
@@ -27,20 +25,17 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex items-center justify-center min-h-screen p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Sign in to Patchwork</CardTitle>
-        </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-8 text-sm text-muted-foreground">
             Sign in with your Aprovan account to connect to the gateway.
           </p>
           <Button
@@ -48,8 +43,8 @@ export default function AuthGate({ children }: { children: ReactNode }) {
               void signIn(`${window.location.pathname}${window.location.search}`)
             }
           >
-            <LogIn className="size-4" />
-            Sign in with Cognito
+            <LogIn className="mr-2 size-4" />
+            Sign in
           </Button>
         </CardContent>
       </Card>

@@ -104,7 +104,7 @@ export async function createCompiler(
   await registry.preload(imageSpec);
 
   // Create service proxy
-  const proxy: Proxy = createHttpProxy(proxyUrl);
+  const proxy: Proxy = createHttpProxy(proxyUrl, options.proxyFetch);
 
   return new PatchworkCompiler(proxy, registry);
 }

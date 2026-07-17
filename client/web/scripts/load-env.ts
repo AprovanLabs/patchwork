@@ -1,4 +1,4 @@
-import { loadAprovanEnv } from "@aprovan/node";
+import { loadAprovanEnv, dotenv } from "@aprovan/node";
 
 const environment = process.env.APROVAN_ENV ?? "prd";
 
@@ -7,6 +7,7 @@ if (environment !== "off" && environment !== "false") {
   process.env.AWS_DEFAULT_REGION ??= process.env.AWS_REGION;
 
   try {
+    dotenv.config();
     await loadAprovanEnv(environment, { overwrite: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -36,6 +36,7 @@ import {
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { UIMessage } from "ai";
+import SessionControls, { CREDENTIALS_URL } from "@/components/SessionControls";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,7 +54,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import WorkspaceSwitcher from "@/components/WorkspaceSwitcher";
+import { getAccessTokenSync } from "@/lib/auth";
+import { GATEWAY_BASE } from "@/lib/gateway";
+import { gatewayFetch } from "@/lib/gateway-fetch";
 import {
   listWorkspaceEntries,
   listWorkspacePaths,
@@ -345,16 +348,23 @@ function TextPartWithSession({
   );
 }
 
-const MCP_URL =
-  (import.meta.env["VITE_MCP_URL"] as string | undefined) ||
-  (import.meta.env.DEV
-    ? "/gateway/mcp"
-    : "https://aprovan.com/api/gateway/mcp");
-const GATEWAY_BASE = MCP_URL.replace(/\/mcp\/?$/, "");
-
 // The compiler calls POST ${PROXY_URL}/:provider/:operation for widget tool calls.
 // Map to the gateway's /tools/:provider/:operation path.
 const PROXY_URL = GATEWAY_BASE ? `${GATEWAY_BASE}/tools` : "";
+
+/**
+ * LLM providers patchwork chat can talk to, via the gateway's
+ * `tools/:provider/createChatCompletion` operation. A provider is usable once
+ * a credential for it exists in the active workspace (the gateway's GET /tools
+ * only lists credentialed providers).
+ */
+const CHAT_PROVIDERS = [
+  { id: "openai", label: "OpenAI" },
+  { id: "anthropic", label: "Anthropic" },
+  { id: "google", label: "Gemini" },
+  { id: "synthetic.new", label: "Synthetic.new" },
+] as const;
+const CHAT_PROVIDER_KEY = "patchwork:chat-provider";
 
 const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn";
 // Local proxy for loading image packages, esm.sh for widget imports
@@ -369,16 +379,6 @@ interface GatewayToolEntry {
   operation: string;
   description?: string;
   inputSchema?: unknown;
-}
-
-// Returns the Cognito access token stored by the platform auth flow at login.
-// Returns null in dev shells that have not wired up auth (calls are skipped).
-function getAuthToken(): string | null {
-  try {
-    return localStorage.getItem("patchwork:authToken");
-  } catch {
-    return null;
-  }
 }
 
 function toProjectRelativePath(projectId: string, path: string): string {
@@ -432,6 +432,14 @@ export default function ChatPage() {
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(
     () => localStorage.getItem(ACTIVE_WORKSPACE_KEY),
+  );
+  const [chatProvider, setChatProvider] = useState<string>(
+    () => localStorage.getItem(CHAT_PROVIDER_KEY) ?? "openai",
+  );
+  // Providers with a credential in the active workspace; null until the
+  // gateway tool list has loaded (unknown → don't block sending).
+  const [connectedProviders, setConnectedProviders] = useState<string[] | null>(
+    null,
   );
   const [chatContainer, setChatContainer] = useState<HTMLDivElement | null>(
     null,
@@ -560,18 +568,15 @@ export default function ChatPage() {
     // Requires the platform auth flow to have stored a Cognito token and an
     // active workspace id. Gracefully skips when either is absent.
     const fetchGatewayTools = async () => {
-      const token = getAuthToken();
+      const token = getAccessTokenSync();
       const wsId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
       if (!token || !wsId || !GATEWAY_BASE) return;
 
       // Register the active workspace with the gateway (idempotent; non-fatal).
       try {
-        await fetch(`${GATEWAY_BASE}/auth/sessions`, {
+        await gatewayFetch(`${GATEWAY_BASE}/auth/sessions`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ workspace_id: wsId }),
         });
       } catch {
@@ -579,13 +584,13 @@ export default function ChatPage() {
       }
 
       try {
-        const res = await fetch(`${GATEWAY_BASE}/tools`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await gatewayFetch(`${GATEWAY_BASE}/tools`);
         if (!res.ok) return;
         const data = (await res.json()) as { tools?: GatewayToolEntry[] };
         const tools = data.tools ?? [];
-        setNamespaces(Array.from(new Set(tools.map((t) => t.provider))));
+        const providers = Array.from(new Set(tools.map((t) => t.provider)));
+        setNamespaces(providers);
+        setConnectedProviders(providers);
         if (import.meta.env.DEV) {
           setServices(
             tools.map((t) => ({
@@ -608,6 +613,7 @@ export default function ChatPage() {
     createCompiler({
       image: IMAGE_SPEC,
       proxyUrl: PROXY_URL,
+      proxyFetch: gatewayFetch,
       cdnBaseUrl: IMAGE_CDN_URL,
       widgetCdnBaseUrl: WIDGET_CDN_URL,
     })
@@ -860,15 +866,20 @@ export default function ChatPage() {
     [compiler, namespaces],
   );
 
+  // Read via ref inside prepareSendMessagesRequest so provider switches apply
+  // to the next send even though useChat holds on to the transport instance.
+  const chatProviderRef = useRef(chatProvider);
+  chatProviderRef.current = chatProvider;
+
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
-        api: `${GATEWAY_BASE}/tools/openai/createChatCompletion`,
-        headers: (): Record<string, string> => {
-          const token = getAuthToken();
-          return token ? { Authorization: `Bearer ${token}` } : {};
-        },
+        api: `${GATEWAY_BASE}/tools/${chatProviderRef.current}/createChatCompletion`,
+        // gatewayFetch carries the bearer token (X-Aprovan-Authorization) and
+        // the CloudFront OAC payload hash (x-amz-content-sha256).
+        fetch: gatewayFetch,
         prepareSendMessagesRequest: ({ messages }) => ({
+          api: `${GATEWAY_BASE}/tools/${chatProviderRef.current}/createChatCompletion`,
           body: {
             args: {
               messages,
@@ -886,16 +897,26 @@ export default function ChatPage() {
 
   const { messages, sendMessage, status, error } = useChat({ transport });
 
+  const providerConnected =
+    connectedProviders === null || connectedProviders.includes(chatProvider);
+  const chatProviderLabel =
+    CHAT_PROVIDERS.find((p) => p.id === chatProvider)?.label ?? chatProvider;
+
+  const handleProviderChange = useCallback((provider: string) => {
+    localStorage.setItem(CHAT_PROVIDER_KEY, provider);
+    setChatProvider(provider);
+  }, []);
+
   const isLoading = status === "submitted" || status === "streaming";
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent) => {
       e?.preventDefault();
-      if (!input.trim()) return;
+      if (!input.trim() || !providerConnected) return;
       sendMessage({ text: input });
       setInput("");
     },
-    [input, sendMessage],
+    [input, sendMessage, providerConnected],
   );
 
   useEffect(() => {
@@ -921,10 +942,6 @@ export default function ChatPage() {
                   className="h-8 w-8 rounded-full"
                 />
                 <span className="text-lg">patchwork</span>
-                <WorkspaceSwitcher
-                  onLoad={handleWorkspaceLoad}
-                  onSwitch={handleWorkspaceSwitch}
-                />
                 <ServicesInspector
                   namespaces={namespaces}
                   services={services}
@@ -942,6 +959,12 @@ export default function ChatPage() {
                     <DialogClose onClose={onClose ?? (() => undefined)} />
                   )}
                 />
+                <div className="ml-auto">
+                  <SessionControls
+                    onLoad={handleWorkspaceLoad}
+                    onSwitch={handleWorkspaceSwitch}
+                  />
+                </div>
               </CardTitle>
             </CardHeader>
 
@@ -1184,13 +1207,64 @@ export default function ChatPage() {
               </div>
             )}
 
-            <div className="p-4 border-t">
+            <div className="p-4 border-t space-y-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <label htmlFor="chat-provider" className="shrink-0">
+                  LLM provider
+                </label>
+                <select
+                  id="chat-provider"
+                  value={chatProvider}
+                  onChange={(e) => handleProviderChange(e.target.value)}
+                  className="h-7 rounded-md border bg-background px-2 text-xs text-foreground"
+                >
+                  {CHAT_PROVIDERS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                      {connectedProviders !== null &&
+                      !connectedProviders.includes(p.id)
+                        ? " (not connected)"
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    providerConnected ? "bg-emerald-500" : "bg-amber-500"
+                  }`}
+                  title={
+                    providerConnected
+                      ? `${chatProviderLabel} connected`
+                      : `${chatProviderLabel} not connected`
+                  }
+                />
+              </div>
+
+              {!providerConnected && (
+                <div className="px-3 py-2 text-xs rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Chat requires an LLM provider credential. {chatProviderLabel}{" "}
+                    is not connected to this workspace —{" "}
+                    <a
+                      href={CREDENTIALS_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline hover:no-underline font-medium"
+                    >
+                      add a credential
+                    </a>{" "}
+                    or switch providers above.
+                  </span>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="flex gap-2 items-end">
                 <MarkdownEditor
                   value={input}
                   onChange={setInput}
                   onSubmit={() => {
-                    if (!isLoading && input.trim()) {
+                    if (!isLoading && input.trim() && providerConnected) {
                       handleSubmit();
                     }
                   }}
@@ -1199,8 +1273,13 @@ export default function ChatPage() {
                 />
                 <Button
                   type="submit"
-                  disabled={isLoading || !input.trim()}
+                  disabled={isLoading || !input.trim() || !providerConnected}
                   className="shrink-0"
+                  title={
+                    providerConnected
+                      ? undefined
+                      : `${chatProviderLabel} is not connected — add a credential first`
+                  }
                 >
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

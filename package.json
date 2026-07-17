@@ -12,7 +12,9 @@
     "lint:fix": "eslint --fix \"**/*.ts?(x)\"",
     "format": "prettier --write .",
     "typecheck": "turbo run typecheck",
-    "clean": "turbo run clean && rm -rf node_modules packages/*/node_modules packages/*/dist"
+    "clean": "turbo run clean && rm -rf node_modules packages/*/node_modules packages/*/dist",
+    "deploy": "scripts/deploy.sh",
+    "deploy:web": "scripts/deploy-web.sh"
   },
   "devDependencies": {
     "@aprovan/eslint-config": "^1.0.0",
