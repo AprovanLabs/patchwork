@@ -85,7 +85,7 @@ function Popover({
     <div className="relative" ref={ref}>
       {trigger}
       {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-1.5 min-w-48 rounded-md border bg-card p-1 shadow-md">
+        <div className="absolute bottom-full left-0 z-50 mb-1.5 min-w-56 rounded-md border bg-card p-1 shadow-md">
           {children}
         </div>
       )}
@@ -185,10 +185,10 @@ export function ProviderModelControls({
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
                 title={`${provider.label} is not connected — set up a credential in the registry`}
               >
-                <ProviderMark className="h-3.5 w-3.5 opacity-60" id={provider.id} />
-                <span className="flex-1 text-left">{provider.label}</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                <span className="flex items-center gap-1 text-[0.65rem] uppercase tracking-wide">
+                <ProviderMark className="h-3.5 w-3.5 shrink-0 opacity-60" id={provider.id} />
+                <span className="flex-1 truncate text-left">{provider.label}</span>
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.65rem] uppercase tracking-wide">
                   add key
                   <ExternalLink className="h-3 w-3" />
                 </span>
@@ -207,10 +207,10 @@ export function ProviderModelControls({
                 isActive ? "text-foreground" : "text-muted-foreground"
               }`}
             >
-              <ProviderMark className="h-3.5 w-3.5" id={provider.id} />
-              <span className="flex-1 text-left">{provider.label}</span>
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              {isActive && <Check className="h-3 w-3" />}
+              <ProviderMark className="h-3.5 w-3.5 shrink-0" id={provider.id} />
+              <span className="flex-1 truncate text-left">{provider.label}</span>
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+              {isActive && <Check className="h-3 w-3 shrink-0" />}
             </button>
           );
         })}
