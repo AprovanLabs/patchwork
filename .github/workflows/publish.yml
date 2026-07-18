@@ -31,8 +31,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      # `...` suffix: also build workspace dependencies (topological order) —
+      # @aprovan/patchwork-mcp needs @aprovan/patchwork-compiler's dist.
       - name: Build packages
-        run: pnpm --filter @aprovan/patchwork --filter @aprovan/patchwork-mcp build
+        run: pnpm --filter "@aprovan/patchwork..." --filter "@aprovan/patchwork-mcp..." build
 
       - name: Append dev SHA to versions
         run: |
