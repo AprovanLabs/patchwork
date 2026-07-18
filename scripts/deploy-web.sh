@@ -48,7 +48,7 @@ if [[ "${SKIP_BUILD:-}" != "1" ]]; then
     APROVAN_ENV="$ENVIRONMENT" \
     AWS_REGION="$AWS_REGION" \
     VITE_MCP_URL="$VITE_MCP_URL" \
-      pnpm --filter @aprovan/patchwork-web build
+      pnpm --filter "@aprovan/patchwork-web..." build
   )
 fi
 

@@ -42,7 +42,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       # No AWS credentials on PRs — build with auth/gateway config disabled.
-      - run: pnpm --filter @aprovan/patchwork-web build
+      - run: pnpm --filter "@aprovan/patchwork-web..." build
         env:
           APROVAN_ENV: off
 
