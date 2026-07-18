@@ -388,7 +388,9 @@ const PROXY_URL = GATEWAY_BASE ? `${GATEWAY_BASE}/tools` : "";
 // workspace (the gateway's GET /tools only lists credentialed providers).
 const CHAT_PROVIDER_KEY = "patchwork:chat-provider";
 
-const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn";
+// Version-pinned: esm.sh caches the unversioned "latest" redirect for hours,
+// so a bare spec can silently serve a stale image after a publish.
+const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn@0.1.1";
 // Local proxy for loading image packages, esm.sh for widget imports
 const IMAGE_CDN_URL = import.meta.env.DEV
   ? "/_local-packages"

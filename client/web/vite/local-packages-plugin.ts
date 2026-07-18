@@ -68,6 +68,10 @@ export function localPackagesPlugin(
             }
           }
 
+          // Version suffixes (`@scope/name@1.2.3`) are CDN addressing —
+          // locally there is only one copy, so strip them.
+          pkgName = pkgName.replace(/(.+)@[^@/]+$/, "$1");
+
           const localPath = resolved[pkgName];
           if (!localPath) return next();
 
