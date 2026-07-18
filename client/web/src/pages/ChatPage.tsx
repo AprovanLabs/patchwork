@@ -3,6 +3,8 @@ import { Bobbin } from '@aprovan/bobbin';
 import { createCompiler, type Compiler , type VirtualProject } from "@aprovan/patchwork-compiler";
 import {
   extractCodeBlocks,
+  parseUsesAttribute,
+  resolvePatchesInText,
   CodePreview,
   WidgetPreview,
   MarkdownEditor,
@@ -337,13 +339,30 @@ function TextPartWithSession({
   return (
     <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:my-2 prose-code:before:content-none prose-code:after:content-none">
       {parts.map((part, index) => {
+        // Patch fences that could not be applied (or are still streaming)
+        // render as plain diffs, never as compilable widget source.
+        if (
+          part.type === "code" &&
+          (part.language === "patch" || part.language === "diff")
+        ) {
+          return (
+            <Markdown key={index} remarkPlugins={[remarkGfm]}>
+              {`\`\`\`diff\n${part.content}\`\`\``}
+            </Markdown>
+          );
+        }
         if (part.type === "code") {
+          // Widgets declare their SDK namespaces in the fence `uses`
+          // attribute; undeclared widgets fall back to every namespace.
+          const declared = parseUsesAttribute(part.attributes?.uses);
           return (
             <CodePreview
               key={index}
               code={part.content}
               compiler={compiler}
-              services={services}
+              services={
+                declared.length > 0 ? declared.map((d) => d.namespace) : services
+              }
               filePath={part.attributes?.path}
               entrypoint="main.tsx"
               onOpenEditSession={open ?? undefined}
@@ -629,7 +648,9 @@ export default function ChatPage() {
       }
     });
 
-    // Initialize compiler
+    // Initialize compiler; the loaded image carries its own runtime prompt
+    // (PROMPT.md via the `patchwork.prompt` manifest field), composed into
+    // the system prompt below.
     createCompiler({
       image: IMAGE_SPEC,
       proxyUrl: PROXY_URL,
@@ -637,7 +658,12 @@ export default function ChatPage() {
       cdnBaseUrl: IMAGE_CDN_URL,
       widgetCdnBaseUrl: WIDGET_CDN_URL,
     })
-      .then(setCompiler)
+      .then((created) => {
+        setCompiler(created);
+        imagePromptsRef.current = [created.getImage(IMAGE_SPEC)]
+          .flatMap((img) => (img?.prompt ? [img.prompt] : []))
+          .join("\n\n");
+      })
       .catch(console.error);
 
     void refreshWorkspace();
@@ -893,6 +919,11 @@ export default function ChatPage() {
   chatProviderRef.current = chatProvider;
   const chatModelRef = useRef(chatModel);
   chatModelRef.current = chatModel;
+  // Prompt composition inputs, read at send time: per-image runtime prompts
+  // (from each image's manifest) and the live namespace list.
+  const imagePromptsRef = useRef("");
+  const namespacesRef = useRef<string[]>([]);
+  namespacesRef.current = namespaces;
 
   // Chat rides the gateway's /llm/:provider/chat — provider aliases resolve
   // to OpenAI-compatible UTDK modules server-side, and the response is the
@@ -909,9 +940,16 @@ export default function ChatPage() {
           body: {
             messages,
             ...(chatModelRef.current ? { model: chatModelRef.current } : {}),
+            // The wrapper prompt is server-managed (PostHog → WFS fallback);
+            // the client only supplies the runtime-derived vars.
             prompt: {
               id: "chat-patchwork-widget",
-              vars: { compilers: [IMAGE_SPEC] },
+              vars: {
+                images:
+                  imagePromptsRef.current ||
+                  `- \`${IMAGE_SPEC}\` (no runtime prompt published)`,
+                namespaces: namespacesRef.current,
+              },
             },
           },
         }),
@@ -920,6 +958,24 @@ export default function ChatPage() {
   );
 
   const { messages, sendMessage, status, error } = useChat({ transport });
+
+  // Fold diff-based widget edits: `patch` fences are applied against the
+  // sources accumulated across the conversation and rewritten into full
+  // files, so rendering (and the editor) never sees a diff.
+  const resolvedMessages = useMemo(() => {
+    const sources = new Map<string, string>();
+    return messages.map((message) => {
+      if (message.role !== "assistant" || !message.parts) return message;
+      return {
+        ...message,
+        parts: message.parts.map((part) =>
+          part.type === "text"
+            ? { ...part, text: resolvePatchesInText(part.text, sources) }
+            : part,
+        ),
+      } as typeof message;
+    });
+  }, [messages]);
 
   const providerConnected =
     connectedProviders === null || connectedProviders.includes(chatProvider);
@@ -1204,7 +1260,7 @@ export default function ChatPage() {
                         <p>Start a conversation</p>
                       </div>
                     ) : (
-                      messages.map((msg) => (
+                      resolvedMessages.map((msg) => (
                         <MessageBubble key={msg.id} message={msg} />
                       ))
                     )}

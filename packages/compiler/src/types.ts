@@ -97,6 +97,17 @@ export interface ImageConfig {
   };
   /** Import path aliases (e.g., { '@/components/ui/*': '@packagedcn/react' }) */
   aliases?: Record<string, string>;
+  /**
+   * Package-relative path to a markdown prompt describing this runtime for
+   * LLMs (allowed imports, styling rules, idioms). Loaded eagerly with the
+   * image and composed into the host's system prompt.
+   */
+  prompt?: string;
+  /**
+   * Named extended docs (skills / DESIGN.md-style), package-relative paths.
+   * Lazy: fetched on demand via `loadImageDoc` for deeper design work.
+   */
+  docs?: Record<string, string>;
 }
 
 /**
@@ -130,6 +141,8 @@ export interface LoadedImage {
   setup?: (root: HTMLElement) => void | Promise<void>;
   /** CSS content (if available) */
   css?: string;
+  /** Resolved runtime prompt (config.prompt file contents), when present. */
+  prompt?: string;
   /**
    * Mount function to handle widget mounting.
    * Each image defines how it expects widgets to export their entry points.
@@ -169,6 +182,9 @@ export interface Compiler {
 
   /** Check if an image is loaded */
   isImageLoaded(spec: string): boolean;
+
+  /** Get a loaded image (manifest config, runtime prompt, …). */
+  getImage(spec: string): LoadedImage | undefined;
 
   /** Compile widget source to ESM */
   compile(

@@ -1,13 +1,15 @@
 {
   "name": "@aprovan/patchwork-image-shadcn",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Patchwork image: ShadCN/ui with Tailwind CSS and Radix UI",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "package.json"
+    "package.json",
+    "PROMPT.md",
+    "DESIGN.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -26,6 +28,10 @@
   },
   "patchwork": {
     "platform": "browser",
+    "prompt": "./PROMPT.md",
+    "docs": {
+      "design": "./DESIGN.md"
+    },
     "dependencies": {
       "react": "^18.0.0",
       "react-dom": "^18.0.0"

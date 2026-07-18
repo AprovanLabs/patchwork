@@ -82,8 +82,10 @@ export {
   createImageRegistry,
   // Loader
   loadImage,
+  loadImageDoc,
   parseImageSpec,
   fetchPackageJson,
+  fetchPackageFile,
 } from "./images/index.js";
 
 // Transforms

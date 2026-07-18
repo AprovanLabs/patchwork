@@ -50,6 +50,40 @@ export async function fetchPackageJson(
 }
 
 /**
+ * Fetch an arbitrary package-relative file from the CDN (e.g. PROMPT.md,
+ * DESIGN.md). Returns undefined when missing — extra docs are optional.
+ */
+export async function fetchPackageFile(
+  packageName: string,
+  relativePath: string,
+  version?: string,
+): Promise<string | undefined> {
+  const cdnBaseUrl = getCdnBaseUrl();
+  const versionSuffix = version ? `@${version}` : "";
+  const cleanPath = relativePath.startsWith("./") ? relativePath.slice(2) : relativePath;
+  try {
+    const response = await fetch(`${cdnBaseUrl}/${packageName}${versionSuffix}/${cleanPath}`);
+    return response.ok ? await response.text() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Lazy-load a named extended doc declared in the image's `docs` manifest
+ * field (skills / DESIGN.md-style). Returns undefined when not declared or
+ * not fetchable.
+ */
+export async function loadImageDoc(
+  image: LoadedImage,
+  name: string,
+): Promise<string | undefined> {
+  const relativePath = image.config.docs?.[name];
+  if (!relativePath) return undefined;
+  return fetchPackageFile(image.name, relativePath, image.version);
+}
+
+/**
  * Try to load an image package from local node_modules
  *
  * Uses dynamic require.resolve to find the package.json,
@@ -106,6 +140,16 @@ async function loadLocalImage(name: string): Promise<LoadedImage | null> {
       }
     }
 
+    // Runtime prompt (optional, package-relative markdown)
+    let prompt: string | undefined;
+    if (config.prompt) {
+      try {
+        prompt = await readFile(join(packageDir, config.prompt), "utf-8");
+      } catch {
+        // Prompt is optional
+      }
+    }
+
     return {
       name: packageJson.name,
       version: packageJson.version,
@@ -113,6 +157,7 @@ async function loadLocalImage(name: string): Promise<LoadedImage | null> {
       dependencies: packageJson.dependencies || {},
       setup,
       mount,
+      prompt,
     };
   } catch {
     // Fall back to other methods
@@ -176,6 +221,11 @@ export async function loadImage(spec: string): Promise<LoadedImage> {
     }
   }
 
+  // Runtime prompt (optional, package-relative markdown)
+  const prompt = config.prompt
+    ? await fetchPackageFile(name, config.prompt, version)
+    : undefined;
+
   return {
     name: packageJson.name,
     version: packageJson.version,
@@ -184,5 +234,6 @@ export async function loadImage(spec: string): Promise<LoadedImage> {
     dependencies: packageJson.dependencies || {},
     setup,
     mount,
+    prompt,
   };
 }

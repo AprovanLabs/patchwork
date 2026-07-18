@@ -54,10 +54,12 @@ export {
   hasCodeBlock,
   getCodeBlockLanguages,
   extractProject,
+  parseUsesAttribute,
   type TextPart,
   type CodePart,
   type ParsedPart,
   type ExtractOptions,
+  type WidgetDependency,
 } from "./lib/code-extractor";
 
 export {
@@ -86,5 +88,7 @@ export {
   saveFile,
   isVFSAvailable,
 } from "./lib/vfs";
+
+export { resolvePatchesInText } from "./lib/patch";
 
 export { cn } from "./lib/utils";

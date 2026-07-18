@@ -138,6 +138,32 @@ export function extractCodeBlocks(
 }
 
 /**
+ * A widget dependency declared in a fence `uses` attribute.
+ * Specs are `namespace[@version]` — the version slot also accepts a
+ * provenance pin (e.g. `github@sha256:…`) for reproducible loads.
+ */
+export interface WidgetDependency {
+  namespace: string;
+  version?: string;
+}
+
+/**
+ * Parse a fence `uses` attribute: space- or comma-separated dependency specs,
+ * e.g. `uses="keyvalue events github@^1"`.
+ */
+export function parseUsesAttribute(uses?: string): WidgetDependency[] {
+  if (!uses) return [];
+  return uses
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map((spec) => {
+      const at = spec.indexOf('@', 1); // skip leading @ of scoped names
+      if (at === -1) return { namespace: spec };
+      return { namespace: spec.slice(0, at), version: spec.slice(at + 1) };
+    });
+}
+
+/**
  * Find the first JSX/TSX block in the text.
  * Returns null if no JSX block is found.
  */

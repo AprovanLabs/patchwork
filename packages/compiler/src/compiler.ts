@@ -12,6 +12,7 @@ import type {
   CompilerOptions,
   CompileOptions,
   CompiledWidget,
+  LoadedImage,
   Manifest,
   MountedWidget,
   MountOptions,
@@ -133,6 +134,13 @@ class PatchworkCompiler implements Compiler {
    */
   isImageLoaded(spec: string): boolean {
     return this.registry.has(spec);
+  }
+
+  /**
+   * Get a loaded image (manifest config, runtime prompt, …)
+   */
+  getImage(spec: string): LoadedImage | undefined {
+    return this.registry.get(spec);
   }
 
   /**

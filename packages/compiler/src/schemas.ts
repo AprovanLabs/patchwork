@@ -58,6 +58,10 @@ export const ImageConfigSchema = z
     esbuild: EsbuildConfigSchema,
     framework: FrameworkConfigSchema,
     aliases: AliasesSchema,
+    // Package-relative markdown prompt describing this runtime for LLMs
+    prompt: z.string().optional(),
+    // Named extended docs (lazy-loaded, skills/DESIGN.md-style)
+    docs: z.record(z.string(), z.string()).optional(),
   })
   .strict();
 
