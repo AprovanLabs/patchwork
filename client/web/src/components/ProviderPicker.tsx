@@ -25,7 +25,7 @@ export interface ChatProvider {
 export const CHAT_PROVIDERS: readonly ChatProvider[] = [
   { id: "openai", label: "OpenAI" },
   { id: "anthropic", label: "Claude" },
-  { id: "google", label: "Gemini" },
+  { id: "gemini", label: "Gemini" },
   { id: "synthetic.new", label: "Synthetic.new" },
 ] as const;
 
@@ -33,7 +33,7 @@ export const CHAT_PROVIDERS: readonly ChatProvider[] = [
 const ICON_SVGS: Record<string, string> = {
   openai: openaiSvg,
   anthropic: claudeSvg,
-  google: geminiSvg,
+  gemini: geminiSvg,
 };
 
 function ProviderMark({ id, className }: { id: string; className?: string }) {
@@ -93,8 +93,8 @@ function Popover({
   );
 }
 
-const triggerClass =
-  "flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
+const pillClass =
+  "flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground";
 
 /** Human-sized model label ("hf:zai-org/GLM-5.2" → "GLM-5.2"). */
 function shortModelName(model: string): string {
@@ -149,20 +149,26 @@ export function ProviderModelControls({
   }, [active, loadModels]);
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-1.5">
       <Popover
         open={providerOpen}
         onClose={() => setProviderOpen(false)}
         trigger={
           <button
             type="button"
-            className={triggerClass}
+            className={pillClass}
             onClick={() => setProviderOpen((open) => !open)}
-            title="Switch LLM provider"
+            title={
+              activeConnected
+                ? `${activeInfo?.label ?? active} — connected`
+                : `${activeInfo?.label ?? active} — no credential`
+            }
           >
             <ProviderMark className="h-3.5 w-3.5" id={active} />
-            <span>{activeInfo?.label ?? active}</span>
-            {!activeConnected && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+            <span className="font-medium">{activeInfo?.label ?? active}</span>
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${activeConnected ? "bg-emerald-500" : "bg-amber-500"}`}
+            />
             <ChevronDown className="h-3 w-3 opacity-60" />
           </button>
         }
@@ -179,10 +185,11 @@ export function ProviderModelControls({
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
                 title={`${provider.label} is not connected — set up a credential in the registry`}
               >
-                <ProviderMark className="h-3.5 w-3.5" id={provider.id} />
+                <ProviderMark className="h-3.5 w-3.5 opacity-60" id={provider.id} />
                 <span className="flex-1 text-left">{provider.label}</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                 <span className="flex items-center gap-1 text-[0.65rem] uppercase tracking-wide">
-                  set up
+                  add key
                   <ExternalLink className="h-3 w-3" />
                 </span>
               </a>
@@ -216,7 +223,7 @@ export function ProviderModelControls({
           trigger={
             <button
               type="button"
-              className={triggerClass}
+              className={pillClass}
               onClick={openModels}
               title={`Model: ${activeModelLabel}`}
             >
