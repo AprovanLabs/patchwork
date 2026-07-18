@@ -136,7 +136,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 .turbo/
-pnpm-lock.yaml
 
 # Hardcopy
 .hardcopy
