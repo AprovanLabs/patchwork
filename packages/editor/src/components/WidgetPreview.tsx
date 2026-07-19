@@ -51,9 +51,15 @@ export function WidgetPreview({
 
         if (cancelled || !containerRef.current) return;
 
+        // Iframe mode keeps the widget's runtime styles (Tailwind Play CDN,
+        // image :root variables, preflight resets) from leaking into the host
+        // page. allow-same-origin is required for the dev-server package proxy
+        // (/_local-packages) and is not a security regression: these widgets
+        // previously mounted fully embedded in the host DOM.
         const mounted = await compiler.mount(widget, {
           target: containerRef.current,
-          mode: 'embedded',
+          mode: 'iframe',
+          sandbox: ['allow-scripts', 'allow-same-origin'],
         });
 
         mountedRef.current = mounted;

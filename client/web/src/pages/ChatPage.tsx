@@ -408,7 +408,7 @@ const CHAT_PROVIDER_KEY = "patchwork:chat-provider";
 
 // Version-pinned: esm.sh caches the unversioned "latest" redirect for hours,
 // so a bare spec can silently serve a stale image after a publish.
-const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn@0.1.1";
+const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn@0.1.2";
 // Local proxy for loading image packages, esm.sh for widget imports
 const IMAGE_CDN_URL = import.meta.env.DEV
   ? "/_local-packages"

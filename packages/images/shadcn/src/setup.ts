@@ -190,11 +190,10 @@ function injectTailwindPlayCdn(): Promise<void> {
     return Promise.resolve();
   }
 
-  tailwindLoadPromise = new Promise((resolve, reject) => {
-    // First, set up the config object BEFORE loading Tailwind
-    // Tailwind Play CDN reads window.tailwind.config on load
-    window.tailwind = {
-      config: {
+  // Applied after the CDN script loads: the Play CDN replaces `window.tailwind`
+  // with its own module object on boot, so a config assigned beforehand is
+  // silently discarded. Post-load assignment is the documented pattern.
+  const tailwindConfig = {
         // Use class strategy so dark: variants only activate with an explicit
         // .dark ancestor — prevents OS prefers-color-scheme from leaking in.
         // We never add the .dark class when darkMode option is false (default).
@@ -243,16 +242,20 @@ function injectTailwindPlayCdn(): Promise<void> {
             },
           },
         },
-      },
-    };
+  };
 
+  tailwindLoadPromise = new Promise((resolve, reject) => {
     // Load Tailwind Play CDN
     const script = document.createElement("script");
     script.id = "patchwork-tailwind-cdn";
     script.src = "https://cdn.tailwindcss.com";
 
-    // Wait for script to load before resolving
     script.onload = () => {
+      // The CDN's boot pass has already run against an unconfigured page;
+      // assigning the config here triggers a regeneration with our theme.
+      if (window.tailwind) {
+        window.tailwind.config = tailwindConfig;
+      }
       resolve();
     };
     script.onerror = () => {

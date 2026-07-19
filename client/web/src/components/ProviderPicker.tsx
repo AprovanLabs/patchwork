@@ -36,13 +36,15 @@ const ICON_SVGS: Record<string, string> = {
   gemini: geminiSvg,
 };
 
-function ProviderMark({ id, className }: { id: string; className?: string }) {
+function ProviderMark({ id, className = "h-4 w-4" }: { id: string; className?: string }) {
   const svg = ICON_SVGS[id];
   if (!svg) {
     // Providers without a brand mark (e.g. synthetic.new) get a monogram.
+    // Glyph styling is fixed (not part of the size className) so the box
+    // never stretches with the letter.
     return (
       <span
-        className={`inline-flex items-center justify-center rounded-sm bg-foreground/80 font-semibold text-background ${className ?? "h-4 w-4 text-[0.6rem]"}`}
+        className={`inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-sm bg-foreground/80 text-[0.6rem] font-semibold leading-none text-background ${className}`}
       >
         {id.charAt(0).toUpperCase()}
       </span>
@@ -51,7 +53,7 @@ function ProviderMark({ id, className }: { id: string; className?: string }) {
   return (
     <span
       aria-hidden
-      className={`inline-flex items-center justify-center [&>svg]:h-full [&>svg]:w-full ${className ?? "h-4 w-4"}`}
+      className={`inline-flex shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full ${className}`}
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );

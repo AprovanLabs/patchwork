@@ -141,7 +141,7 @@ function ProviderMark({
     );
   }
   return (
-    <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-foreground/80 text-[0.6rem] font-semibold text-background">
+    <span className="inline-flex h-4 w-4 shrink-0 select-none items-center justify-center overflow-hidden rounded-sm bg-foreground/80 text-[0.6rem] font-semibold leading-none text-background">
       {provider.charAt(0).toUpperCase()}
     </span>
   );
