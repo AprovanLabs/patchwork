@@ -50,12 +50,13 @@ import {
   saveModelPreference,
   type LlmProviderInfo,
 } from "@/lib/llm";
+import { AppHeader } from "@aprovan/ui/shell";
 import { ServicesMenu } from "@/components/ServicesMenu";
 import SessionControls from "@/components/SessionControls";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -1112,8 +1113,12 @@ export default function ChatPage() {
           ref={setChatContainer}
         >
           <Card className="flex-1 flex flex-col min-h-0 overflow-hidden border max-sm:rounded-none max-sm:border-x-0">
-            <CardHeader className="border-b py-3 max-sm:px-3">
-              <CardTitle className="flex items-center gap-2 sm:gap-3">
+            {/* Shared shell header (same AppHeader as the home page and
+                registry) with chat-specific controls in its slots. */}
+            <AppHeader
+              className="static border-b bg-transparent backdrop-blur-none"
+              homeHref="https://aprovan.com/"
+              leading={
                 <button
                   onClick={() => setSidebarOpen((open) => !open)}
                   className="md:hidden p-1.5 -ml-1 rounded hover:bg-muted"
@@ -1121,21 +1126,26 @@ export default function ChatPage() {
                 >
                   <PanelLeft className="h-4 w-4" />
                 </button>
+              }
+              links={[
+                { label: "Home", href: "https://aprovan.com/" },
+                { label: "Registry", href: "https://aprovan.com/registry/" },
+              ]}
+              logo={
                 <img
                   src={APROVAN_LOGO}
                   alt="Aprovan"
-                  className="h-8 w-8 rounded-full max-sm:h-7 max-sm:w-7"
+                  className="h-7 w-7 rounded-full"
                 />
-                <span className="text-lg max-sm:hidden">patchwork</span>
-                <ServicesMenu services={services} />
-                <div className="ml-auto">
-                  <SessionControls
-                    onLoad={handleWorkspaceLoad}
-                    onSwitch={handleWorkspaceSwitch}
-                  />
-                </div>
-              </CardTitle>
-            </CardHeader>
+              }
+              name="patchwork"
+            >
+              <ServicesMenu services={services} />
+              <SessionControls
+                onLoad={handleWorkspaceLoad}
+                onSwitch={handleWorkspaceSwitch}
+              />
+            </AppHeader>
 
             <CardContent className="flex-1 p-0 min-h-0 flex relative">
               {sidebarOpen && (
