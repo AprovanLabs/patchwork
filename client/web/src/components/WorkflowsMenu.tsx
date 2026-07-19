@@ -1,7 +1,9 @@
 /**
  * Header workflows menu: the shared WorkflowsPanel (same component the
  * registry renders) in a dialog, wired to the gateway's `workflows` tool
- * namespace through the chat app's authenticated fetch.
+ * namespace through the chat app's authenticated fetch. Open state can be
+ * controlled by the host so other surfaces (the sidebar explorer) can open
+ * the same panel.
  */
 
 import { Workflow } from "lucide-react";
@@ -14,36 +16,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { GATEWAY_BASE } from "@/lib/gateway";
-import { gatewayFetch } from "@/lib/gateway-fetch";
-
-async function invokeWorkflows(
-  operation: string,
-  args: Record<string, unknown>,
-): Promise<unknown> {
-  const res = await gatewayFetch(`${GATEWAY_BASE}/tools/workflows/${operation}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ args }),
-  });
-  const body = (await res.json()) as { data?: unknown; error?: string };
-  if (!res.ok) throw new Error(body.error ?? `workflows.${operation} failed (${res.status})`);
-  return body.data;
-}
+import { invokeWorkflowsTool } from "@/components/WorkflowsExplorer";
 
 export function WorkflowsMenu({
   onOpenScript,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   onOpenScript?: (path: string) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = onOpenChange ?? setUncontrolledOpen;
 
   const handleOpenScript = useCallback(
     (path: string) => {
       setOpen(false);
       onOpenScript?.(path);
     },
-    [onOpenScript],
+    [onOpenScript, setOpen],
   );
 
   return (
@@ -62,7 +55,7 @@ export function WorkflowsMenu({
           <DialogClose onClose={() => setOpen(false)} />
         </DialogHeader>
         <DialogContent>
-          <WorkflowsPanel invoke={invokeWorkflows} onOpenScript={handleOpenScript} />
+          <WorkflowsPanel invoke={invokeWorkflowsTool} onOpenScript={handleOpenScript} />
         </DialogContent>
       </Dialog>
     </>

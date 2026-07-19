@@ -68,6 +68,7 @@ function generateIframeContent(
   inputs: Record<string, unknown>,
   services: string[],
   baseUrl: string,
+  darkMode: boolean,
 ): string {
   const bridgeScript = generateIframeBridgeScript(services);
 
@@ -112,7 +113,9 @@ function generateIframeContent(
       try {
         const img = await import(/* webpackIgnore: true */ imageModuleUrl);
         if (typeof img?.setup === 'function') {
-          await img.setup(root);
+          // Follow the host page's theme so an embedded widget doesn't
+          // render light-on-dark (or vice versa).
+          await img.setup(root, { darkMode: ${JSON.stringify(darkMode)} });
         }
       } catch (e) {
         console.error('[patchwork-iframe] Failed to run image setup:', e);
@@ -326,7 +329,12 @@ export async function mountIframe(
   // Use window.location.origin as base URL so relative paths like /_local-packages/ resolve correctly
   const services = widget.manifest.services || [];
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-  const content = generateIframeContent(image, inputs, services, baseUrl);
+  // Widgets inherit the host page's theme (`.dark` on <html>, the shadcn
+  // convention every Aprovan app uses) so embedded surfaces match the app.
+  const darkMode =
+    typeof document !== "undefined" &&
+    document.documentElement.classList.contains("dark");
+  const content = generateIframeContent(image, inputs, services, baseUrl, darkMode);
   iframe.srcdoc = content;
 
   // Append to target

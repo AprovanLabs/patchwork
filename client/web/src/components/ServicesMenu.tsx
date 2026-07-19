@@ -21,6 +21,7 @@ import {
   Plus,
   Radio,
   Server,
+  Workflow,
   Wrench,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -54,6 +55,11 @@ const NATIVE_GROUPS: Record<
     label: "Registry",
     blurb: "Look up available SDKs and operations",
     Icon: BookOpen,
+  },
+  workflows: {
+    label: "Workflows",
+    blurb: "Register + run workspace workflows",
+    Icon: Workflow,
   },
 };
 

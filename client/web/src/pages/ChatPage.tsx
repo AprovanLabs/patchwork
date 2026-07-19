@@ -54,6 +54,7 @@ import { AppHeader } from "@aprovan/ui/shell";
 import { ServicesMenu } from "@/components/ServicesMenu";
 import SessionControls from "@/components/SessionControls";
 import { WorkflowFlow, isWorkflowScript } from "@/components/WorkflowFlow";
+import { WorkflowsExplorer } from "@/components/WorkflowsExplorer";
 import { WorkflowsMenu } from "@/components/WorkflowsMenu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -573,6 +574,9 @@ export default function ChatPage() {
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
   // Workspace tree: static column on md+, off-canvas drawer on small screens.
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Shared open state: the header button and the sidebar explorer both open
+  // the same workflows panel dialog.
+  const [workflowsPanelOpen, setWorkflowsPanelOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const tabRequestRefs = useRef<Map<string, number>>(new Map());
   // Deduplicate listWorkspacePaths() calls when multiple files change in the same poll batch.
@@ -1155,7 +1159,11 @@ export default function ChatPage() {
               name="patchwork"
             >
               <ServicesMenu services={services} />
-              <WorkflowsMenu onOpenScript={openWorkspacePreview} />
+              <WorkflowsMenu
+                onOpenScript={openWorkspacePreview}
+                open={workflowsPanelOpen}
+                onOpenChange={setWorkflowsPanelOpen}
+              />
               <SessionControls
                 onLoad={handleWorkspaceLoad}
                 onSwitch={handleWorkspaceSwitch}
@@ -1230,6 +1238,15 @@ export default function ChatPage() {
                     title="Files"
                   />
                 )}
+                <div className="mt-auto">
+                  <WorkflowsExplorer
+                    onOpenScript={(path) => {
+                      setSidebarOpen(false);
+                      openWorkspacePreview(path);
+                    }}
+                    onOpenPanel={() => setWorkflowsPanelOpen(true)}
+                  />
+                </div>
               </div>
               <div className="flex-1 min-h-0 flex flex-col">
                 {openTabs.size > 0 && (

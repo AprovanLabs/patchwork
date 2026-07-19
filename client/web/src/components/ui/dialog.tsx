@@ -20,8 +20,10 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+      {/* Heavier scrim + blur: widget iframes behind the dialog are often
+          bright (their own theme), and a thin tint lets them glow through. */}
       <div
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm"
         onClick={() => onOpenChange(false)}
       />
       <div className="relative z-50 w-full max-w-2xl max-h-[90dvh] sm:max-h-[85vh] overflow-hidden rounded-lg border bg-background shadow-lg">

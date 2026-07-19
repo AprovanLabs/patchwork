@@ -47,6 +47,20 @@ export function createHttpProxy(
       }
 
       const result = await response.json();
+      // Unwrap the gateway's `{ data, meta }` response envelope so widget
+      // code sees the operation's actual result — the same shape scripts get
+      // from the server-side workflow runner. Only the envelope (data + meta
+      // together) is unwrapped; APIs that themselves return a `data` key
+      // pass through intact.
+      if (
+        result &&
+        typeof result === "object" &&
+        "data" in result &&
+        "meta" in result &&
+        Object.keys(result).length === 2
+      ) {
+        return (result as { data: unknown }).data;
+      }
       return result;
     },
   };
