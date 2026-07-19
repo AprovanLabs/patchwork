@@ -231,8 +231,8 @@ export function EditModal({
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-8">
-      <div className="flex flex-col bg-background rounded-lg shadow-xl w-full h-full max-w-6xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 sm:p-8">
+      <div className="flex flex-col bg-background shadow-xl w-full h-full max-w-6xl max-h-[100dvh] sm:max-h-[90vh] overflow-hidden rounded-none sm:rounded-lg">
         <div className="flex items-center gap-2 px-4 py-3 bg-background border-b-2">
           <Pencil className="h-4 w-4 text-primary" />
           {session.isApplying && (
@@ -376,7 +376,7 @@ export function EditModal({
           streamingNotes={session.streamingNotes}
           isStreaming={session.isApplying}
           pendingPrompt={session.pendingPrompt}
-          className="h-48"
+          className="h-36 sm:h-48"
         />
 
         {(session.error || saveError) && (

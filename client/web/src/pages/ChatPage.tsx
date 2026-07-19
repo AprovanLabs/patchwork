@@ -6,9 +6,9 @@ import {
   parseUsesAttribute,
   resolvePatchesInText,
   CodePreview,
+  CodeBlockView,
   WidgetPreview,
   MarkdownEditor,
-  ServicesInspector,
   EditModal,
   FileTree,
   type ServiceInfo,
@@ -22,6 +22,7 @@ import {
   Brain,
   ChevronDown,
   Minus,
+  PanelLeft,
   RefreshCw,
   RotateCcw,
   X,
@@ -49,6 +50,7 @@ import {
   saveModelPreference,
   type LlmProviderInfo,
 } from "@/lib/llm";
+import { ServicesMenu } from "@/components/ServicesMenu";
 import SessionControls from "@/components/SessionControls";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -59,12 +61,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  Dialog,
-  DialogHeader,
-  DialogContent,
-  DialogClose,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getAccessTokenSync } from "@/lib/auth";
@@ -80,6 +76,7 @@ import {
   createSingleWorkspaceFileProject,
   saveWorkspaceProject,
   subscribeToWorkspaceChanges,
+  workspaceWidgetVfs,
   resetStore,
 } from "@/lib/workspace-vfs";
 
@@ -239,7 +236,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
       )}
 
       <div
-        className={`flex flex-col gap-1 max-w-[80%] min-w-0 ${
+        className={`flex flex-col gap-1 max-w-[92%] sm:max-w-[80%] min-w-0 ${
           isUser ? "items-end" : "items-start"
         }`}
       >
@@ -334,7 +331,9 @@ function TextPartWithSession({
     );
   }
 
-  const parts = extractCodeBlocks(text);
+  // includeUnclosed keeps a still-streaming widget fence visible instead of
+  // hiding it until the closing fence arrives.
+  const parts = extractCodeBlocks(text, { includeUnclosed: true });
 
   return (
     <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:my-2 prose-code:before:content-none prose-code:after:content-none">
@@ -349,6 +348,24 @@ function TextPartWithSession({
             <Markdown key={index} remarkPlugins={[remarkGfm]}>
               {`\`\`\`diff\n${part.content}\`\`\``}
             </Markdown>
+          );
+        }
+        // A block whose closing fence hasn't streamed in yet: show the code
+        // arriving live, but don't compile the partial source.
+        if (part.type === "code" && part.unclosed) {
+          return (
+            <div key={index} className="not-prose my-2 border rounded-lg overflow-hidden min-w-0">
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>Generating widget…</span>
+                {part.attributes?.path && (
+                  <span className="font-mono">{part.attributes.path}</span>
+                )}
+              </div>
+              <div className="bg-muted/30 overflow-auto max-h-[40vh]">
+                <CodeBlockView content={part.content} language={part.language} />
+              </div>
+            </div>
           );
         }
         if (part.type === "code") {
@@ -366,6 +383,7 @@ function TextPartWithSession({
               filePath={part.attributes?.path}
               entrypoint="main.tsx"
               onOpenEditSession={open ?? undefined}
+              vfs={workspaceWidgetVfs}
             />
           );
         }
@@ -416,6 +434,48 @@ function toProjectRelativePath(projectId: string, path: string): string {
   return normalizedPath;
 }
 
+/**
+ * Compact per-operation signatures for the system prompt's {{tools}} var —
+ * enough for the model to emit correct single-object calls without pasting
+ * full JSON schemas. Large providers are capped; the registry.search meta
+ * tool covers the tail.
+ */
+const TOOL_PROMPT_CAP_PER_NAMESPACE = 40;
+
+function formatToolSignatures(services: ServiceInfo[]): string {
+  const byNamespace = new Map<string, ServiceInfo[]>();
+  for (const service of services) {
+    const list = byNamespace.get(service.namespace) ?? [];
+    list.push(service);
+    byNamespace.set(service.namespace, list);
+  }
+  const lines: string[] = [];
+  for (const [namespace, tools] of byNamespace) {
+    for (const tool of tools.slice(0, TOOL_PROMPT_CAP_PER_NAMESPACE)) {
+      const schema = tool.parameters as
+        | { properties?: Record<string, unknown>; required?: string[] }
+        | undefined;
+      const required = schema?.required ?? [];
+      const optional = Object.keys(schema?.properties ?? {}).filter(
+        (key) => !required.includes(key),
+      );
+      const params = [...required, ...optional.map((key) => `${key}?`)]
+        .slice(0, 8)
+        .join(", ");
+      const description = tool.description
+        ? ` — ${tool.description.slice(0, 90)}`
+        : "";
+      lines.push(`- ${namespace}.${tool.procedure}({ ${params} })${description}`);
+    }
+    if (tools.length > TOOL_PROMPT_CAP_PER_NAMESPACE) {
+      lines.push(
+        `- …${tools.length - TOOL_PROMPT_CAP_PER_NAMESPACE} more ${namespace} operations — discover with registry.search({ q })`,
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
 const TABS_KEY_PREFIX = 'patchwork:open-tabs';
 const ACTIVE_WORKSPACE_KEY = 'patchwork:active-workspace';
 
@@ -446,6 +506,7 @@ export default function ChatPage() {
     "What's the weather in Houston, Texas like?",
   );
   const [compiler, setCompiler] = useState<Compiler | null>(null);
+  const [compilerError, setCompilerError] = useState<string | null>(null);
   const [namespaces, setNamespaces] = useState<string[]>([]);
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([]);
@@ -495,6 +556,8 @@ export default function ChatPage() {
     return paths[0] ?? null;
   });
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
+  // Workspace tree: static column on md+, off-canvas drawer on small screens.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const tabRequestRefs = useRef<Map<string, number>>(new Map());
   // Deduplicate listWorkspacePaths() calls when multiple files change in the same poll batch.
@@ -622,17 +685,15 @@ export default function ChatPage() {
         const tools = data.tools ?? [];
         const providers = Array.from(new Set(tools.map((t) => t.provider)));
         setNamespaces(providers);
-        if (import.meta.env.DEV) {
-          setServices(
-            tools.map((t) => ({
-              namespace: t.provider,
-              name: t.name,
-              procedure: t.operation,
-              description: t.description ?? "",
-              parameters: t.inputSchema as Record<string, unknown> | undefined,
-            })),
-          );
-        }
+        setServices(
+          tools.map((t) => ({
+            namespace: t.provider,
+            name: t.name,
+            procedure: t.operation,
+            description: t.description ?? "",
+            parameters: t.inputSchema as Record<string, unknown> | undefined,
+          })),
+        );
       } catch {
         setNamespaces([]);
         setServices([]);
@@ -640,13 +701,23 @@ export default function ChatPage() {
     };
     void fetchGatewayTools();
 
-    // Chat provider list — connected flags drive the provider picker.
+    // Chat provider list — connected flags drive the provider picker. When
+    // the stored/default provider has no credential, fall over to the first
+    // connected one instead of blocking the composer.
     void fetchLlmProviders().then((providers) => {
       setLlmProviders(providers);
       if (providers) {
-        setConnectedProviders(
-          providers.filter((provider) => provider.connected).map((provider) => provider.id),
-        );
+        const connected = providers
+          .filter((provider) => provider.connected)
+          .map((provider) => provider.id);
+        setConnectedProviders(connected);
+        setChatProvider((current) => {
+          if (connected.length === 0 || connected.includes(current)) return current;
+          const fallback = connected[0];
+          localStorage.setItem(CHAT_PROVIDER_KEY, fallback);
+          setChatModel(loadModelPreference(fallback));
+          return fallback;
+        });
       }
     });
 
@@ -662,11 +733,19 @@ export default function ChatPage() {
     })
       .then((created) => {
         setCompiler(created);
+        setCompilerError(null);
         imagePromptsRef.current = [created.getImage(IMAGE_SPEC)]
           .flatMap((img) => (img?.prompt ? [img.prompt] : []))
           .join("\n\n");
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        // Without a compiler every widget silently falls back to "Compiler
+        // not initialized" — surface the real cause instead.
+        setCompilerError(
+          err instanceof Error ? err.message : "Failed to load the widget compiler",
+        );
+      });
 
     void refreshWorkspace();
   }, []);
@@ -756,6 +835,7 @@ export default function ChatPage() {
       if (!project) return;
 
       setWorkspaceActivePath(path);
+      setSidebarOpen(false);
       setEditSession({
         project,
         initialTreePath: project.entry,
@@ -769,6 +849,7 @@ export default function ChatPage() {
     setWorkspaceActivePath(path);
     setActiveTabPath(path);
     setPreviewCollapsed(false);
+    setSidebarOpen(false);
 
     // If tab already open, just activate it
     setOpenTabs((prev) => {
@@ -922,10 +1003,13 @@ export default function ChatPage() {
   const chatModelRef = useRef(chatModel);
   chatModelRef.current = chatModel;
   // Prompt composition inputs, read at send time: per-image runtime prompts
-  // (from each image's manifest) and the live namespace list.
+  // (from each image's manifest), the live namespace list, and compact tool
+  // signatures so generated calls match the real SDK contract.
   const imagePromptsRef = useRef("");
   const namespacesRef = useRef<string[]>([]);
   namespacesRef.current = namespaces;
+  const servicesRef = useRef<ServiceInfo[]>([]);
+  servicesRef.current = services;
 
   // Chat rides the gateway's /llm/:provider/chat — provider aliases resolve
   // to OpenAI-compatible UTDK modules server-side, and the response is the
@@ -951,6 +1035,9 @@ export default function ChatPage() {
                   imagePromptsRef.current ||
                   `- \`${IMAGE_SPEC}\` (no runtime prompt published)`,
                 namespaces: namespacesRef.current,
+                tools:
+                  formatToolSignatures(servicesRef.current) ||
+                  "(tool list unavailable — stick to the documented native namespaces)",
               },
             },
           },
@@ -1021,35 +1108,26 @@ export default function ChatPage() {
     <PatchworkCtx.Provider value={patchworkCtx}>
       <SharedEditSessionCtx.Provider value={openSharedEditSession}>
         <div
-          className="flex flex-col h-screen max-w-6xl mx-auto p-4"
+          className="flex flex-col h-dvh max-w-6xl mx-auto p-0 sm:p-4"
           ref={setChatContainer}
         >
-          <Card className="flex-1 flex flex-col min-h-0 overflow-hidden border">
-            <CardHeader className="border-b py-3">
-              <CardTitle className="flex items-center gap-3">
+          <Card className="flex-1 flex flex-col min-h-0 overflow-hidden border max-sm:rounded-none max-sm:border-x-0">
+            <CardHeader className="border-b py-3 max-sm:px-3">
+              <CardTitle className="flex items-center gap-2 sm:gap-3">
+                <button
+                  onClick={() => setSidebarOpen((open) => !open)}
+                  className="md:hidden p-1.5 -ml-1 rounded hover:bg-muted"
+                  title="Toggle workspace files"
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </button>
                 <img
                   src={APROVAN_LOGO}
                   alt="Aprovan"
-                  className="h-8 w-8 rounded-full"
+                  className="h-8 w-8 rounded-full max-sm:h-7 max-sm:w-7"
                 />
-                <span className="text-lg">patchwork</span>
-                <ServicesInspector
-                  namespaces={namespaces}
-                  services={services}
-                  DialogComponent={({ open, onOpenChange, children }) => (
-                    <Dialog
-                      open={open ?? false}
-                      onOpenChange={onOpenChange ?? (() => undefined)}
-                    >
-                      {children}
-                    </Dialog>
-                  )}
-                  DialogHeaderComponent={DialogHeader}
-                  DialogContentComponent={DialogContent}
-                  DialogCloseComponent={({ onClose }) => (
-                    <DialogClose onClose={onClose ?? (() => undefined)} />
-                  )}
-                />
+                <span className="text-lg max-sm:hidden">patchwork</span>
+                <ServicesMenu services={services} />
                 <div className="ml-auto">
                   <SessionControls
                     onLoad={handleWorkspaceLoad}
@@ -1059,8 +1137,18 @@ export default function ChatPage() {
               </CardTitle>
             </CardHeader>
 
-            <CardContent className="flex-1 p-0 min-h-0 flex">
-              <div className="w-64 border-r bg-muted/20 min-h-0 flex flex-col min-w-sm">
+            <CardContent className="flex-1 p-0 min-h-0 flex relative">
+              {sidebarOpen && (
+                <div
+                  className="md:hidden absolute inset-0 z-30 bg-black/40"
+                  onClick={() => setSidebarOpen(false)}
+                />
+              )}
+              <div
+                className={`${
+                  sidebarOpen ? "flex" : "hidden"
+                } md:flex flex-col min-h-0 border-r bg-background md:bg-muted/20 absolute inset-y-0 left-0 z-40 w-72 max-w-[85vw] shadow-lg md:static md:w-72 md:max-w-none md:shadow-none`}
+              >
                 <div className="px-3 py-2 border-b flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <span>Workspace</span>
                   <button
@@ -1243,6 +1331,7 @@ export default function ChatPage() {
                               services={namespaces}
                               filePath={activeTabPath}
                               onOpenEditSession={openSharedEditSession}
+                              vfs={workspaceWidgetVfs}
                             />
                           )}
                         </div>
@@ -1251,7 +1340,7 @@ export default function ChatPage() {
                   </div>
                 )}
                 <ScrollArea className="h-full flex-1" ref={scrollRef}>
-                  <div className="p-4 space-y-4">
+                  <div className="p-3 sm:p-4 space-y-4">
                     {messages.length === 0 ? (
                       <div className="text-center text-muted-foreground py-12">
                         <img
@@ -1298,7 +1387,14 @@ export default function ChatPage() {
               </div>
             )}
 
-            <div className="p-4 border-t space-y-2">
+            {compilerError && (
+              <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Widget previews unavailable — {compilerError}</span>
+              </div>
+            )}
+
+            <div className="p-2.5 sm:p-4 border-t space-y-2">
               <div className="flex items-center">
                 <ProviderModelControls
                   providers={llmProviders}

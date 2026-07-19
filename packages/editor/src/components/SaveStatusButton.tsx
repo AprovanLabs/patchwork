@@ -7,6 +7,8 @@ interface SaveStatusButtonProps {
   onClick: () => void;
   disabled?: boolean;
   tone: 'muted' | 'primary';
+  /** Where the save lands (shown in the tooltip). */
+  target?: string;
 }
 
 function getToneClass(tone: 'muted' | 'primary', status: SaveStatus): string {
@@ -32,13 +34,14 @@ export function SaveStatusButton({
   onClick,
   disabled = false,
   tone,
+  target,
 }: SaveStatusButtonProps) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       className={`px-2 py-1 text-xs rounded flex items-center gap-1 disabled:opacity-50 ${getToneClass(tone, status)}`}
-      title="Save"
+      title={target ? `Save to ${target}` : 'Save'}
     >
       <span className="inline-flex h-3 w-3 items-center justify-center shrink-0">
         {status === 'saving' ? (

@@ -14,6 +14,7 @@ import {
   type VirtualProject,
   type WatchCallback,
 } from "@aprovan/patchwork-compiler";
+import type { WidgetVfs } from "@aprovan/patchwork-editor";
 import { GATEWAY_BASE } from "./gateway";
 import { gatewayFetch } from "./gateway-fetch";
 
@@ -311,3 +312,15 @@ export function subscribeToWorkspaceChanges(
   watchers.add(callback);
   return () => watchers.delete(callback);
 }
+
+/**
+ * Widget storage adapter for `CodePreview`: saves land in the workspace FS
+ * (gateway or OPFS) instead of the editor package's dev-only `/vfs` routes.
+ */
+export const workspaceWidgetVfs: WidgetVfs = {
+  usePaths: async () => true,
+  saveProject: saveWorkspaceProject,
+  readFile,
+  subscribe: (callback) =>
+    subscribeToWorkspaceChanges((event, path) => callback({ path, type: event })),
+};

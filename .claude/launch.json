@@ -4,7 +4,23 @@
     {
       "name": "patchwork-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@aprovan/patchwork-web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@aprovan/patchwork-web",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "patchwork-web-offline",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "APROVAN_ENV=off",
+        "pnpm",
+        "--filter",
+        "@aprovan/patchwork-web",
+        "dev"
+      ],
       "port": 5173
     }
   ]

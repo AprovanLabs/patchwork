@@ -111,6 +111,29 @@ export function subscribeToChanges(
 }
 
 /**
+ * Storage adapter widgets save to / reload from. `CodePreview` talks to the
+ * VFS only through this interface so hosts can supply their own backend
+ * (e.g. the patchwork web app's gateway workspace FS); the default
+ * {@link httpWidgetVfs} keeps the dev-server `/vfs` behavior.
+ */
+export interface WidgetVfs {
+  /** Whether fence `path` attributes map to real VFS paths (dir = project id). */
+  usePaths(): Promise<boolean>;
+  saveProject(project: VirtualProject): Promise<void>;
+  readFile(path: string): Promise<string>;
+  /** Watch for external changes. Returns unsubscribe. */
+  subscribe(callback: (record: { path: string; type: string }) => void): () => void;
+}
+
+/** Default adapter: the dev server's HTTP `/vfs` routes. */
+export const httpWidgetVfs: WidgetVfs = {
+  usePaths: async () => (await getVFSConfig()).usePaths,
+  saveProject,
+  readFile: (path) => loadFile(path),
+  subscribe: (callback) => subscribeToChanges(callback),
+};
+
+/**
  * Check if VFS is available (backend server has /vfs routes enabled).
  */
 export async function isVFSAvailable(): Promise<boolean> {

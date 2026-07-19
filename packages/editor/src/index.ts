@@ -87,6 +87,8 @@ export {
   listProjects,
   saveFile,
   isVFSAvailable,
+  httpWidgetVfs,
+  type WidgetVfs,
 } from "./lib/vfs";
 
 export { resolvePatchesInText } from "./lib/patch";

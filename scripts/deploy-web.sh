@@ -29,17 +29,19 @@ resolve CLOUDFRONT_DISTRIBUTION_ID "$WEB_REGION" \
 
 DIST_DIR="$REPO_ROOT/client/web/dist"
 
-# Pin the gateway MCP URL for the build. load-env.ts also derives this from the
+# Pin the gateway URLs for the build. load-env.ts also derives these from the
 # shared SSM env, but a developer's client/web/.env (loaded first via dotenv)
-# can shadow GATEWAY_URL with a localhost value — an explicit VITE_MCP_URL
-# always wins over both.
-if [[ -z "${VITE_MCP_URL:-}" ]]; then
+# can shadow GATEWAY_URL with a localhost value — explicit VITE_* always wins.
+# MCP lives at the origin's /api/mcp; REST stays at GATEWAY_URL (…/api/gateway).
+if [[ -z "${VITE_MCP_URL:-}" || -z "${VITE_GATEWAY_URL:-}" ]]; then
   GATEWAY_URL="$(shared_env_value GATEWAY_URL)"
   [[ -n "$GATEWAY_URL" ]] ||
-    die "GATEWAY_URL unresolved (checked SSM /aprovan/${ENVIRONMENT}/env). Set VITE_MCP_URL explicitly."
-  VITE_MCP_URL="${GATEWAY_URL%/}/mcp"
+    die "GATEWAY_URL unresolved (checked SSM /aprovan/${ENVIRONMENT}/env). Set VITE_MCP_URL/VITE_GATEWAY_URL explicitly."
+  ORIGIN="$(printf '%s' "$GATEWAY_URL" | sed -E 's#^(https?://[^/]+).*#\1#')"
+  : "${VITE_MCP_URL:=${ORIGIN}/api/mcp}"
+  : "${VITE_GATEWAY_URL:=${GATEWAY_URL%/}}"
 fi
-log "Gateway MCP URL: $VITE_MCP_URL"
+log "Gateway MCP URL: $VITE_MCP_URL (REST: $VITE_GATEWAY_URL)"
 
 if [[ "${SKIP_BUILD:-}" != "1" ]]; then
   log "Building @aprovan/patchwork-web (base /chat, env $ENVIRONMENT)"
@@ -48,6 +50,7 @@ if [[ "${SKIP_BUILD:-}" != "1" ]]; then
     APROVAN_ENV="$ENVIRONMENT" \
     AWS_REGION="$AWS_REGION" \
     VITE_MCP_URL="$VITE_MCP_URL" \
+    VITE_GATEWAY_URL="$VITE_GATEWAY_URL" \
       pnpm --filter "@aprovan/patchwork-web..." build
   )
 fi

@@ -7,7 +7,7 @@ forwards tool calls through that toolbox and reads generated artifacts through
 the toolbox resource API.
 
 ```sh
-TOOLBOX_MCP_URL=https://aprovan.com/api/gateway/mcp \
+TOOLBOX_MCP_URL=https://aprovan.com/api/mcp \
 TOOLBOX_TOKEN=... \
 pnpm --filter @aprovan/patchwork-mcp dev
 ```

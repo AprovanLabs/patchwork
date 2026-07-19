@@ -611,7 +611,7 @@ export function FileTree({
   }, [directoryLoader, reloadToken]);
 
   return (
-    <div className="min-w-48 border-r bg-muted/30 overflow-auto text-foreground">
+    <div className="min-w-36 sm:min-w-48 max-w-[45vw] sm:max-w-none border-r bg-muted/30 overflow-auto text-foreground">
       <div className="p-2 border-b text-xs font-medium text-muted-foreground uppercase tracking-wide">
         {title}
       </div>

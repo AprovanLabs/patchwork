@@ -74,8 +74,8 @@ importers:
         specifier: 0.1.0-dev.7343775
         version: 0.1.0-dev.7343775(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@aprovan/ui':
-        specifier: ^0.2.3
-        version: 0.2.3(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^0.2.4
+        version: 0.2.4(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@lobehub/icons-static-svg':
         specifier: ^1.93.0
         version: 1.93.0
@@ -481,8 +481,8 @@ packages:
     peerDependencies:
       react: '>=18'
 
-  '@aprovan/ui@0.2.3':
-    resolution: {integrity: sha512-yL1Z/Rp7WcwC7MpO0d2RV65LgkI5zCW2nAyX7HzNteji/XBLs7EejwBnE1F/Jox3FWzWj5JEHyN24kuS6m1l6Q==}
+  '@aprovan/ui@0.2.4':
+    resolution: {integrity: sha512-AT/gBENeyCMiqsU0T6TXUs9WgNK+Sl/+f3FjBW3TGxNYhSTmWraI+CNU5sXB3YXFpg7bzaCSCxYCCI5H3yM61Q==}
     peerDependencies:
       react: '>=18'
 
@@ -5805,7 +5805,7 @@ snapshots:
       - '@types/react-dom'
       - react-dom
 
-  '@aprovan/ui@0.2.3(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@aprovan/ui@0.2.4(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       class-variance-authority: 0.7.1
       clsx: 2.1.1

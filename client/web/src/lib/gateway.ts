@@ -13,12 +13,15 @@ import { createGatewayClient } from "@aprovan/ui/gateway";
 import { getAccessTokenSync } from "./auth";
 import type { GatewayClient } from "@aprovan/ui/gateway";
 
-const MCP_URL =
+/** Public MCP endpoint (REST and MCP no longer share a prefix). */
+export const MCP_URL =
   (import.meta.env["VITE_MCP_URL"] as string | undefined) ||
-  (import.meta.env.DEV ? "/gateway/mcp" : "https://aprovan.com/api/gateway/mcp");
+  (import.meta.env.DEV ? "/gateway/mcp" : "https://aprovan.com/api/mcp");
 
-/** Gateway base URL (MCP URL minus the trailing `/mcp`). */
-export const GATEWAY_BASE = MCP_URL.replace(/\/mcp\/?$/, "");
+/** Gateway REST base URL. */
+export const GATEWAY_BASE =
+  (import.meta.env["VITE_GATEWAY_URL"] as string | undefined)?.replace(/\/$/, "") ||
+  (import.meta.env.DEV ? "/gateway" : "https://aprovan.com/api/gateway");
 
 export const gateway: GatewayClient = createGatewayClient({
   baseUrl: GATEWAY_BASE,

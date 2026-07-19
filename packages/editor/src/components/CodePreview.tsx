@@ -1,7 +1,7 @@
 import { createSingleFileProject } from '@aprovan/patchwork-compiler';
 import { Code, Eye, Pencil, RotateCcw, MessageSquare } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { saveProject, getVFSConfig, loadFile, subscribeToChanges } from '../lib/vfs';
+import { httpWidgetVfs, type WidgetVfs } from '../lib/vfs';
 import { EditModal, type CompileFn, CodeBlockView, MediaPreview, getFileType } from './edit';
 import { MarkdownPreview } from './MarkdownPreview';
 import { SaveStatusButton, type SaveStatus } from './SaveStatusButton';
@@ -25,6 +25,8 @@ interface CodePreviewProps {
     initialCode: string;
     initialProject: VirtualProject;
   }) => void;
+  /** Storage adapter for save/reload (default: the dev-server HTTP `/vfs`). */
+  vfs?: WidgetVfs;
 }
 
 function createManifest(services?: string[]): Manifest {
@@ -44,6 +46,7 @@ export function CodePreview({
   filePath,
   entrypoint = 'index.ts',
   onOpenEditSession,
+  vfs = httpWidgetVfs,
 }: CodePreviewProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
@@ -52,38 +55,47 @@ export function CodePreview({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [lastSavedCode, setLastSavedCode] = useState(originalCode);
   const [vfsPath, setVfsPath] = useState<string | null>(null);
+  // Where an unnamed widget was saved (chosen via the path prompt); fence
+  // `path` attributes take precedence.
+  const [savePath, setSavePath] = useState<string | null>(null);
+  const [pathPromptOpen, setPathPromptOpen] = useState(false);
+  const [pathDraft, setPathDraft] = useState('');
   const currentCodeRef = useRef(currentCode);
   const lastSavedRef = useRef(lastSavedCode);
   const isEditingRef = useRef(isEditing);
 
-  // Stable project ID for this widget instance (fallback when not using paths)
-  const fallbackId = useMemo(() => crypto.randomUUID(), []);
+  // Widgets without a `path` attribute still need a stable, human-findable
+  // home in the workspace tree.
+  const fallbackId = useMemo(
+    () => `widgets/widget-${crypto.randomUUID().slice(0, 8)}`,
+    [],
+  );
 
-  // Determine project ID based on server config and available path
+  // Fence `path` attribute wins; otherwise the user-chosen save path.
+  const effectiveFilePath = filePath ?? savePath ?? undefined;
+
+  // Determine project ID based on the VFS adapter and available path
   const getProjectId = useCallback(async () => {
-    if (filePath) {
-      const config = await getVFSConfig();
-      if (config.usePaths) {
-        // Use the directory containing the file as project ID
-        const parts = filePath.split('/');
-        if (parts.length > 1) {
-          return parts.slice(0, -1).join('/');
-        }
-        // Single file, use filename without extension as ID
-        return filePath.replace(/\.[^.]+$/, '');
+    if (effectiveFilePath && (await vfs.usePaths())) {
+      // Use the directory containing the file as project ID
+      const parts = effectiveFilePath.split('/');
+      if (parts.length > 1) {
+        return parts.slice(0, -1).join('/');
       }
+      // Single file, use filename without extension as ID
+      return effectiveFilePath.replace(/\.[^.]+$/, '');
     }
     return fallbackId;
-  }, [filePath, fallbackId]);
+  }, [effectiveFilePath, fallbackId, vfs]);
 
   // Get the entry filename
   const getEntryFile = useCallback(() => {
-    if (filePath) {
-      const parts = filePath.split('/');
+    if (effectiveFilePath) {
+      const parts = effectiveFilePath.split('/');
       return parts[parts.length - 1] || entrypoint;
     }
     return entrypoint;
-  }, [filePath]);
+  }, [effectiveFilePath, entrypoint]);
 
   useEffect(() => {
     currentCodeRef.current = currentCode;
@@ -121,7 +133,7 @@ export function CodePreview({
 
   useEffect(() => {
     if (!vfsPath) return;
-    const unsubscribe = subscribeToChanges(async (record) => {
+    const unsubscribe = vfs.subscribe(async (record) => {
       if (record.path !== vfsPath) return;
       if (record.type === 'delete') {
         setSaveStatus('unsaved');
@@ -129,7 +141,7 @@ export function CodePreview({
       }
       if (isEditingRef.current) return;
       try {
-        const remote = await loadFile(vfsPath);
+        const remote = await vfs.readFile(vfsPath);
         if (currentCodeRef.current !== lastSavedRef.current) {
           setSaveStatus('unsaved');
           return;
@@ -144,22 +156,52 @@ export function CodePreview({
       }
     });
     return () => unsubscribe();
-  }, [vfsPath]);
+  }, [vfsPath, vfs]);
 
-  // Manual save handler
-  const handleSave = useCallback(async () => {
-    setSaveStatus('saving');
-    try {
-      const projectId = await getProjectId();
-      const entryFile = getEntryFile();
-      const project = createSingleFileProject(currentCode, entryFile, projectId);
-      await saveProject(project);
-      setLastSavedCode(currentCode);
-      setSaveStatus('saved');
-    } catch {
-      setSaveStatus('error');
+  // Save to an explicit target path (from the prompt) or the derived one.
+  const saveTo = useCallback(
+    async (targetPath: string | null) => {
+      setSaveStatus('saving');
+      try {
+        let projectId: string;
+        let entryFile: string;
+        if (targetPath) {
+          const parts = targetPath.split('/').filter(Boolean);
+          entryFile = parts.pop() ?? 'main.tsx';
+          projectId = parts.join('/');
+        } else {
+          projectId = await getProjectId();
+          entryFile = getEntryFile();
+        }
+        const project = createSingleFileProject(currentCode, entryFile, projectId);
+        await vfs.saveProject(project);
+        setLastSavedCode(currentCode);
+        setSaveStatus('saved');
+      } catch {
+        setSaveStatus('error');
+      }
+    },
+    [currentCode, getProjectId, getEntryFile, vfs],
+  );
+
+  // Manual save: an unnamed widget first asks where to land, prefilled with
+  // the generated default; later saves reuse the chosen path.
+  const handleSave = useCallback(() => {
+    if (!effectiveFilePath) {
+      setPathDraft(`${fallbackId}/${entrypoint}`);
+      setPathPromptOpen(true);
+      return;
     }
-  }, [currentCode, getProjectId, getEntryFile]);
+    void saveTo(null);
+  }, [effectiveFilePath, fallbackId, entrypoint, saveTo]);
+
+  const confirmSavePath = useCallback(() => {
+    const normalized = pathDraft.replace(/^\/+|\/+$/g, '').trim();
+    if (!normalized) return;
+    setSavePath(normalized);
+    setPathPromptOpen(false);
+    void saveTo(normalized);
+  }, [pathDraft, saveTo]);
 
   const previewPath = filePath ?? entrypoint;
   const fileType = useMemo(() => getFileType(previewPath), [previewPath]);
@@ -295,6 +337,7 @@ export function CodePreview({
               onClick={handleSave}
               disabled={saveStatus === 'saving'}
               tone="muted"
+              target={vfsPath ?? undefined}
             />
             <button
               onClick={() => setShowPreview(!showPreview)}
@@ -305,6 +348,36 @@ export function CodePreview({
             </button>
           </div>
         </div>
+
+        {pathPromptOpen && (
+          <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30">
+            <span className="text-xs text-muted-foreground shrink-0">Save to</span>
+            <input
+              value={pathDraft}
+              onChange={(e) => setPathDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') confirmSavePath();
+                if (e.key === 'Escape') setPathPromptOpen(false);
+              }}
+              autoFocus
+              spellCheck={false}
+              className="flex-1 min-w-0 rounded border bg-background px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <button
+              onClick={confirmSavePath}
+              disabled={!pathDraft.trim()}
+              className="px-2 py-1 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setPathPromptOpen(false)}
+              className="px-2 py-1 text-xs rounded hover:bg-muted text-muted-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {showPreview ? (
           <div className="bg-card overflow-y-auto overflow-x-hidden max-h-[60vh]">
@@ -335,7 +408,7 @@ export function CodePreview({
                 const projectId = await getProjectId();
                 const entryFile = getEntryFile();
                 const project = createSingleFileProject(finalCode, entryFile, projectId);
-                await saveProject(project);
+                await vfs.saveProject(project);
                 setLastSavedCode(finalCode);
                 setSaveStatus('saved');
               } catch {

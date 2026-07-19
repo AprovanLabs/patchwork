@@ -17,9 +17,11 @@ if (environment !== "off" && environment !== "false") {
     );
   }
 
+  // REST rides GATEWAY_URL (…/api/gateway); MCP lives at the origin's /api/mcp.
   const gatewayUrl = process.env.GATEWAY_URL;
-  if (gatewayUrl && !process.env.VITE_MCP_URL) {
-    process.env.VITE_MCP_URL = `${gatewayUrl.replace(/\/$/, "")}/mcp`;
+  if (gatewayUrl) {
+    process.env.VITE_GATEWAY_URL ??= gatewayUrl.replace(/\/$/, "");
+    process.env.VITE_MCP_URL ??= `${new URL(gatewayUrl).origin}/api/mcp`;
   }
 
   // Cognito OIDC issuer (authority) — NOT the hosted-UI domain. oidc-client-ts

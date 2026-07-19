@@ -12,11 +12,13 @@ const UNCLOSED_BLOCK_REGEX = /```([a-zA-Z0-9_+-]*)((?:\s+[a-zA-Z_][\w-]*="[^"]*"
 const ATTRIBUTE_REGEX = /([a-zA-Z_][\w-]*)="([^"]*)"/g;
 
 export type TextPart = { type: 'text'; content: string };
-export type CodePart = { 
-  type: 'code' | string; 
-  content: string; 
+export type CodePart = {
+  type: 'code' | string;
+  content: string;
   language: 'jsx' | 'tsx' | string;
   attributes?: Record<string, string>;
+  /** True for a still-streaming block whose closing fence hasn't arrived. */
+  unclosed?: boolean;
 };
 export type ParsedPart = TextPart | CodePart;
 
@@ -115,7 +117,7 @@ export function extractCodeBlocks(
       }
 
       if (included) {
-        parts.push({ type: 'code', content, language, attributes });
+        parts.push({ type: 'code', content, language, attributes, unclosed: true });
       }
       lastIndex = text.length; // Mark all text as processed
     }

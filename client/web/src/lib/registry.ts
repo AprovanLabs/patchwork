@@ -22,3 +22,35 @@ export function credentialsUrl(provider?: string): string {
   const query = provider ? `?provider=${encodeURIComponent(provider)}` : "";
   return registryUrl(`/account/credentials/${query}`);
 }
+
+/** Provider detail page in the registry catalog. */
+export function providerUrl(provider: string): string {
+  return registryUrl(`/providers/?p=${encodeURIComponent(provider)}`);
+}
+
+export interface CatalogProviderSummary {
+  id: string;
+  title: string;
+  description: string | null;
+  packageName: string;
+  icon: string | null;
+}
+
+/**
+ * The public registry catalog (all published providers, with icons). Static
+ * JSON — same origin in production, so no auth involved. Null on failure.
+ */
+export async function fetchCatalogProviders(): Promise<
+  CatalogProviderSummary[] | null
+> {
+  try {
+    const response = await fetch(registryUrl("/catalog/providers.json"));
+    if (!response.ok) return null;
+    const body = (await response.json()) as {
+      providers?: CatalogProviderSummary[];
+    };
+    return Array.isArray(body.providers) ? body.providers : null;
+  } catch {
+    return null;
+  }
+}
