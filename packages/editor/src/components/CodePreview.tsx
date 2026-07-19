@@ -27,6 +27,13 @@ interface CodePreviewProps {
   }) => void;
   /** Storage adapter for save/reload (default: the dev-server HTTP `/vfs`). */
   vfs?: WidgetVfs;
+  /**
+   * App-supplied preview override. Called before the built-in preview
+   * renderers; returning a node replaces the preview body (e.g. patchwork
+   * renders workflow scripts as a Tailor flow). Return null/undefined to
+   * fall through to the defaults.
+   */
+  customPreview?: (args: { code: string; filePath?: string }) => React.ReactNode | null | undefined;
 }
 
 function createManifest(services?: string[]): Manifest {
@@ -47,6 +54,7 @@ export function CodePreview({
   entrypoint = 'index.ts',
   onOpenEditSession,
   vfs = httpWidgetVfs,
+  customPreview,
 }: CodePreviewProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
@@ -249,6 +257,9 @@ export function CodePreview({
   const hasChanges = currentCode !== originalCode;
 
   const previewBody = useMemo(() => {
+    const custom = customPreview?.({ code: currentCode, filePath });
+    if (custom) return custom;
+
     if (canRenderWidget) {
       return (
         <WidgetPreview
@@ -284,7 +295,7 @@ export function CodePreview({
         language={fileType.language}
       />
     );
-  }, [canRenderWidget, compiler, currentCode, fileType, isEditing, previewPath, services, showPreview]);
+  }, [canRenderWidget, compiler, currentCode, customPreview, filePath, fileType, isEditing, previewPath, services, showPreview]);
 
   const handleOpenEditor = useCallback(async () => {
     if (!onOpenEditSession) {

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@aprovan/ui/theme.css";
+@import "@aprovan/registry-ui/tailor.css";
 
 /* Tailwind does not scan node_modules by default, but the prebuilt @aprovan
    packages ship components as class-name-bearing JS — without these sources

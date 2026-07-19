@@ -53,6 +53,8 @@ import {
 import { AppHeader } from "@aprovan/ui/shell";
 import { ServicesMenu } from "@/components/ServicesMenu";
 import SessionControls from "@/components/SessionControls";
+import { WorkflowFlow, isWorkflowScript } from "@/components/WorkflowFlow";
+import { WorkflowsMenu } from "@/components/WorkflowsMenu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -105,6 +107,17 @@ function createPreviewManifest(services?: string[]) {
     services,
   };
 }
+
+// Workflow scripts (plain js/ts under workflows/) render as a Tailor flow
+// instead of compiling as widgets — the chat's renderer for workflows, the
+// way Markdown files get the Markdown renderer.
+const workflowCustomPreview = ({
+  code,
+  filePath,
+}: {
+  code: string;
+  filePath?: string;
+}) => (isWorkflowScript(filePath) ? <WorkflowFlow source={code} /> : null);
 
 const SharedEditSessionCtx = createContext<
   | ((session: {
@@ -385,6 +398,7 @@ function TextPartWithSession({
               entrypoint="main.tsx"
               onOpenEditSession={open ?? undefined}
               vfs={workspaceWidgetVfs}
+              customPreview={workflowCustomPreview}
             />
           );
         }
@@ -1141,6 +1155,7 @@ export default function ChatPage() {
               name="patchwork"
             >
               <ServicesMenu services={services} />
+              <WorkflowsMenu onOpenScript={openWorkspacePreview} />
               <SessionControls
                 onLoad={handleWorkspaceLoad}
                 onSwitch={handleWorkspaceSwitch}
@@ -1342,6 +1357,7 @@ export default function ChatPage() {
                               filePath={activeTabPath}
                               onOpenEditSession={openSharedEditSession}
                               vfs={workspaceWidgetVfs}
+                              customPreview={workflowCustomPreview}
                             />
                           )}
                         </div>
