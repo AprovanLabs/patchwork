@@ -54,6 +54,7 @@ import { AppHeader } from "@aprovan/ui/shell";
 import { ServicesMenu } from "@/components/ServicesMenu";
 import SessionControls from "@/components/SessionControls";
 import { WorkflowFlow, isWorkflowScript } from "@/components/WorkflowFlow";
+import { JsonPreview, isJsonFile } from "@/components/JsonPreview";
 import { WorkflowsExplorer } from "@/components/WorkflowsExplorer";
 import { WorkflowsMenu } from "@/components/WorkflowsMenu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -110,16 +111,21 @@ function createPreviewManifest(services?: string[]) {
   };
 }
 
-// Workflow scripts (plain js/ts under workflows/) render as a Tailor flow
-// instead of compiling as widgets — the chat's renderer for workflows, the
-// way Markdown files get the Markdown renderer.
+// File-type renderers layered over the widget compiler: workflow scripts
+// (plain js/ts under workflows/) render as a Tailor flow, .json files get
+// the collapsible JSON tree. Anything unmatched falls through to the
+// editor's built-in previews.
 const workflowCustomPreview = ({
   code,
   filePath,
 }: {
   code: string;
   filePath?: string;
-}) => (isWorkflowScript(filePath, code) ? <WorkflowFlow source={code} /> : null);
+}) => {
+  if (isWorkflowScript(filePath, code)) return <WorkflowFlow source={code} />;
+  if (isJsonFile(filePath)) return <JsonPreview code={code} />;
+  return null;
+};
 
 const SharedEditSessionCtx = createContext<
   | ((session: {

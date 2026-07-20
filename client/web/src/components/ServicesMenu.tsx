@@ -18,9 +18,12 @@ import {
   Database,
   ExternalLink,
   FolderTree,
+  LayoutGrid,
+  Plug,
   Plus,
   Radio,
   Server,
+  Webhook,
   Workflow,
   Wrench,
 } from "lucide-react";
@@ -60,6 +63,21 @@ const NATIVE_GROUPS: Record<
     label: "Workflows",
     blurb: "Register + run workspace workflows",
     Icon: Workflow,
+  },
+  apps: {
+    label: "Apps",
+    blurb: "Publish + manage workspace apps",
+    Icon: LayoutGrid,
+  },
+  webhooks: {
+    label: "Webhooks",
+    blurb: "Register provider webhooks that trigger workflows",
+    Icon: Webhook,
+  },
+  interfaces: {
+    label: "Interfaces",
+    blurb: "Bind generic interfaces (llm, sql) to providers",
+    Icon: Plug,
   },
 };
 

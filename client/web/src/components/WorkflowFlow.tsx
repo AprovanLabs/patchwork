@@ -12,15 +12,19 @@ const TailorFlow = lazy(() =>
 
 /**
  * Workflow scripts render as a flow instead of compiling as widgets. A file
- * is a workflow when it lives under a workflows/ directory (any extension —
- * entrypoints are often named main.tsx), or when its content is a bare
- * script body: widgets always `export` something, workflow scripts never do,
- * and feeding a bare script (top-level await/return) to the widget compiler
- * is a guaranteed build error.
+ * is a workflow when it is plain js/ts under a workflows/ directory, or when
+ * its content is a bare script body that awaits namespace tool calls —
+ * widgets always `export` something (and use JSX), workflow scripts never
+ * do. Extension and shape checks are strict so data files (.json, .md)
+ * never fall into the flow renderer.
  */
 export function isWorkflowScript(path: string | undefined, code?: string): boolean {
-  if (path && /(^|\/)workflows\//.test(path)) return true;
-  return Boolean(code) && !/^\s*export\b/m.test(code ?? "");
+  if (path && /(^|\/)workflows\/[^/]+\.(js|ts)$/.test(path)) return true;
+  if (path && !/\.(js|ts)$/.test(path)) return false;
+  if (!code) return false;
+  if (/^\s*(import\s|export\s)/m.test(code)) return false;
+  if (/<[A-Z][A-Za-z]*[\s/>]/.test(code)) return false;
+  return /\bawait\s+[a-zA-Z_$][\w$]*\.[\w$.]+\(/.test(code);
 }
 
 export function WorkflowFlow({ source }: { source: string }) {
