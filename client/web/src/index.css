@@ -8,6 +8,8 @@
    the workspace switcher ended up unsized with a transparent dropdown. */
 @source "../node_modules/@aprovan/ui/dist";
 @source "../node_modules/@aprovan/registry-ui/dist";
+@source "../node_modules/@aprovan/patchwork-editor/dist";
+@source "../node_modules/@aprovan/bobbin/dist";
 
 /* `dark:` utilities follow the `.dark` root class (synced with the OS scheme
    in index.html) so they agree with the theme tokens, which are class-driven.

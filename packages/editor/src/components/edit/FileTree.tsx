@@ -9,6 +9,7 @@ import {
   Loader2,
   Pin,
   PinOff,
+  Trash2,
   X,
 } from 'lucide-react';
 import { useMemo, useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
@@ -20,6 +21,48 @@ interface TreeNode {
   path: string;
   isDir: boolean;
   children: TreeNode[];
+}
+
+/**
+ * Two-click delete: the first click arms the control (red), the second
+ * confirms. Arming resets when the pointer leaves the row.
+ */
+function DeleteControl({
+  path,
+  isDir,
+  onDelete,
+  hovered,
+}: {
+  path: string;
+  isDir: boolean;
+  onDelete: (path: string, isDir: boolean) => void;
+  hovered: boolean;
+}) {
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!hovered) setArmed(false);
+  }, [hovered]);
+
+  if (!hovered) return null;
+  return (
+    <span
+      onClick={(e) => {
+        e.stopPropagation();
+        if (armed) {
+          onDelete(path, isDir);
+        } else {
+          setArmed(true);
+        }
+      }}
+      className={`p-1 rounded cursor-pointer ${
+        armed ? 'bg-destructive/20 text-destructive' : 'hover:bg-destructive/10'
+      }`}
+      title={armed ? `Really delete ${isDir ? 'folder' : 'file'}?` : 'Delete'}
+    >
+      <Trash2 className={`h-3 w-3 ${armed ? 'text-destructive' : 'text-muted-foreground'}`} />
+    </span>
+  );
 }
 
 export interface FileTreeEntry {
@@ -86,6 +129,7 @@ interface TreeNodeComponentProps {
   openInEditorTitle?: string;
   pinnedPaths?: Map<string, boolean>;
   onTogglePin?: (path: string, isDir: boolean) => void;
+  onDeletePath?: (path: string, isDir: boolean) => void;
   pageSize?: number;
   depth?: number;
 }
@@ -102,6 +146,7 @@ function TreeNodeComponent({
   openInEditorTitle = 'Open in editor',
   pinnedPaths,
   onTogglePin,
+  onDeletePath,
   pageSize = 10,
   depth = 0,
 }: TreeNodeComponentProps) {
@@ -155,6 +200,7 @@ function TreeNodeComponent({
             openInEditorTitle={openInEditorTitle}
             pinnedPaths={pinnedPaths}
             onTogglePin={onTogglePin}
+            onDeletePath={onDeletePath}
             pageSize={pageSize}
             depth={depth}
           />
@@ -219,6 +265,9 @@ function TreeNodeComponent({
               {openInEditorIcon ?? <Pencil className="h-3 w-3 text-primary" />}
             </span>
           )}
+          {onDeletePath && (
+            <DeleteControl path={node.path} isDir onDelete={onDeletePath} hovered={isHovered} />
+          )}
         </button>
         {expanded && (
           <div>
@@ -236,6 +285,7 @@ function TreeNodeComponent({
                 openInEditorTitle={openInEditorTitle}
                 pinnedPaths={pinnedPaths}
                 onTogglePin={onTogglePin}
+                onDeletePath={onDeletePath}
                 pageSize={pageSize}
                 depth={depth + 1}
               />
@@ -300,6 +350,9 @@ function TreeNodeComponent({
             <Upload className="h-3 w-3 text-primary" />
           </span>
         )}
+        {onDeletePath && (
+          <DeleteControl path={node.path} isDir={false} onDelete={onDeletePath} hovered={isHovered} />
+        )}
       </button>
       {isMedia && (
         <input
@@ -328,6 +381,7 @@ export interface FileTreeProps {
   openInEditorTitle?: string;
   pinnedPaths?: Map<string, boolean>;
   onTogglePin?: (path: string, isDir: boolean) => void;
+  onDeletePath?: (path: string, isDir: boolean) => void;
   directoryLoader?: FileTreeDirectoryLoader;
   pageSize?: number;
   reloadToken?: number;
@@ -344,6 +398,7 @@ interface LazyTreeNodeProps {
   openInEditorTitle?: string;
   pinnedPaths?: Map<string, boolean>;
   onTogglePin?: (path: string, isDir: boolean) => void;
+  onDeletePath?: (path: string, isDir: boolean) => void;
   directoryLoader: FileTreeDirectoryLoader;
   pageSize: number;
   depth?: number;
@@ -361,6 +416,7 @@ function LazyTreeNode({
   openInEditorTitle = 'Open in editor',
   pinnedPaths,
   onTogglePin,
+  onDeletePath,
   directoryLoader,
   pageSize,
   depth = 0,
@@ -464,6 +520,9 @@ function LazyTreeNode({
               {openInEditorIcon ?? <Pencil className="h-3 w-3 text-primary" />}
             </span>
           )}
+          {onDeletePath && (
+            <DeleteControl path={entry.path} isDir={false} onDelete={onDeletePath} hovered={isHovered} />
+          )}
         </button>
       </div>
     );
@@ -506,6 +565,9 @@ function LazyTreeNode({
             {openInEditorIcon ?? <Pencil className="h-3 w-3 text-primary" />}
           </span>
         )}
+        {onDeletePath && (
+          <DeleteControl path={entry.path} isDir onDelete={onDeletePath} hovered={isHovered} />
+        )}
       </button>
 
       {expanded && (
@@ -531,6 +593,7 @@ function LazyTreeNode({
               openInEditorTitle={openInEditorTitle}
               pinnedPaths={pinnedPaths}
               onTogglePin={onTogglePin}
+              onDeletePath={onDeletePath}
               directoryLoader={directoryLoader}
               pageSize={pageSize}
               depth={depth + 1}
@@ -569,6 +632,7 @@ export function FileTree({
   openInEditorTitle,
   pinnedPaths,
   onTogglePin,
+  onDeletePath,
   directoryLoader,
   pageSize = 10,
   reloadToken,
@@ -664,6 +728,7 @@ export function FileTree({
                 openInEditorTitle={openInEditorTitle}
                 pinnedPaths={pinnedPaths}
                 onTogglePin={onTogglePin}
+                onDeletePath={onDeletePath}
                 directoryLoader={directoryLoader}
                 pageSize={pageSize}
                 reloadToken={reloadToken}
@@ -683,6 +748,7 @@ export function FileTree({
             openInEditorTitle={openInEditorTitle}
             pinnedPaths={pinnedPaths}
             onTogglePin={onTogglePin}
+            onDeletePath={onDeletePath}
             pageSize={pageSize}
           />
         )}

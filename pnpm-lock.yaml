@@ -71,8 +71,8 @@ importers:
         specifier: 0.1.0-dev.7343775
         version: 0.1.0-dev.7343775
       '@aprovan/registry-ui':
-        specifier: ^0.2.3
-        version: 0.2.3(@codemirror/lint@6.9.7)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^0.3.0
+        version: 0.3.0(@codemirror/lint@6.9.7)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@aprovan/ui':
         specifier: ^0.3.1
         version: 0.3.1(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -471,8 +471,8 @@ packages:
   '@aprovan/registry-main@0.1.0-dev.7343775':
     resolution: {integrity: sha512-Z4my5ZGDJbNCk3kQ3sFRc2fcJKs6LCo0Ghx08Lw1k9CFawpiKeVXDBcTYNJQuEVq77wl1FbqBO+74zxwgseOPA==}
 
-  '@aprovan/registry-ui@0.2.3':
-    resolution: {integrity: sha512-80SunyPzgPGyN+sNSUYAoLuf//GLBB/FIVvLsUvWc3eaOuzY08tsyOBQh0jnK3naLBX4gUsqNENxDBgURgoItA==}
+  '@aprovan/registry-ui@0.3.0':
+    resolution: {integrity: sha512-+qVPudNiXv3+cH0Jl6JwCckYyZx63KnfUhXrhb7a+JBeV34pIvctcEkHuF7QCgDyOmXMfaprFTvqamdZlOLesg==}
     peerDependencies:
       react: '>=18'
 
@@ -5940,7 +5940,7 @@ snapshots:
 
   '@aprovan/registry-main@0.1.0-dev.7343775': {}
 
-  '@aprovan/registry-ui@0.2.3(@codemirror/lint@6.9.7)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@aprovan/registry-ui@0.3.0(@codemirror/lint@6.9.7)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@aprovan/registry-main': 0.1.0-dev.7343775
       '@aprovan/ui': 0.2.4(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)

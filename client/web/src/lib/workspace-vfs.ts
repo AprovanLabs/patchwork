@@ -1,11 +1,15 @@
 /**
  * Workspace filesystem for patchwork.
  *
- * Two backends behind one interface: the gateway's workspace FS (`/fs`
- * routes — the source of truth that follows the workspace across devices and
- * agents) and browser OPFS (offline / unconfigured fallback). The backend is
- * probed once per page load; every exported helper is backend-agnostic so
- * `ChatPage` never knows which one it's talking to.
+ * A sync layer over two stores: the gateway's workspace FS (`/fs` routes —
+ * the source of truth that follows the workspace across devices and agents)
+ * and browser OPFS (offline cache + write-ahead store). When the gateway is
+ * configured, every mutation lands in OPFS first (nothing is ever lost to a
+ * dropped connection) and then write-through to the gateway; failures are
+ * journaled and flushed on the next successful contact. Reads prefer the
+ * gateway and fall back to the cache. Without a gateway, OPFS is simply the
+ * store. Every exported helper is backend-agnostic so `ChatPage` never knows
+ * which mode it's in.
  */
 
 import {
@@ -47,6 +51,8 @@ interface WorkspaceBackend {
   list(prefix?: string): Promise<string[]>;
   read(path: string): Promise<string>;
   write(path: string, content: string): Promise<void>;
+  /** Delete a file, or a whole subtree with recursive. */
+  remove(path: string, recursive?: boolean): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +117,12 @@ const opfsBackend: WorkspaceBackend = {
     await writer.write(content);
     await writer.close();
   },
+  async remove(path, recursive = false) {
+    const parts = split(path);
+    const name = parts.pop();
+    if (!name) throw new Error("File path is required");
+    await (await opfsDirectory(parts.join("/"))).removeEntry(name, { recursive });
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -139,6 +151,163 @@ const gatewayBackend: WorkspaceBackend = {
       body: JSON.stringify({ content, mimeType: mimeType(path) }),
     });
     if (!response.ok) throw new Error(`fs write failed (${response.status})`);
+  },
+  async remove(path, recursive = false) {
+    const suffix = recursive ? "?recursive=1" : "";
+    const response = await gatewayFetch(`${GATEWAY_BASE}/fs/${normalize(path)}${suffix}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) throw new Error(`fs delete failed (${response.status})`);
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Offline journal
+// ---------------------------------------------------------------------------
+
+/**
+ * Mutations that couldn't reach the gateway. Only the operation + path are
+ * journaled — the content of a pending write is whatever OPFS holds for that
+ * path at flush time, so repeated offline edits collapse into one upload.
+ * Persisted in localStorage (OPFS itself holds the file bodies); like OPFS
+ * it is origin-scoped, not workspace-scoped.
+ */
+interface PendingOp {
+  op: "write" | "remove";
+  path: string;
+  recursive?: boolean;
+}
+
+const PENDING_KEY = "patchwork:wfs-pending";
+
+function loadPending(): PendingOp[] {
+  try {
+    return JSON.parse(localStorage.getItem(PENDING_KEY) ?? "[]") as PendingOp[];
+  } catch {
+    return [];
+  }
+}
+
+function savePending(entries: PendingOp[]): void {
+  try {
+    if (entries.length === 0) localStorage.removeItem(PENDING_KEY);
+    else localStorage.setItem(PENDING_KEY, JSON.stringify(entries));
+  } catch {
+    // Journal persistence is best-effort; in-memory state still applies.
+  }
+}
+
+let pending: PendingOp[] = loadPending();
+
+function setPending(path: string, op: PendingOp): void {
+  pending = [...pending.filter((entry) => entry.path !== path), op];
+  savePending(pending);
+}
+
+function clearPending(path: string): void {
+  if (!pending.some((entry) => entry.path === path)) return;
+  pending = pending.filter((entry) => entry.path !== path);
+  savePending(pending);
+}
+
+function hasPendingWrite(path: string): boolean {
+  return pending.some((entry) => entry.op === "write" && entry.path === path);
+}
+
+let flushInFlight: Promise<void> | null = null;
+
+/** Replay journaled mutations against the gateway; stops on first failure. */
+function flushPending(): Promise<void> {
+  if (pending.length === 0) return Promise.resolve();
+  flushInFlight ??= (async () => {
+    try {
+      for (const entry of [...pending]) {
+        if (entry.op === "write") {
+          await gatewayBackend.write(entry.path, await opfsBackend.read(entry.path));
+        } else {
+          await gatewayBackend.remove(entry.path, entry.recursive);
+        }
+        clearPending(entry.path);
+      }
+    } catch {
+      // Still offline (or a conflicting failure); retry on next contact.
+    } finally {
+      flushInFlight = null;
+    }
+  })();
+  return flushInFlight;
+}
+
+/** A gateway op succeeded — good moment to drain the journal. */
+function noteOnline(): void {
+  if (pending.length > 0) void flushPending();
+}
+
+// ---------------------------------------------------------------------------
+// Synced backend: OPFS cache + write-ahead, gateway source of truth
+// ---------------------------------------------------------------------------
+
+const syncedBackend: WorkspaceBackend = {
+  async list(prefix = "") {
+    try {
+      const remote = await gatewayBackend.list(prefix);
+      noteOnline();
+      const scope = normalize(prefix);
+      const inScope = (path: string) =>
+        !scope || path === scope || path.startsWith(`${scope}/`);
+      const removed = new Set(
+        pending.filter((entry) => entry.op === "remove").map((entry) => entry.path),
+      );
+      const merged = new Set(
+        remote.filter(
+          (path) =>
+            !removed.has(path) &&
+            ![...removed].some((removedPath) => path.startsWith(`${removedPath}/`)),
+        ),
+      );
+      for (const entry of pending) {
+        if (entry.op === "write" && inScope(entry.path)) merged.add(entry.path);
+      }
+      return [...merged].sort();
+    } catch {
+      return opfsBackend.list(prefix);
+    }
+  },
+  async read(path) {
+    if (!hasPendingWrite(path)) {
+      try {
+        const content = await gatewayBackend.read(path);
+        noteOnline();
+        // Refresh the offline cache in the background.
+        void opfsBackend.write(path, content).catch(() => {});
+        return content;
+      } catch {
+        // Gateway unreachable or file gateway-side missing — serve the cache.
+      }
+    }
+    return opfsBackend.read(path);
+  },
+  async write(path, content) {
+    // Local-first: OPFS before the network, so a dropped connection never
+    // loses an edit.
+    await opfsBackend.write(path, content);
+    try {
+      await gatewayBackend.write(path, content);
+      clearPending(path);
+      noteOnline();
+    } catch {
+      setPending(path, { op: "write", path });
+    }
+  },
+  async remove(path, recursive = false) {
+    await opfsBackend.remove(path, recursive).catch(() => {});
+    try {
+      await gatewayBackend.remove(path, recursive);
+      clearPending(path);
+      noteOnline();
+    } catch {
+      setPending(path, { op: "remove", path, recursive });
+    }
   },
 };
 
@@ -181,13 +350,15 @@ function backend(): Promise<WorkspaceBackend> {
     try {
       const response = await gatewayFetch(`${GATEWAY_BASE}/fs`);
       if (response.ok) {
+        await flushPending();
         await migrateOpfsToGateway();
-        return gatewayBackend;
+        return syncedBackend;
       }
     } catch {
-      // Gateway unreachable — run local.
+      // Gateway unreachable right now — the synced backend still serves the
+      // OPFS cache and journals mutations until contact resumes.
     }
-    return opfsBackend;
+    return syncedBackend;
   })();
   return backendPromise;
 }
@@ -208,6 +379,25 @@ async function readFile(path: string): Promise<string> {
 async function writeFile(path: string, content: string): Promise<void> {
   await (await backend()).write(path, content);
   for (const watcher of watchers) watcher("update", normalize(path));
+}
+
+/**
+ * Delete a workspace file or (with recursive) a whole directory subtree.
+ * Watchers fire per removed path so open tabs close and trees refresh.
+ */
+export async function deleteWorkspacePath(
+  path: string,
+  options: { recursive?: boolean } = {},
+): Promise<void> {
+  const target = normalize(path);
+  const store = await backend();
+  const removed = options.recursive
+    ? (await store.list(target)).filter((p) => p === target || p.startsWith(`${target}/`))
+    : [target];
+  await store.remove(target, options.recursive);
+  for (const removedPath of removed.length > 0 ? removed : [target]) {
+    for (const watcher of watchers) watcher("delete", removedPath);
+  }
 }
 
 export function toWorkspaceTreeFiles(paths: string[]): VirtualFile[] {

@@ -34,7 +34,7 @@ jobs:
       # `...` suffix: also build workspace dependencies (topological order) —
       # @aprovan/patchwork-mcp needs @aprovan/patchwork-compiler's dist.
       - name: Build packages
-        run: pnpm --filter "@aprovan/patchwork..." --filter "@aprovan/patchwork-mcp..." build
+        run: pnpm --filter "@aprovan/patchwork..." --filter "@aprovan/patchwork-mcp..." --filter "@aprovan/patchwork-compiler..." --filter "@aprovan/patchwork-image-shadcn..." build
 
       - name: Append dev SHA to versions
         run: |
@@ -43,5 +43,26 @@ jobs:
 
       - name: Publish packages
         run: pnpm --filter @aprovan/patchwork --filter @aprovan/patchwork-mcp publish --no-git-checks --access public --tag dev
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Compiler + image packages publish as stable `latest` whenever the
+      # committed version isn't on npm yet (release flow = bump version, push
+      # to main). The chat and the gateway app shell pin these by exact
+      # version from esm.sh, so a bumped pin without a published package
+      # breaks deployed widget previews.
+      - name: Publish compiler and images (stable, when version is new)
+        run: |
+          for pkg in @aprovan/patchwork-compiler @aprovan/patchwork-image-shadcn; do
+            dir=$(pnpm --filter "$pkg" exec pwd 2>/dev/null | tail -1) || continue
+            [ -n "$dir" ] || continue
+            version=$(node -p "require('$dir/package.json').version")
+            if npm view "$pkg@$version" version >/dev/null 2>&1; then
+              echo "$pkg@$version already published — skipping"
+            else
+              echo "Publishing $pkg@$version"
+              pnpm --filter "$pkg" publish --no-git-checks --access public
+            fi
+          done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

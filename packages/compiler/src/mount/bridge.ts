@@ -283,9 +283,12 @@ export function createIframeProxy(): Proxy {
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >();
 
-  // Listen for results from parent
+  // Listen for results from parent. Only the embedding parent may deliver
+  // service results — any other frame able to postMessage here could inject
+  // forged responses.
   if (typeof window !== "undefined") {
     window.addEventListener("message", (event: MessageEvent) => {
+      if (event.source !== window.parent) return;
       const message = event.data as BridgeMessage;
       if (!message || typeof message !== "object") return;
 
@@ -354,6 +357,8 @@ export function generateIframeBridgeScript(services: string[]): string {
   const pendingCalls = new Map();
 
   window.addEventListener('message', function(event) {
+    // Only the embedding parent may deliver service results.
+    if (event.source !== window.parent) return;
     const message = event.data;
     if (!message || typeof message !== 'object') return;
 

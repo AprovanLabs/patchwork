@@ -1,6 +1,6 @@
 {
   "name": "@aprovan/patchwork-image-shadcn",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Patchwork image: ShadCN/ui with Tailwind CSS and Radix UI",
   "type": "module",
   "main": "./dist/index.js",

@@ -72,6 +72,7 @@ import { GATEWAY_BASE } from "@/lib/gateway";
 import { gatewayFetch } from "@/lib/gateway-fetch";
 import { credentialsUrl } from "@/lib/registry";
 import {
+  deleteWorkspacePath,
   listWorkspaceEntries,
   listWorkspacePaths,
   toWorkspaceTreeFiles,
@@ -424,7 +425,7 @@ const CHAT_PROVIDER_KEY = "patchwork:chat-provider";
 
 // Version-pinned: esm.sh caches the unversioned "latest" redirect for hours,
 // so a bare spec can silently serve a stale image after a publish.
-const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn@0.1.3";
+const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn@0.1.4";
 // Local proxy for loading image packages, esm.sh for widget imports
 const IMAGE_CDN_URL = import.meta.env.DEV
   ? "/_local-packages"
@@ -603,6 +604,14 @@ export default function ChatPage() {
       else next.set(path, isDir);
       localStorage.setItem('patchwork:pinned-paths', JSON.stringify(Array.from(next)));
       return next;
+    });
+  }, []);
+
+  const deleteWorkspaceEntry = useCallback((path: string, isDir: boolean) => {
+    // Watchers fire per removed path, which closes any open tabs and
+    // refreshes the tree — no extra bookkeeping here.
+    void deleteWorkspacePath(path, { recursive: isDir }).catch((err) => {
+      setWorkspaceError(err instanceof Error ? err.message : "Delete failed");
     });
   }, []);
 
@@ -1219,6 +1228,7 @@ export default function ChatPage() {
                     openInEditorTitle="Edit"
                     pinnedPaths={pinnedPaths}
                     onTogglePin={togglePin}
+                    onDeletePath={deleteWorkspaceEntry}
                     title="Files"
                   />
                 ) : (
@@ -1235,6 +1245,7 @@ export default function ChatPage() {
                     reloadToken={workspaceTreeVersion}
                     pinnedPaths={pinnedPaths}
                     onTogglePin={togglePin}
+                    onDeletePath={deleteWorkspaceEntry}
                     title="Files"
                   />
                 )}

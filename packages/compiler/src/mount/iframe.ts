@@ -218,6 +218,9 @@ function generateIframeContent(
     // Wait for widget code via postMessage (more efficient than inline in srcdoc)
     // We convert relative URLs to absolute so they work inside blob URL context
     window.addEventListener('message', async function handleWidgetCode(event) {
+      // Only the embedding parent may deliver widget code — this message
+      // becomes executable module source.
+      if (event.source !== window.parent) return;
       if (!event.data || event.data.type !== 'widget-code') return;
       window.removeEventListener('message', handleWidgetCode);
       

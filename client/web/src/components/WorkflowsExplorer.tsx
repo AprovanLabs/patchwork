@@ -34,19 +34,21 @@ interface RunSummary {
   startedAt: string;
 }
 
-export async function invokeWorkflowsTool(
-  operation: string,
-  args: Record<string, unknown>,
-): Promise<unknown> {
-  const res = await gatewayFetch(`${GATEWAY_BASE}/tools/workflows/${operation}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ args }),
-  });
-  const body = (await res.json()) as { data?: unknown; error?: string };
-  if (!res.ok) throw new Error(body.error ?? `workflows.${operation} failed (${res.status})`);
-  return body.data;
+function invokeNamespaceTool(namespace: string) {
+  return async (operation: string, args: Record<string, unknown>): Promise<unknown> => {
+    const res = await gatewayFetch(`${GATEWAY_BASE}/tools/${namespace}/${operation}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args }),
+    });
+    const body = (await res.json()) as { data?: unknown; error?: string };
+    if (!res.ok) throw new Error(body.error ?? `${namespace}.${operation} failed (${res.status})`);
+    return body.data;
+  };
 }
+
+export const invokeWorkflowsTool = invokeNamespaceTool("workflows");
+export const invokeAppsTool = invokeNamespaceTool("apps");
 
 function TriggerIcons({ workflow }: { workflow: WorkflowEntry }) {
   return (

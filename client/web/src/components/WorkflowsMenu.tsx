@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { invokeWorkflowsTool } from "@/components/WorkflowsExplorer";
+import { invokeAppsTool, invokeWorkflowsTool } from "@/components/WorkflowsExplorer";
 
 export function WorkflowsMenu({
   onOpenScript,
@@ -55,7 +55,11 @@ export function WorkflowsMenu({
           <DialogClose onClose={() => setOpen(false)} />
         </DialogHeader>
         <DialogContent>
-          <WorkflowsPanel invoke={invokeWorkflowsTool} onOpenScript={handleOpenScript} />
+          <WorkflowsPanel
+            invoke={invokeWorkflowsTool}
+            invokeApps={invokeAppsTool}
+            onOpenScript={handleOpenScript}
+          />
         </DialogContent>
       </Dialog>
     </>
