@@ -10,11 +10,17 @@ const TailorFlow = lazy(() =>
   import("@aprovan/registry-ui/tailor").then((m) => ({ default: m.TailorFlow })),
 );
 
-/** Workflow scripts: plain (non-JSX) js/ts under a workflows/ directory. */
-export function isWorkflowScript(path: string | undefined): boolean {
-  if (!path) return false;
-  if (!/(^|\/)workflows\//.test(path)) return false;
-  return /\.(js|ts|mjs)$/.test(path) && !/\.(jsx|tsx)$/.test(path);
+/**
+ * Workflow scripts render as a flow instead of compiling as widgets. A file
+ * is a workflow when it lives under a workflows/ directory (any extension —
+ * entrypoints are often named main.tsx), or when its content is a bare
+ * script body: widgets always `export` something, workflow scripts never do,
+ * and feeding a bare script (top-level await/return) to the widget compiler
+ * is a guaranteed build error.
+ */
+export function isWorkflowScript(path: string | undefined, code?: string): boolean {
+  if (path && /(^|\/)workflows\//.test(path)) return true;
+  return Boolean(code) && !/^\s*export\b/m.test(code ?? "");
 }
 
 export function WorkflowFlow({ source }: { source: string }) {

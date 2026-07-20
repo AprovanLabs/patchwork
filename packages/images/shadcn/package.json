@@ -1,6 +1,6 @@
 {
   "name": "@aprovan/patchwork-image-shadcn",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Patchwork image: ShadCN/ui with Tailwind CSS and Radix UI",
   "type": "module",
   "main": "./dist/index.js",
@@ -37,7 +37,7 @@
       "react-dom": "^18.0.0"
     },
     "esbuild": {
-      "target": "es2020",
+      "target": "es2022",
       "format": "esm",
       "jsx": "transform",
       "jsxFactory": "React.createElement",

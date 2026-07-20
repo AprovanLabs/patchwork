@@ -118,7 +118,7 @@ const workflowCustomPreview = ({
 }: {
   code: string;
   filePath?: string;
-}) => (isWorkflowScript(filePath) ? <WorkflowFlow source={code} /> : null);
+}) => (isWorkflowScript(filePath, code) ? <WorkflowFlow source={code} /> : null);
 
 const SharedEditSessionCtx = createContext<
   | ((session: {
@@ -424,7 +424,7 @@ const CHAT_PROVIDER_KEY = "patchwork:chat-provider";
 
 // Version-pinned: esm.sh caches the unversioned "latest" redirect for hours,
 // so a bare spec can silently serve a stale image after a publish.
-const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn@0.1.2";
+const IMAGE_SPEC = "@aprovan/patchwork-image-shadcn@0.1.3";
 // Local proxy for loading image packages, esm.sh for widget imports
 const IMAGE_CDN_URL = import.meta.env.DEV
   ? "/_local-packages"

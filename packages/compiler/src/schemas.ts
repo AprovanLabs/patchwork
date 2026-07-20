@@ -155,7 +155,7 @@ export function safeParseManifest(data: unknown): Manifest | null {
 export const DEFAULT_IMAGE_CONFIG: ImageConfig = {
   platform: 'browser',
   esbuild: {
-    target: 'es2020',
+    target: 'es2022',
     format: 'esm',
     jsx: 'automatic',
   },

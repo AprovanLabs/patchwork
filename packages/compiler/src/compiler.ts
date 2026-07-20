@@ -62,6 +62,20 @@ async function initEsbuild(
   return esbuildInitPromise;
 }
 
+const MIN_ES_TARGET = 2022;
+
+/**
+ * Upgrade es20xx targets below es2022 so top-level await always compiles.
+ * Non-es targets (node20, esnext, ...) pass through untouched.
+ */
+function floorTarget(target: string): string {
+  const match = /^es(\d{4})$/i.exec(target);
+  if (match && Number(match[1]) < MIN_ES_TARGET) {
+    return `es${MIN_ES_TARGET}`;
+  }
+  return target;
+}
+
 /**
  * Generate a content hash for caching
  */
@@ -166,7 +180,9 @@ class PatchworkCompiler implements Compiler {
     const esbuildConfig = image?.config.esbuild || {};
     const frameworkConfig = image?.config.framework || {};
 
-    const target = esbuildConfig.target || "es2020";
+    // Floor the target at es2022: top-level await is required by workflow
+    // scripts, and older published image configs still pin es2020.
+    const target = floorTarget(esbuildConfig.target || "es2022");
     const format = esbuildConfig.format || "esm";
     const jsx = esbuildConfig.jsx ?? "automatic";
 
