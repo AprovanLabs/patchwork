@@ -21,6 +21,7 @@ import {
   LayoutGrid,
   Plug,
   Plus,
+  RefreshCw,
   Radio,
   Server,
   Webhook,
@@ -73,6 +74,11 @@ const NATIVE_GROUPS: Record<
     label: "Webhooks",
     blurb: "Register provider webhooks that trigger workflows",
     Icon: Webhook,
+  },
+  sync: {
+    label: "Sync",
+    blurb: "Source → transform → sink data pipelines",
+    Icon: RefreshCw,
   },
   interfaces: {
     label: "Interfaces",
