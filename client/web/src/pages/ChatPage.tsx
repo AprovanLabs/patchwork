@@ -53,8 +53,9 @@ import {
 import { AppHeader } from "@aprovan/ui/shell";
 import { ServicesMenu } from "@/components/ServicesMenu";
 import SessionControls from "@/components/SessionControls";
-import { WorkflowFlow, isWorkflowScript } from "@/components/WorkflowFlow";
-import { JsonPreview, isJsonFile } from "@/components/JsonPreview";
+import { WorkspaceFilePreview } from "@/components/WorkspaceFilePreview";
+import { resolveRenderer } from "@aprovan/registry-ui/renderers";
+import "@aprovan/registry-ui/tailor";
 import { WorkflowsExplorer } from "@/components/WorkflowsExplorer";
 import { WorkflowsMenu } from "@/components/WorkflowsMenu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -111,10 +112,8 @@ function createPreviewManifest(services?: string[]) {
   };
 }
 
-// File-type renderers layered over the widget compiler: workflow scripts
-// (plain js/ts under workflows/) render as a Tailor flow, .json files get
-// the collapsible JSON tree. Anything unmatched falls through to the
-// editor's built-in previews.
+// Registry-ui renderers (workflow TailorFlow, JSON tree, …) layered over the
+// widget compiler. Unmatched types fall through to the editor defaults.
 const workflowCustomPreview = ({
   code,
   filePath,
@@ -122,9 +121,9 @@ const workflowCustomPreview = ({
   code: string;
   filePath?: string;
 }) => {
-  if (isWorkflowScript(filePath, code)) return <WorkflowFlow source={code} />;
-  if (isJsonFile(filePath)) return <JsonPreview code={code} />;
-  return null;
+  const input = { path: filePath, content: code };
+  if (!resolveRenderer(input)) return null;
+  return <WorkspaceFilePreview code={code} filePath={filePath} />;
 };
 
 const SharedEditSessionCtx = createContext<
