@@ -15,7 +15,7 @@
     "@aprovan/patchwork-compiler": "workspace:*",
     "@aprovan/patchwork-editor": "workspace:*",
     "@aprovan/registry-main": "0.1.0-dev.7343775",
-    "@aprovan/registry-ui": "^0.3.0",
+    "@aprovan/registry-ui": "0.3.0-dev.ae2213d",
     "@aprovan/ui": "^0.3.1",
     "@lobehub/icons-static-svg": "^1.93.0",
     "@radix-ui/react-avatar": "^1.1.11",
