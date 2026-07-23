@@ -17,12 +17,12 @@ import { MarkdownPreview } from '../MarkdownPreview';
 import { SaveStatusButton, type SaveStatus } from '../SaveStatusButton';
 import { CodeBlockView } from './CodeBlockView';
 import { EditHistory } from './EditHistory';
-import { FileTree } from './FileTree';
 import { getFileType, isCompilable, isMarkdownFile, getMimeType } from './fileTypes';
 import { MediaPreview } from './MediaPreview';
 import { SaveConfirmDialog } from './SaveConfirmDialog';
 import { getActiveContent, getFiles } from './types';
 import { useEditSession, type UseEditSessionOptions } from './useEditSession';
+import { WorkspaceTree } from './WorkspaceTree';
 import type { VirtualProject } from '@aprovan/patchwork-compiler';
 
 // Simple hash for React key to force re-render on code changes
@@ -90,6 +90,8 @@ export function EditModal({
   const effectiveTreePath = treePath || session.activeFile;
   currentCodeRef.current = code;
   const files = useMemo(() => getFiles(session.project), [session.project]);
+  const treePaths = useMemo(() => files.map((f) => f.path), [files]);
+  const activeFileName = session.activeFile.split('/').pop() ?? session.activeFile;
   const projectSnapshot = useMemo(
     () =>
       Array.from(session.project.files.entries())
@@ -230,10 +232,14 @@ export function EditModal({
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 sm:p-8">
-      <div className="flex flex-col bg-background shadow-xl w-full h-full max-w-6xl max-h-[100dvh] sm:max-h-[90vh] overflow-hidden rounded-none sm:rounded-lg">
-        <div className="flex items-center gap-2 px-4 py-3 bg-background border-b-2">
-          <Pencil className="h-4 w-4 text-primary" />
+    {/* Full-view editing surface — fills the viewport like an IDE panel, not a
+        dialog floating in a scrim. */}
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+        <div className="flex items-center gap-2 px-4 py-2 bg-background border-b shrink-0">
+          <Pencil className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-sm font-medium truncate max-w-[40vw]" title={session.activeFile}>
+            {activeFileName}
+          </span>
           {session.isApplying && (
             <span className="text-xs font-medium text-primary flex items-center gap-1 ml-2">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -287,19 +293,20 @@ export function EditModal({
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 border-b-2 overflow-hidden flex">
+        <div className="flex-1 min-h-0 border-b overflow-hidden flex">
           {!hideFileTree && showTree && (
-            <FileTree
-              files={files}
-              activeFile={session.activeFile}
-              activePath={effectiveTreePath}
-              onSelectFile={(path) => {
-                setTreePath(path);
-                session.setActiveFile(path);
-              }}
-              onSelectDirectory={(path) => setTreePath(path)}
-              onReplaceFile={session.replaceFile}
-            />
+            <aside className="w-64 max-w-[45vw] sm:max-w-none shrink-0 border-r bg-muted/20 flex flex-col min-h-0">
+              <WorkspaceTree
+                paths={treePaths}
+                activePath={effectiveTreePath}
+                onSelectFile={(path) => {
+                  setTreePath(path);
+                  session.setActiveFile(path);
+                }}
+                onSelectDirectory={(path) => setTreePath(path)}
+                className="flex-1 min-h-0"
+              />
+            </aside>
           )}
           <div className="flex-1 min-w-0 overflow-auto">
             {fileType.category === 'compilable' && showPreview ? (
@@ -371,23 +378,25 @@ export function EditModal({
           </div>
         </div>
 
-        <EditHistory
-          entries={session.history}
-          streamingNotes={session.streamingNotes}
-          isStreaming={session.isApplying}
-          pendingPrompt={session.pendingPrompt}
-          className="h-36 sm:h-48"
-        />
+        <div className="shrink-0">
+          <EditHistory
+            entries={session.history}
+            streamingNotes={session.streamingNotes}
+            isStreaming={session.isApplying}
+            pendingPrompt={session.pendingPrompt}
+            className="h-36 sm:h-48"
+          />
+        </div>
 
         {(session.error || saveError) && (
-          <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm flex items-center gap-2 border-t-2 border-destructive">
+          <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm flex items-center gap-2 border-t border-destructive shrink-0">
             <AlertCircle className="h-4 w-4 shrink-0" />
             {session.error || saveError}
           </div>
         )}
 
         {bobbinChanges.length > 0 && (
-          <div className="px-4 py-2 bg-blue-50 text-blue-700 text-sm flex items-center gap-2 border-t">
+          <div className="px-4 py-2 bg-blue-50 text-blue-700 text-sm flex items-center gap-2 border-t shrink-0">
             <span>{bobbinChanges.length} visual change{bobbinChanges.length !== 1 ? 's' : ''}</span>
             <button
               onClick={() => setBobbinChanges([])}
@@ -398,7 +407,7 @@ export function EditModal({
           </div>
         )}
 
-        <div className="p-4 border-t-2 bg-primary/5 flex gap-2 items-end">
+        <div className="p-4 border-t bg-primary/5 flex gap-2 items-end shrink-0">
           <div className="flex-1">
             <MarkdownEditor
               value={editInput}
@@ -420,7 +429,6 @@ export function EditModal({
             )}
           </button>
         </div>
-      </div>
     </div>
     <SaveConfirmDialog
       isOpen={showConfirm}

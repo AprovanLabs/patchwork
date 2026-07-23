@@ -10,7 +10,7 @@ import {
   WidgetPreview,
   MarkdownEditor,
   EditModal,
-  FileTree,
+  WorkspaceTree,
   type ServiceInfo,
 } from "@aprovan/patchwork-editor";
 import { DefaultChatTransport } from "ai";
@@ -74,9 +74,7 @@ import { gatewayFetch } from "@/lib/gateway-fetch";
 import { credentialsUrl } from "@/lib/registry";
 import {
   deleteWorkspacePath,
-  listWorkspaceEntries,
   listWorkspacePaths,
-  toWorkspaceTreeFiles,
   loadWorkspaceDirectoryProject,
   loadWorkspaceFileProject,
   createSingleWorkspaceFileProject,
@@ -533,7 +531,6 @@ export default function ChatPage() {
   const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([]);
   const [workspaceActivePath, setWorkspaceActivePath] = useState("");
   const [workspaceFilter, setWorkspaceFilter] = useState("");
-  const [workspaceTreeVersion, setWorkspaceTreeVersion] = useState(0);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(
@@ -625,11 +622,9 @@ export default function ChatPage() {
     setWorkspaceLoading(true);
     setWorkspaceError(null);
     try {
-      if (workspaceFilter.trim()) {
-        const paths = await listWorkspacePaths();
-        setWorkspaceFiles(paths);
-      }
-      setWorkspaceTreeVersion((prev) => prev + 1);
+      // The tree is fed the full flat path list; the filter narrows it
+      // client-side, so always reload the complete set.
+      setWorkspaceFiles(await listWorkspacePaths());
     } catch (err) {
       setWorkspaceError(
         err instanceof Error ? err.message : "Failed to load workspace",
@@ -637,7 +632,7 @@ export default function ChatPage() {
     } finally {
       setWorkspaceLoading(false);
     }
-  }, [workspaceFilter]);
+  }, []);
 
   useEffect(() => {
     return subscribeToWorkspaceChanges((_event, changedPath) => {
@@ -657,11 +652,10 @@ export default function ChatPage() {
       // fire callbacks synchronously, so only the first one triggers a fetch.
       if (pendingTreeRefreshRef.current) return;
       pendingTreeRefreshRef.current = true;
-      setWorkspaceTreeVersion((prev) => prev + 1);
       listWorkspacePaths()
         .then((allPaths) => {
           pendingTreeRefreshRef.current = false;
-          if (workspaceFilter.trim()) setWorkspaceFiles(allPaths);
+          setWorkspaceFiles(allPaths);
           const existing = new Set(allPaths);
           setOpenTabs((prev) => {
             let changed = false;
@@ -674,11 +668,11 @@ export default function ChatPage() {
         })
         .catch(() => { pendingTreeRefreshRef.current = false; });
     });
-  }, [workspaceFilter]);
+  }, []);
 
+  // Seed the tree with the full path list on mount and whenever the active
+  // workspace switches.
   useEffect(() => {
-    if (!workspaceFilter.trim()) return;
-
     setWorkspaceLoading(true);
     setWorkspaceError(null);
 
@@ -690,7 +684,7 @@ export default function ChatPage() {
         );
       })
       .finally(() => setWorkspaceLoading(false));
-  }, [workspaceFilter]);
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     // Fetch available services directly from the gateway.
@@ -1222,36 +1216,19 @@ export default function ChatPage() {
                 <div className="p-3 text-xs text-destructive">
                   {workspaceError}
                 </div>
-              ) : workspaceFilter.trim() ? (
-                <FileTree
-                  files={toWorkspaceTreeFiles(filteredWorkspaceFiles)}
-                  activePath={workspaceActivePath}
-                  onSelectFile={openWorkspacePreview}
-                  onSelectDirectory={setWorkspaceActivePath}
-                  onOpenInEditor={openWorkspaceSession}
-                  openInEditorMode="all"
-                  openInEditorTitle="Edit"
-                  pinnedPaths={pinnedPaths}
-                  onTogglePin={togglePin}
-                  onDeletePath={deleteWorkspaceEntry}
-                  title="Files"
-                />
               ) : (
-                <FileTree
-                  files={[]}
+                <WorkspaceTree
+                  paths={filteredWorkspaceFiles}
                   activePath={workspaceActivePath}
                   onSelectFile={openWorkspacePreview}
                   onSelectDirectory={setWorkspaceActivePath}
                   onOpenInEditor={openWorkspaceSession}
-                  openInEditorMode="all"
                   openInEditorTitle="Edit"
-                  directoryLoader={listWorkspaceEntries}
-                  pageSize={10}
-                  reloadToken={workspaceTreeVersion}
                   pinnedPaths={pinnedPaths}
                   onTogglePin={togglePin}
                   onDeletePath={deleteWorkspaceEntry}
                   title="Files"
+                  className="flex-1 min-h-0"
                 />
               )}
               <div className="mt-auto">

@@ -71,8 +71,8 @@ importers:
         specifier: 0.1.0-dev.7343775
         version: 0.1.0-dev.7343775
       '@aprovan/registry-ui':
-        specifier: 0.3.0-dev.c559885
-        version: 0.3.0-dev.c559885(@codemirror/lint@6.9.7)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: 0.3.0-dev.89d8d73
+        version: 0.3.0-dev.89d8d73(@codemirror/lint@6.9.7)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@aprovan/ui':
         specifier: ^0.3.1
         version: 0.3.1(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -241,6 +241,9 @@ importers:
       '@aprovan/patchwork-compiler':
         specifier: workspace:*
         version: link:../compiler
+      '@pierre/trees':
+        specifier: 1.0.0-beta.5
+        version: 1.0.0-beta.5(@shikijs/themes@3.22.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(shiki@3.22.0)
       '@tiptap/core':
         specifier: ^3.19.0
         version: 3.20.0(@tiptap/pm@3.20.0)
@@ -471,8 +474,8 @@ packages:
   '@aprovan/registry-main@0.1.0-dev.7343775':
     resolution: {integrity: sha512-Z4my5ZGDJbNCk3kQ3sFRc2fcJKs6LCo0Ghx08Lw1k9CFawpiKeVXDBcTYNJQuEVq77wl1FbqBO+74zxwgseOPA==}
 
-  '@aprovan/registry-ui@0.3.0-dev.c559885':
-    resolution: {integrity: sha512-l9ECsozBXdpZSCRrLp6eRkDHEFGiBMCaYah71IocA9v69i0tGqbuPbb3206MLf0xBbUxf3zz7ZR1TP+Uie/zlg==}
+  '@aprovan/registry-ui@0.3.0-dev.89d8d73':
+    resolution: {integrity: sha512-bvvSncJxWUE0jZ/wcJSIjKUILdFuobLrJAibqiMcaFmCXJy6ejobeJAh5eN5QlVcntW3ByOZGWJY9js9Z3369w==}
     peerDependencies:
       react: '>=18'
 
@@ -1294,6 +1297,32 @@ packages:
 
   '@package-json/types@0.0.12':
     resolution: {integrity: sha512-uu43FGU34B5VM9mCNjXCwLaGHYjXdNincqKLaraaCW+7S2+SmiBg1Nv8bPnmschrIfZmfKNY9f3fC376MRrObw==}
+
+  '@pierre/theming@0.0.2':
+    resolution: {integrity: sha512-QM1M4stXfnzfaE8I8YbjXSApV8c+2dBsXJj8eYg9WTpBR/cTmCZIcfGnN4p13iRrYu2Br/R/OJfEL7uR8Qjctw==}
+    peerDependencies:
+      '@pierre/theme': ^1.1.0
+      '@shikijs/themes': ^3.0.0 || ^4.0.0
+      react: ^18.3.1 || ^19.0.0
+      react-dom: ^18.3.1 || ^19.0.0
+      shiki: ^3.0.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@pierre/theme':
+        optional: true
+      '@shikijs/themes':
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
+      shiki:
+        optional: true
+
+  '@pierre/trees@1.0.0-beta.5':
+    resolution: {integrity: sha512-IzxkB9qv6GLbeEXObhlAD205LfYHiLeRwJdnaIdX0f5keTZF4X9EfiuEQ3QiyxOxouVVmUX3rX7m6a8zNMo/wA==}
+    peerDependencies:
+      react: ^18.3.1 || ^19.0.0
+      react-dom: ^18.3.1 || ^19.0.0
 
   '@playwright/test@1.61.0':
     resolution: {integrity: sha512-cKA5B6lpFEMyMGjxF54QihfYpB4FkEGH+qZhtArDEG+wezQAJY8Pq6C7T1SjWz+FFzt3TbyoXBQYk/0292TdJA==}
@@ -5073,6 +5102,14 @@ packages:
     resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
     engines: {node: ^10 || ^12 || >=14}
 
+  preact-render-to-string@6.6.5:
+    resolution: {integrity: sha512-O6MHzYNIKYaiSX3bOw0gGZfEbOmlIDtDfWwN1JJdc/T3ihzRT6tGGSEWE088dWrEDGa1u7101q+6fzQnO9XCPA==}
+    peerDependencies:
+      preact: '>=10 || >= 11.0.0-0'
+
+  preact@11.0.0-beta.0:
+    resolution: {integrity: sha512-IcODoASASYwJ9kxz7+MJeiJhvLriwSb4y4mHIyxdgaRZp6kPUud7xytrk/6GZw8U3y6EFJaRb5wi9SrEK+8+lg==}
+
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
@@ -6079,7 +6116,7 @@ snapshots:
 
   '@aprovan/registry-main@0.1.0-dev.7343775': {}
 
-  '@aprovan/registry-ui@0.3.0-dev.c559885(@codemirror/lint@6.9.7)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@aprovan/registry-ui@0.3.0-dev.89d8d73(@codemirror/lint@6.9.7)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@aprovan/registry-main': 0.1.0-dev.7343775
       '@aprovan/ui': 0.2.4(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -6880,6 +6917,25 @@ snapshots:
   '@opentelemetry/api@1.9.0': {}
 
   '@package-json/types@0.0.12': {}
+
+  '@pierre/theming@0.0.2(@shikijs/themes@3.22.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(shiki@3.22.0)':
+    optionalDependencies:
+      '@shikijs/themes': 3.22.0
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+      shiki: 3.22.0
+
+  '@pierre/trees@1.0.0-beta.5(@shikijs/themes@3.22.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(shiki@3.22.0)':
+    dependencies:
+      '@pierre/theming': 0.0.2(@shikijs/themes@3.22.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(shiki@3.22.0)
+      preact: 11.0.0-beta.0
+      preact-render-to-string: 6.6.5(preact@11.0.0-beta.0)
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+    transitivePeerDependencies:
+      - '@pierre/theme'
+      - '@shikijs/themes'
+      - shiki
 
   '@playwright/test@1.61.0':
     dependencies:
@@ -11118,6 +11174,12 @@ snapshots:
       nanoid: 3.3.11
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  preact-render-to-string@6.6.5(preact@11.0.0-beta.0):
+    dependencies:
+      preact: 11.0.0-beta.0
+
+  preact@11.0.0-beta.0: {}
 
   prelude-ls@1.2.1: {}
 

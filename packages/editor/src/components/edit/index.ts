@@ -7,7 +7,7 @@ export * from './useProjectState';
 export * from './useEditSession';
 export * from './EditHistory';
 export * from './EditModal';
-export * from './FileTree';
+export * from './WorkspaceTree';
 export * from './SaveConfirmDialog';
 export * from './fileTypes';
 export * from './CodeBlockView';

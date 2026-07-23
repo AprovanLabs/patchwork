@@ -40,12 +40,6 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 const mimeType = (path: string): string =>
   MIME_BY_EXTENSION[path.split(".").pop() ?? ""] ?? "text/plain";
 
-export interface WorkspaceEntry {
-  name: string;
-  path: string;
-  isDir: boolean;
-}
-
 interface WorkspaceBackend {
   /** Every file path, sorted, optionally under a prefix. */
   list(prefix?: string): Promise<string[]>;
@@ -398,35 +392,6 @@ export async function deleteWorkspacePath(
   for (const removedPath of removed.length > 0 ? removed : [target]) {
     for (const watcher of watchers) watcher("delete", removedPath);
   }
-}
-
-export function toWorkspaceTreeFiles(paths: string[]): VirtualFile[] {
-  return paths.map((path) => ({ path, content: "" }));
-}
-
-/** Immediate children of a directory, derived from the flat path list. */
-export async function listWorkspaceEntries(
-  path = "",
-): Promise<WorkspaceEntry[]> {
-  const scope = normalize(path);
-  const paths = await (await backend()).list(scope);
-  const children = new Map<string, WorkspaceEntry>();
-  for (const filePath of paths) {
-    const relative = scope ? filePath.slice(scope.length + 1) : filePath;
-    if (!relative) continue;
-    const [head, ...rest] = relative.split("/");
-    if (!head || children.has(head)) continue;
-    children.set(head, {
-      name: head,
-      path: scope ? `${scope}/${head}` : head,
-      isDir: rest.length > 0,
-    });
-  }
-  return [...children.values()].sort(
-    (left, right) =>
-      Number(right.isDir) - Number(left.isDir) ||
-      left.name.localeCompare(right.name),
-  );
 }
 
 export async function listWorkspacePaths(): Promise<string[]> {

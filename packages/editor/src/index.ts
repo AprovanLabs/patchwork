@@ -9,7 +9,7 @@ export { ServicesInspector, type ServiceInfo } from "./components/ServicesInspec
 export {
   EditModal,
   EditHistory,
-  FileTree,
+  WorkspaceTree,
   SaveConfirmDialog,
   CodeBlockView,
   MediaPreview,
@@ -27,7 +27,7 @@ export {
   type CompileResult,
   type CompileFn,
   type EditApiOptions,
-  type FileTreeProps,
+  type WorkspaceTreeProps,
   type SaveConfirmDialogProps,
   type CodeBlockViewProps,
   type MediaPreviewProps,
