@@ -1,6 +1,10 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { defaultTokens } from '../tokens';
-import { applyStyleToElement, enableContentEditable } from '../utils/dom';
+import {
+  applyStyleToElement,
+  computedStyleOf,
+  enableContentEditable,
+} from '../utils/dom';
 import { getElementPath, getElementXPath } from '../utils/selectors';
 import { serializeChangesToYAML } from './changeSerializer';
 import { useChangeTracker } from './useChangeTracker';
@@ -43,12 +47,17 @@ export function useBobbin(props: BobbinProps = {}) {
   );
 
   // Element selection
-  const { hoveredElement, selectedElement, selectElement, clearSelection } =
-    useElementSelection({
-      container,
-      exclude: [...exclude, '[data-bobbin]'],
-      enabled: isActive,
-    });
+  const {
+    hoveredElement,
+    selectedElement,
+    selectElement,
+    clearSelection,
+    documents,
+  } = useElementSelection({
+    container,
+    exclude: [...exclude, '[data-bobbin]'],
+    enabled: isActive,
+  });
 
   // Change tracking
   const changeTracker = useChangeTracker();
@@ -106,7 +115,7 @@ export function useBobbin(props: BobbinProps = {}) {
       if (!selectedElement) return;
 
       const el = selectedElement.element;
-      const originalValue = getComputedStyle(el).getPropertyValue(property);
+      const originalValue = computedStyleOf(el).getPropertyValue(property);
 
       applyStyleToElement(el, property, value);
       changeTracker.recordStyleChange(
@@ -202,7 +211,7 @@ export function useBobbin(props: BobbinProps = {}) {
       if (!selectedElement) return;
 
       const el = selectedElement.element;
-      const newEl = document.createElement('span');
+      const newEl = el.ownerDocument.createElement('span');
       newEl.textContent = content || '\u200B'; // Zero-width space if empty
       newEl.contentEditable = 'true';
 
@@ -335,19 +344,22 @@ export function useBobbin(props: BobbinProps = {}) {
   const resetChanges = useCallback(() => {
     const originalStates = changeTracker.originalStates;
 
-    // Revert all changes by applying original values
+    // Revert all changes by applying original values. Paths are relative to
+    // the document that owns them — widget elements live in a frame.
     for (const [path, properties] of originalStates.entries()) {
-      // Find the element by path
-      const el = document.querySelector(path) as HTMLElement;
-      if (!el) continue;
+      for (const doc of documents) {
+        const el = doc.querySelector(path) as HTMLElement | null;
+        if (!el) continue;
 
-      for (const [property, originalValue] of properties.entries()) {
-        applyStyleToElement(el, property, originalValue);
+        for (const [property, originalValue] of properties.entries()) {
+          applyStyleToElement(el, property, originalValue);
+        }
+        break;
       }
     }
 
     changeTracker.clearChanges();
-  }, [changeTracker]);
+  }, [changeTracker, documents]);
 
   const exportChanges = useCallback(() => {
     return serializeChangesToYAML(

@@ -1,3 +1,4 @@
+import { computedStyleOf, viewportRect } from '../../utils/dom';
 import type { SelectedElement } from '../../types';
 
 interface MarginPaddingOverlayProps {
@@ -10,7 +11,7 @@ export function MarginPaddingOverlay({
   zIndex = 9997,
 }: MarginPaddingOverlayProps) {
   const { element, rect } = selectedElement;
-  const computed = window.getComputedStyle(element);
+  const computed = computedStyleOf(element);
 
   const margin = {
     top: parseFloat(computed.marginTop) || 0,
@@ -47,9 +48,9 @@ export function MarginPaddingOverlay({
     if (!isFlexOrGrid || (rowGap === 0 && columnGap === 0)) return [];
     
     const children = Array.from(element.children).filter(
-      child => child instanceof HTMLElement && 
-               getComputedStyle(child).display !== 'none' &&
-               getComputedStyle(child).visibility !== 'hidden'
+      child => child instanceof HTMLElement &&
+               computedStyleOf(child).display !== 'none' &&
+               computedStyleOf(child).visibility !== 'hidden'
     ) as HTMLElement[];
     
     if (children.length < 2) return [];
@@ -61,8 +62,8 @@ export function MarginPaddingOverlay({
       const nextChild = children[i + 1];
       if (!currentChild || !nextChild) continue;
       
-      const currentRect = currentChild.getBoundingClientRect();
-      const nextRect = nextChild.getBoundingClientRect();
+      const currentRect = viewportRect(currentChild);
+      const nextRect = viewportRect(nextChild);
       
       if (isColumn || display.includes('grid')) {
         // For column flex or grid, show row gaps (vertical gaps between rows)

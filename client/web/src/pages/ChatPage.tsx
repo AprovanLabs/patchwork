@@ -61,7 +61,6 @@ import { WorkflowsMenu } from "@/components/WorkflowsMenu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -556,7 +555,9 @@ export default function ChatPage() {
   const [connectedProviders, setConnectedProviders] = useState<string[] | null>(
     null,
   );
-  const [chatContainer, setChatContainer] = useState<HTMLDivElement | null>(
+  // The rendered widget's surface — Bobbin scopes selection and anchors its
+  // pill to it rather than to the page.
+  const [previewSurface, setPreviewSurface] = useState<HTMLDivElement | null>(
     null,
   );
   const [editSession, setEditSession] = useState<{
@@ -1140,250 +1141,262 @@ export default function ChatPage() {
   return (
     <PatchworkCtx.Provider value={patchworkCtx}>
       <SharedEditSessionCtx.Provider value={openSharedEditSession}>
-        <div
-          className="flex flex-col h-dvh max-w-6xl mx-auto p-0 sm:p-4"
-          ref={setChatContainer}
-        >
-          <Card className="flex-1 flex flex-col min-h-0 overflow-hidden border max-sm:rounded-none max-sm:border-x-0">
-            {/* Shared shell header (same AppHeader as the home page and
-                registry) with chat-specific controls in its slots. */}
-            <AppHeader
-              className="static border-b bg-transparent backdrop-blur-none"
-              homeHref="https://aprovan.com/"
-              leading={
-                <button
-                  onClick={() => setSidebarOpen((open) => !open)}
-                  className="md:hidden p-1.5 -ml-1 rounded hover:bg-muted"
-                  title="Toggle workspace files"
-                >
-                  <PanelLeft className="h-4 w-4" />
-                </button>
-              }
-              links={[
-                { label: "Home", href: "https://aprovan.com/" },
-                { label: "Registry", href: "https://aprovan.com/registry/" },
-              ]}
-              logo={
-                <img
-                  src={APROVAN_LOGO}
-                  alt="Aprovan"
-                  className="h-7 w-7 rounded-full"
-                />
-              }
-              name="patchwork"
-            >
-              <ServicesMenu services={services} />
-              <WorkflowsMenu
-                onOpenScript={openWorkspacePreview}
-                open={workflowsPanelOpen}
-                onOpenChange={setWorkflowsPanelOpen}
+        {/* Full-bleed app shell: the viewport is the frame, so the preview
+            surface gets every pixel the sidebar doesn't need. Prose keeps its
+            own readable measure below. */}
+        <div className="flex flex-col h-dvh overflow-hidden bg-background">
+          {/* Shared shell header (same AppHeader as the home page and
+              registry) with chat-specific controls in its slots. */}
+          <AppHeader
+            className="static shrink-0 border-b bg-transparent backdrop-blur-none"
+            homeHref="https://aprovan.com/"
+            leading={
+              <button
+                onClick={() => setSidebarOpen((open) => !open)}
+                className="md:hidden p-1.5 -ml-1 rounded hover:bg-muted"
+                title="Toggle workspace files"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </button>
+            }
+            links={[
+              { label: "Home", href: "https://aprovan.com/" },
+              { label: "Registry", href: "https://aprovan.com/registry/" },
+            ]}
+            logo={
+              <img
+                src={APROVAN_LOGO}
+                alt="Aprovan"
+                className="h-7 w-7 rounded-full"
               />
-              <SessionControls
-                onLoad={handleWorkspaceLoad}
-                onSwitch={handleWorkspaceSwitch}
-              />
-            </AppHeader>
+            }
+            name="patchwork"
+          >
+            <ServicesMenu services={services} />
+            <WorkflowsMenu
+              onOpenScript={openWorkspacePreview}
+              open={workflowsPanelOpen}
+              onOpenChange={setWorkflowsPanelOpen}
+            />
+            <SessionControls
+              onLoad={handleWorkspaceLoad}
+              onSwitch={handleWorkspaceSwitch}
+            />
+          </AppHeader>
 
-            <CardContent className="flex-1 p-0 min-h-0 flex relative">
-              {sidebarOpen && (
-                <div
-                  className="md:hidden absolute inset-0 z-30 bg-black/40"
-                  onClick={() => setSidebarOpen(false)}
+          <div className="flex-1 min-h-0 flex relative">
+            {sidebarOpen && (
+              <div
+                className="md:hidden absolute inset-0 z-30 bg-black/40"
+                onClick={() => setSidebarOpen(false)}
+              />
+            )}
+            <div
+              className={`${
+                sidebarOpen ? "flex" : "hidden"
+              } md:flex flex-col min-h-0 border-r bg-background md:bg-muted/20 absolute inset-y-0 left-0 z-40 w-72 max-w-[85vw] shadow-lg md:static md:w-72 md:max-w-none md:shadow-none`}
+            >
+              <div className="px-3 py-2 border-b flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <span>Workspace</span>
+                <button
+                  onClick={() => void refreshWorkspace()}
+                  className="ml-auto p-1 rounded hover:bg-muted"
+                  title="Refresh workspace"
+                >
+                  <RefreshCw
+                    className={`h-3 w-3 ${
+                      workspaceLoading ? "animate-spin" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="p-2 border-b">
+                <Input
+                  value={workspaceFilter}
+                  onChange={(e) => setWorkspaceFilter(e.target.value)}
+                  placeholder="Filter files..."
+                  className="h-8"
+                />
+              </div>
+              {workspaceError ? (
+                <div className="p-3 text-xs text-destructive">
+                  {workspaceError}
+                </div>
+              ) : workspaceFilter.trim() ? (
+                <FileTree
+                  files={toWorkspaceTreeFiles(filteredWorkspaceFiles)}
+                  activePath={workspaceActivePath}
+                  onSelectFile={openWorkspacePreview}
+                  onSelectDirectory={setWorkspaceActivePath}
+                  onOpenInEditor={openWorkspaceSession}
+                  openInEditorMode="all"
+                  openInEditorTitle="Edit"
+                  pinnedPaths={pinnedPaths}
+                  onTogglePin={togglePin}
+                  onDeletePath={deleteWorkspaceEntry}
+                  title="Files"
+                />
+              ) : (
+                <FileTree
+                  files={[]}
+                  activePath={workspaceActivePath}
+                  onSelectFile={openWorkspacePreview}
+                  onSelectDirectory={setWorkspaceActivePath}
+                  onOpenInEditor={openWorkspaceSession}
+                  openInEditorMode="all"
+                  openInEditorTitle="Edit"
+                  directoryLoader={listWorkspaceEntries}
+                  pageSize={10}
+                  reloadToken={workspaceTreeVersion}
+                  pinnedPaths={pinnedPaths}
+                  onTogglePin={togglePin}
+                  onDeletePath={deleteWorkspaceEntry}
+                  title="Files"
                 />
               )}
-              <div
-                className={`${
-                  sidebarOpen ? "flex" : "hidden"
-                } md:flex flex-col min-h-0 border-r bg-background md:bg-muted/20 absolute inset-y-0 left-0 z-40 w-72 max-w-[85vw] shadow-lg md:static md:w-72 md:max-w-none md:shadow-none`}
-              >
-                <div className="px-3 py-2 border-b flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  <span>Workspace</span>
-                  <button
-                    onClick={() => void refreshWorkspace()}
-                    className="ml-auto p-1 rounded hover:bg-muted"
-                    title="Refresh workspace"
-                  >
-                    <RefreshCw
-                      className={`h-3 w-3 ${
-                        workspaceLoading ? "animate-spin" : ""
-                      }`}
-                    />
-                  </button>
-                </div>
-                <div className="p-2 border-b">
-                  <Input
-                    value={workspaceFilter}
-                    onChange={(e) => setWorkspaceFilter(e.target.value)}
-                    placeholder="Filter files..."
-                    className="h-8"
-                  />
-                </div>
-                {workspaceError ? (
-                  <div className="p-3 text-xs text-destructive">
-                    {workspaceError}
-                  </div>
-                ) : workspaceFilter.trim() ? (
-                  <FileTree
-                    files={toWorkspaceTreeFiles(filteredWorkspaceFiles)}
-                    activePath={workspaceActivePath}
-                    onSelectFile={openWorkspacePreview}
-                    onSelectDirectory={setWorkspaceActivePath}
-                    onOpenInEditor={openWorkspaceSession}
-                    openInEditorMode="all"
-                    openInEditorTitle="Edit"
-                    pinnedPaths={pinnedPaths}
-                    onTogglePin={togglePin}
-                    onDeletePath={deleteWorkspaceEntry}
-                    title="Files"
-                  />
-                ) : (
-                  <FileTree
-                    files={[]}
-                    activePath={workspaceActivePath}
-                    onSelectFile={openWorkspacePreview}
-                    onSelectDirectory={setWorkspaceActivePath}
-                    onOpenInEditor={openWorkspaceSession}
-                    openInEditorMode="all"
-                    openInEditorTitle="Edit"
-                    directoryLoader={listWorkspaceEntries}
-                    pageSize={10}
-                    reloadToken={workspaceTreeVersion}
-                    pinnedPaths={pinnedPaths}
-                    onTogglePin={togglePin}
-                    onDeletePath={deleteWorkspaceEntry}
-                    title="Files"
-                  />
-                )}
-                <div className="mt-auto">
-                  <WorkflowsExplorer
-                    onOpenScript={(path) => {
-                      setSidebarOpen(false);
-                      openWorkspacePreview(path);
-                    }}
-                    onOpenPanel={() => setWorkflowsPanelOpen(true)}
-                  />
-                </div>
+              <div className="mt-auto">
+                <WorkflowsExplorer
+                  onOpenScript={(path) => {
+                    setSidebarOpen(false);
+                    openWorkspacePreview(path);
+                  }}
+                  onOpenPanel={() => setWorkflowsPanelOpen(true)}
+                />
               </div>
-              <div className="flex-1 min-h-0 flex flex-col">
-                {openTabs.size > 0 && (
-                  <div className="border-b bg-muted/10">
-                    {/* Tab bar */}
-                    <div className="flex items-center border-b bg-muted/30">
-                      <div className="flex-1 flex items-center overflow-x-auto min-w-0">
-                        {[...openTabs.entries()].map(([path, tab]) => {
-                          const fileName = path.split("/").pop() ?? path;
-                          const isActive = path === activeTabPath;
-                          const isStale = tab.stale ?? false;
-                          return (
-                            <button
-                              key={path}
-                              onClick={() => {
-                                setActiveTabPath(path);
-                                setWorkspaceActivePath(path);
-                                setPreviewCollapsed(false);
-                              }}
-                              className={`group relative flex items-center gap-1.5 px-3 py-1.5 text-xs border-r shrink-0 max-w-[200px] ${
-                                isActive
-                                  ? "bg-background text-foreground border-b-2 border-b-primary"
-                                  : "text-muted-foreground hover:bg-muted/50"
-                              }`}
-                              title={isStale ? `${path} — modified externally` : path}
-                            >
-                              {isStale && (
-                                <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-orange-400" title="Modified externally" />
-                              )}
-                              <span className={`truncate ${isStale ? "text-orange-600 dark:text-orange-400" : ""}`}>{fileName}</span>
-                              {isStale && (
-                                <span
-                                  role="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    reloadStaleTab(path);
-                                  }}
-                                  className="shrink-0 p-0.5 rounded hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Reload from server"
-                                >
-                                  <RotateCcw className="h-3 w-3" />
-                                </span>
-                              )}
+            </div>
+
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+              {openTabs.size > 0 && (
+                <div
+                  className={`flex flex-col border-b bg-muted/10 ${
+                    previewCollapsed ? "shrink-0" : "flex-[2] min-h-0"
+                  }`}
+                >
+                  {/* Tab bar */}
+                  <div className="flex items-center border-b bg-muted/30 shrink-0">
+                    <div className="flex-1 flex items-center overflow-x-auto min-w-0">
+                      {[...openTabs.entries()].map(([path, tab]) => {
+                        const fileName = path.split("/").pop() ?? path;
+                        const isActive = path === activeTabPath;
+                        const isStale = tab.stale ?? false;
+                        return (
+                          <button
+                            key={path}
+                            onClick={() => {
+                              setActiveTabPath(path);
+                              setWorkspaceActivePath(path);
+                              setPreviewCollapsed(false);
+                            }}
+                            className={`group relative flex items-center gap-1.5 px-3 py-1.5 text-xs border-r shrink-0 max-w-[200px] ${
+                              isActive
+                                ? "bg-background text-foreground border-b-2 border-b-primary"
+                                : "text-muted-foreground hover:bg-muted/50"
+                            }`}
+                            title={isStale ? `${path} — modified externally` : path}
+                          >
+                            {isStale && (
+                              <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-orange-400" title="Modified externally" />
+                            )}
+                            <span className={`truncate ${isStale ? "text-orange-600 dark:text-orange-400" : ""}`}>{fileName}</span>
+                            {isStale && (
                               <span
                                 role="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  closeTab(path);
+                                  reloadStaleTab(path);
                                 }}
                                 className="shrink-0 p-0.5 rounded hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="Close tab"
+                                title="Reload from server"
                               >
-                                <X className="h-3 w-3" />
+                                <RotateCcw className="h-3 w-3" />
                               </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="flex items-center gap-0.5 px-1 shrink-0">
-                        <button
-                          onClick={() => setPreviewCollapsed((p) => !p)}
-                          className="p-1 rounded hover:bg-muted"
-                          title={previewCollapsed ? "Expand preview" : "Collapse preview"}
-                        >
-                          {previewCollapsed ? (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          ) : (
-                            <Minus className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                        <button
-                          onClick={closeAllTabs}
-                          className="p-1 rounded hover:bg-muted"
-                          title="Close all tabs"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                            )}
+                            <span
+                              role="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                closeTab(path);
+                              }}
+                              className="shrink-0 p-0.5 rounded hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Close tab"
+                            >
+                              <X className="h-3 w-3" />
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
+                    <div className="flex items-center gap-0.5 px-1 shrink-0">
+                      <button
+                        onClick={() => setPreviewCollapsed((p) => !p)}
+                        className="p-1 rounded hover:bg-muted"
+                        title={previewCollapsed ? "Expand preview" : "Collapse preview"}
+                      >
+                        {previewCollapsed ? (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <Minus className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                      <button
+                        onClick={closeAllTabs}
+                        className="p-1 rounded hover:bg-muted"
+                        title="Close all tabs"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
 
-                    {/* Active tab content */}
-                    {!previewCollapsed && activeTabPath && openTabs.has(activeTabPath) && (() => {
-                      const tab = openTabs.get(activeTabPath)!;
-                      return (
-                        <div key={activeTabPath} className="bg-card min-h-24">
-                          {tab.stale && !tab.loading && (
-                            <div className="px-3 py-1.5 text-xs bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 flex items-center gap-2 text-orange-700 dark:text-orange-400">
-                              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                              <span>This file was modified externally.</span>
-                              <button
-                                onClick={() => reloadStaleTab(activeTabPath)}
-                                className="ml-auto underline hover:no-underline"
-                              >
-                                Reload
-                              </button>
-                              <button
-                                onClick={() => setOpenTabs((prev) => {
-                                  const t = prev.get(activeTabPath);
-                                  if (!t) return prev;
-                                  const next = new Map(prev);
-                                  next.set(activeTabPath, { ...t, stale: false });
-                                  return next;
-                                })}
-                                className="underline hover:no-underline"
-                              >
-                                Keep local
-                              </button>
-                            </div>
-                          )}
-                          {tab.loading ? (
-                            <div className="p-3 flex items-center gap-2 text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span className="text-sm">Loading file preview...</span>
-                            </div>
-                          ) : tab.error ? (
-                            <div className="p-3 text-sm text-destructive flex items-center gap-2">
-                              <AlertCircle className="h-4 w-4 shrink-0" />
-                              <span>{tab.error}</span>
-                            </div>
-                          ) : (
+                  {/* Active tab content. The pane owns the height and the
+                      preview scrolls inside it, so a widget taller than the
+                      screen is never clipped. */}
+                  {!previewCollapsed && activeTabPath && openTabs.has(activeTabPath) && (() => {
+                    const tab = openTabs.get(activeTabPath)!;
+                    return (
+                      <div
+                        key={activeTabPath}
+                        className="flex-1 min-h-0 flex flex-col bg-card relative"
+                        ref={setPreviewSurface}
+                      >
+                        {tab.stale && !tab.loading && (
+                          <div className="shrink-0 px-3 py-1.5 text-xs bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                            <span>This file was modified externally.</span>
+                            <button
+                              onClick={() => reloadStaleTab(activeTabPath)}
+                              className="ml-auto underline hover:no-underline"
+                            >
+                              Reload
+                            </button>
+                            <button
+                              onClick={() => setOpenTabs((prev) => {
+                                const t = prev.get(activeTabPath);
+                                if (!t) return prev;
+                                const next = new Map(prev);
+                                next.set(activeTabPath, { ...t, stale: false });
+                                return next;
+                              })}
+                              className="underline hover:no-underline"
+                            >
+                              Keep local
+                            </button>
+                          </div>
+                        )}
+                        {tab.loading ? (
+                          <div className="p-3 flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Loading file preview...</span>
+                          </div>
+                        ) : tab.error ? (
+                          <div className="p-3 text-sm text-destructive flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 shrink-0" />
+                            <span>{tab.error}</span>
+                          </div>
+                        ) : (
+                          <>
                             <CodePreview
+                              fill
                               code={tab.code}
                               compiler={compiler}
                               services={namespaces}
@@ -1392,142 +1405,147 @@ export default function ChatPage() {
                               vfs={workspaceWidgetVfs}
                               customPreview={workflowCustomPreview}
                             />
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-                <ScrollArea className="h-full flex-1" ref={scrollRef}>
-                  <div className="p-3 sm:p-4 space-y-4">
-                    {messages.length === 0 ? (
-                      <div className="text-center text-muted-foreground py-12">
-                        <img
-                          src={APROVAN_LOGO}
-                          alt=""
-                          className="h-12 w-12 mx-auto mb-4 opacity-50 rounded-full"
-                        />
-                        <p>Start a conversation</p>
+                            {/* The edit pill belongs to the widget surface it
+                                acts on, not the page — and it yields to
+                                anything modal over that surface (the edit
+                                modal, the mobile file drawer). */}
+                            {!editSession && !sidebarOpen && (
+                              <Bobbin
+                                container={previewSurface}
+                                defaultActive={false}
+                                showInspector
+                                onChanges={() => undefined}
+                                exclude={[".bobbin-pill", "[data-bobbin]"]}
+                              />
+                            )}
+                          </>
+                        )}
                       </div>
-                    ) : (
-                      resolvedMessages.map((msg) => (
-                        <MessageBubble key={msg.id} message={msg} />
-                      ))
-                    )}
-
-                    {isLoading &&
-                      messages[messages.length - 1]?.role !== "assistant" && (
-                        <div className="flex gap-3 justify-start">
-                          <Avatar className="h-8 w-8 shrink-0">
-                            <img
-                              src={APROVAN_LOGO}
-                              alt=""
-                              className="rounded-full"
-                            />
-                            <AvatarFallback>A</AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col gap-1">
-                            <div className="h-5" />
-                            <div className="bg-muted rounded-lg px-4 py-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                  </div>
-                </ScrollArea>
-              </div>
-            </CardContent>
-
-            {error && (
-              <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                {error.message}
-              </div>
-            )}
-
-            {compilerError && (
-              <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>Widget previews unavailable — {compilerError}</span>
-              </div>
-            )}
-
-            <div className="p-2.5 sm:p-4 border-t space-y-2">
-              <div className="flex items-center">
-                <ProviderModelControls
-                  providers={llmProviders}
-                  active={chatProvider}
-                  onSelectProvider={handleProviderChange}
-                  model={chatModel}
-                  onSelectModel={handleModelChange}
-                  loadModels={fetchLlmModels}
-                />
-              </div>
-
-              {!providerConnected && (
-                <div className="px-3 py-2 text-xs rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 flex items-center gap-2">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span>
-                    Chat requires an LLM provider credential. {chatProviderLabel}{" "}
-                    is not connected to this workspace —{" "}
-                    <a
-                      href={credentialsUrl(chatProvider)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline hover:no-underline font-medium"
-                    >
-                      add a credential
-                    </a>{" "}
-                    or switch providers above.
-                  </span>
+                    );
+                  })()}
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="flex gap-2 items-end">
-                <MarkdownEditor
-                  value={input}
-                  onChange={setInput}
-                  onSubmit={() => {
-                    if (!isLoading && input.trim() && providerConnected) {
-                      handleSubmit();
-                    }
-                  }}
-                  placeholder="Type a message... (Shift+Enter for new line)"
-                  disabled={isLoading}
-                />
-                <Button
-                  type="submit"
-                  disabled={isLoading || !input.trim() || !providerConnected}
-                  className="shrink-0"
-                  title={
-                    providerConnected
-                      ? undefined
-                      : `${chatProviderLabel} is not connected — add a credential first`
-                  }
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+              <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+                <div className="mx-auto w-full max-w-3xl p-3 sm:p-4 space-y-4">
+                  {messages.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-12">
+                      <img
+                        src={APROVAN_LOGO}
+                        alt=""
+                        className="h-12 w-12 mx-auto mb-4 opacity-50 rounded-full"
+                      />
+                      <p>Start a conversation</p>
+                    </div>
                   ) : (
-                    <Send className="h-4 w-4" />
+                    resolvedMessages.map((msg) => (
+                      <MessageBubble key={msg.id} message={msg} />
+                    ))
                   )}
-                </Button>
-              </form>
-            </div>
-          </Card>
 
-          {/* The edit pill only makes sense while a widget surface is on
-              screen — an open preview tab — never on a bare chat. */}
-          {!editSession && openTabs.size > 0 && !previewCollapsed && (
-            <Bobbin
-              container={chatContainer}
-              pillContainer={chatContainer}
-              defaultActive={false}
-              showInspector
-              onChanges={() => undefined}
-              exclude={[".bobbin-pill", "[data-bobbin]"]}
-            />
-          )}
+                  {isLoading &&
+                    messages[messages.length - 1]?.role !== "assistant" && (
+                      <div className="flex gap-3 justify-start">
+                        <Avatar className="h-8 w-8 shrink-0">
+                          <img
+                            src={APROVAN_LOGO}
+                            alt=""
+                            className="rounded-full"
+                          />
+                          <AvatarFallback>A</AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col gap-1">
+                          <div className="h-5" />
+                          <div className="bg-muted rounded-lg px-4 py-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </ScrollArea>
+
+              {error && (
+                <div className="shrink-0 px-4 py-2 bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  {error.message}
+                </div>
+              )}
+
+              {compilerError && (
+                <div className="shrink-0 px-4 py-2 bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>Widget previews unavailable — {compilerError}</span>
+                </div>
+              )}
+
+              {/* Composer tracks the message column's measure so the two read
+                  as one thread even when the preview pane is wide. */}
+              <div className="shrink-0 border-t p-2.5 sm:p-4">
+                <div className="mx-auto w-full max-w-3xl space-y-2">
+                  <div className="flex items-center">
+                    <ProviderModelControls
+                      providers={llmProviders}
+                      active={chatProvider}
+                      onSelectProvider={handleProviderChange}
+                      model={chatModel}
+                      onSelectModel={handleModelChange}
+                      loadModels={fetchLlmModels}
+                    />
+                  </div>
+
+                  {!providerConnected && (
+                    <div className="px-3 py-2 text-xs rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        Chat requires an LLM provider credential.{" "}
+                        {chatProviderLabel} is not connected to this workspace —{" "}
+                        <a
+                          href={credentialsUrl(chatProvider)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline hover:no-underline font-medium"
+                        >
+                          add a credential
+                        </a>{" "}
+                        or switch providers above.
+                      </span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+                    <MarkdownEditor
+                      value={input}
+                      onChange={setInput}
+                      onSubmit={() => {
+                        if (!isLoading && input.trim() && providerConnected) {
+                          handleSubmit();
+                        }
+                      }}
+                      placeholder="Type a message... (Shift+Enter for new line)"
+                      disabled={isLoading}
+                    />
+                    <Button
+                      type="submit"
+                      disabled={isLoading || !input.trim() || !providerConnected}
+                      className="shrink-0"
+                      title={
+                        providerConnected
+                          ? undefined
+                          : `${chatProviderLabel} is not connected — add a credential first`
+                      }
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         {editSession && (
           <EditModal

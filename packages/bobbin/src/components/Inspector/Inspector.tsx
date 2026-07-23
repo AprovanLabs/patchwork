@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { computedStyleOf } from '../../utils/dom';
 import type { SelectedElement } from '../../types';
 
 interface InspectorProps {
@@ -17,7 +18,7 @@ export function Inspector({
   const [isMinimized, setIsMinimized] = useState(false);
 
   const computedStyles = useMemo(() => {
-    const computed = window.getComputedStyle(selectedElement.element);
+    const computed = computedStyleOf(selectedElement.element);
     const styles: Record<string, string> = {};
     
     // Get commonly-inspected properties
@@ -51,7 +52,8 @@ export function Inspector({
   const domPath = useMemo(() => {
     const path: HTMLElement[] = [];
     let el: HTMLElement | null = selectedElement.element;
-    while (el && el !== document.body) {
+    const root = selectedElement.element.ownerDocument.body;
+    while (el && el !== root) {
       path.unshift(el);
       el = el.parentElement;
     }

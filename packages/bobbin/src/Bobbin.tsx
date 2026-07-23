@@ -17,8 +17,10 @@ export function Bobbin(props: BobbinComponentProps) {
   const { showInspector = false, ...bobbinProps } = props;
   
   const bobbin = useBobbin(bobbinProps);
-  const { zIndex = 9999, pillContainer } = bobbinProps;
+  const { zIndex = 9999 } = bobbinProps;
 
+  // Portaled to the body so overlays are positioned in viewport space, above
+  // whatever chrome (modal, card) wraps the surface being edited.
   return createPortal(
     <div data-bobbin="root">
       {/* Floating pill */}
@@ -26,7 +28,7 @@ export function Bobbin(props: BobbinComponentProps) {
         state={bobbin}
         actions={bobbin}
         position={bobbinProps.position}
-        container={pillContainer ?? bobbinProps.container}
+        container={bobbinProps.container}
         zIndex={zIndex}
       />
 

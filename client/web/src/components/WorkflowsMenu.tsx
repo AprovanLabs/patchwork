@@ -4,6 +4,11 @@
  * namespace through the chat app's authenticated fetch. Open state can be
  * controlled by the host so other surfaces (the sidebar explorer) can open
  * the same panel.
+ *
+ * `loadScript` is what upgrades a row from a bare run form to the flow graph:
+ * the panel only draws a run's trace onto the graph when it can read the
+ * workflow's source, and the workflows namespace doesn't serve it — the
+ * workspace FS does.
  */
 
 import { Workflow } from "lucide-react";
@@ -17,6 +22,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { invokeAppsTool, invokeWorkflowsTool } from "@/components/WorkflowsExplorer";
+import { readFile } from "@/lib/workspace-vfs";
+
+const loadScript = async (path: string): Promise<string | null> =>
+  readFile(path).catch(() => null);
 
 export function WorkflowsMenu({
   onOpenScript,
@@ -58,6 +67,7 @@ export function WorkflowsMenu({
           <WorkflowsPanel
             invoke={invokeWorkflowsTool}
             invokeApps={invokeAppsTool}
+            loadScript={loadScript}
             onOpenScript={handleOpenScript}
           />
         </DialogContent>

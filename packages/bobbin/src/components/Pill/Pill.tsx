@@ -41,10 +41,13 @@ export function Pill({ state, actions, position, container, zIndex = 9999 }: Pil
 
     const updatePosition = () => {
       const rect = container.getBoundingClientRect();
-      // Position from viewport edges based on container position
+      // Anchored to the bottom-right of the surface it edits — clamped to the
+      // viewport so a surface taller than the screen can't push it off.
       setComputedPosition({
-        bottom: window.innerHeight - rect.bottom + offset.bottom,
-        right: window.innerWidth - rect.right + offset.right,
+        bottom:
+          window.innerHeight - Math.min(rect.bottom, window.innerHeight) + offset.bottom,
+        right:
+          window.innerWidth - Math.min(rect.right, window.innerWidth) + offset.right,
       });
     };
 

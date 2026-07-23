@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { computedStyleOf } from '../../utils/dom';
 import type { SelectedElement, BobbinActions } from '../../types';
 
 interface ControlHandlesProps {
@@ -15,7 +16,7 @@ function getLayoutDirection(element: HTMLElement): 'horizontal' | 'vertical' | '
   const parent = element.parentElement;
   if (!parent) return 'unknown';
   
-  const style = getComputedStyle(parent);
+  const style = computedStyleOf(parent);
   const display = style.display;
   const flexDirection = style.flexDirection;
   

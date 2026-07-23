@@ -1,4 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import {
+  containsAcrossFrames,
+  frameDocuments,
+  viewportRect,
+} from '../utils/dom';
 import { getElementPath, getElementXPath } from '../utils/selectors';
 import type { SelectedElement } from '../types';
 
@@ -8,6 +13,9 @@ export interface UseElementSelectionOptions {
   enabled?: boolean;
 }
 
+const sameDocuments = (a: Document[], b: Document[]) =>
+  a.length === b.length && a.every((doc, i) => doc === b[i]);
+
 export function useElementSelection(options: UseElementSelectionOptions) {
   const { container, exclude = [], enabled = true } = options;
 
@@ -16,6 +24,9 @@ export function useElementSelection(options: UseElementSelectionOptions) {
   );
   const [selectedElement, setSelectedElement] =
     useState<SelectedElement | null>(null);
+  // Widget previews render inside same-origin iframes, and events raised in a
+  // frame never reach the host document — selection has to listen in each one.
+  const [documents, setDocuments] = useState<Document[]>(() => [document]);
   const lastRectRef = useRef<DOMRect | null>(null);
 
   const isExcluded = useCallback(
@@ -34,7 +45,7 @@ export function useElementSelection(options: UseElementSelectionOptions) {
     (el: HTMLElement): SelectedElement => {
       return {
         element: el,
-        rect: el.getBoundingClientRect(),
+        rect: viewportRect(el),
         path: getElementPath(el),
         xpath: getElementXPath(el),
         tagName: el.tagName.toLowerCase(),
@@ -49,7 +60,9 @@ export function useElementSelection(options: UseElementSelectionOptions) {
     (e: MouseEvent) => {
       if (!enabled) return;
 
-      const target = document.elementFromPoint(
+      // Coordinates are frame-local, so hit-test in the frame that fired.
+      const doc = (e.view ?? window).document;
+      const target = doc.elementFromPoint(
         e.clientX,
         e.clientY,
       ) as HTMLElement | null;
@@ -59,7 +72,7 @@ export function useElementSelection(options: UseElementSelectionOptions) {
       }
 
       // Check if within container bounds
-      if (container && !container.contains(target)) {
+      if (container && !containsAcrossFrames(container, target)) {
         setHoveredElement(null);
         return;
       }
@@ -106,33 +119,76 @@ export function useElementSelection(options: UseElementSelectionOptions) {
     [createSelectedElement, clearSelection],
   );
 
+  // Track which documents live under the container. A widget frame is replaced
+  // on every recompile, and its document only exists once the frame has
+  // loaded, so re-scan on both DOM mutations and frame loads.
+  useEffect(() => {
+    if (!enabled) return;
+    const root = container ?? document.body;
+
+    const scan = () =>
+      setDocuments((prev) => {
+        const next = frameDocuments(root);
+        return sameDocuments(prev, next) ? prev : next;
+      });
+
+    scan();
+    const observer = new MutationObserver(scan);
+    observer.observe(root, { childList: true, subtree: true });
+    // `load` doesn't bubble, but the capture phase still reaches the window.
+    window.addEventListener('load', scan, true);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('load', scan, true);
+      setDocuments([document]);
+    };
+  }, [enabled, container]);
+
   useEffect(() => {
     if (!enabled) return;
 
-    document.addEventListener('mousemove', handleMouseMove, { passive: true });
-    document.addEventListener('click', handleClick, { capture: true });
+    for (const doc of documents) {
+      doc.addEventListener('mousemove', handleMouseMove, { passive: true });
+      doc.addEventListener('click', handleClick, { capture: true });
+    }
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('click', handleClick, { capture: true });
+      for (const doc of documents) {
+        doc.removeEventListener('mousemove', handleMouseMove);
+        doc.removeEventListener('click', handleClick, { capture: true });
+      }
     };
-  }, [enabled, handleMouseMove, handleClick]);
+  }, [enabled, documents, handleMouseMove, handleClick]);
 
-  // Update rect on scroll/resize
+  // Update rect on scroll/resize — capture so nested scrollers (the preview
+  // surface, the widget frame) are picked up too.
   useEffect(() => {
     if (!selectedElement) return;
 
     const updateRect = () => {
-      const newRect = selectedElement.element.getBoundingClientRect();
-      setSelectedElement((prev) => (prev ? { ...prev, rect: newRect } : null));
+      setSelectedElement((prev) =>
+        prev ? { ...prev, rect: viewportRect(prev.element) } : null,
+      );
     };
 
-    window.addEventListener('scroll', updateRect, { passive: true });
-    window.addEventListener('resize', updateRect, { passive: true });
+    const views = new Set<Window>([
+      window,
+      selectedElement.element.ownerDocument.defaultView ?? window,
+    ]);
+    for (const view of views) {
+      view.addEventListener('scroll', updateRect, {
+        passive: true,
+        capture: true,
+      });
+      view.addEventListener('resize', updateRect, { passive: true });
+    }
 
     return () => {
-      window.removeEventListener('scroll', updateRect);
-      window.removeEventListener('resize', updateRect);
+      for (const view of views) {
+        view.removeEventListener('scroll', updateRect, { capture: true });
+        view.removeEventListener('resize', updateRect);
+      }
     };
   }, [selectedElement?.element]);
 
@@ -141,6 +197,7 @@ export function useElementSelection(options: UseElementSelectionOptions) {
     selectedElement,
     selectElement,
     clearSelection,
+    documents,
     lastRect: lastRectRef.current,
   };
 }

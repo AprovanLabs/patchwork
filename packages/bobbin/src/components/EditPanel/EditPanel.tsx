@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { computedStyleOf } from '../../utils/dom';
 import { AnnotationSection } from './sections/AnnotationSection';
 import { BackgroundSection } from './sections/BackgroundSection';
 import { EffectsSection } from './sections/EffectsSection';
@@ -169,7 +170,7 @@ export function EditPanel({
     });
   };
 
-  const computedStyle = window.getComputedStyle(selectedElement.element);
+  const computedStyle = computedStyleOf(selectedElement.element);
 
   const themeIcons = {
     light: <SunIcon />,

@@ -4,9 +4,11 @@ export function generateId(): string {
 
 export function getElementPath(el: HTMLElement): string {
   const path: string[] = [];
+  // Widgets live in their own frame document; stop at *that* body.
+  const root = el.ownerDocument.body;
   let current: HTMLElement | null = el;
 
-  while (current && current !== document.body) {
+  while (current && current !== root) {
     let selector = current.tagName.toLowerCase();
 
     if (current.id) {
@@ -36,13 +38,10 @@ export function getElementPath(el: HTMLElement): string {
 
 export function getElementXPath(el: HTMLElement): string {
   const parts: string[] = [];
+  const doc = el.ownerDocument;
   let current: HTMLElement | null = el;
 
-  while (
-    current &&
-    current !== document.body &&
-    current !== document.documentElement
-  ) {
+  while (current && current !== doc.body && current !== doc.documentElement) {
     let part = current.tagName.toLowerCase();
 
     // If element has an id, use it as anchor

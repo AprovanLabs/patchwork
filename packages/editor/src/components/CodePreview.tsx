@@ -28,6 +28,12 @@ interface CodePreviewProps {
   /** Storage adapter for save/reload (default: the dev-server HTTP `/vfs`). */
   vfs?: WidgetVfs;
   /**
+   * Stretch to the parent instead of sizing to the content. Inline in a chat
+   * message the preview caps itself at 60vh; in a dedicated preview pane the
+   * pane owns the height and the body scrolls inside it.
+   */
+  fill?: boolean;
+  /**
    * App-supplied preview override. Called before the built-in preview
    * renderers; returning a node replaces the preview body (e.g. patchwork
    * renders workflow scripts as a Tailor flow). Return null/undefined to
@@ -55,6 +61,7 @@ export function CodePreview({
   onOpenEditSession,
   vfs = httpWidgetVfs,
   customPreview,
+  fill = false,
 }: CodePreviewProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
@@ -315,10 +322,22 @@ export function CodePreview({
     });
   }, [onOpenEditSession, getProjectId, getEntryFile, currentCode, filePath]);
 
+  // In fill mode the surrounding pane already draws the frame and owns the
+  // height; inline in a message the preview is its own bordered card.
+  const bodyClass = fill
+    ? 'flex flex-col flex-1 min-h-0 overflow-y-auto bg-card'
+    : 'flex flex-col min-h-[400px] max-h-[60vh] overflow-y-auto bg-card';
+
   return (
     <>
-      <div className="border rounded-lg overflow-hidden min-w-0">
-        <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b rounded-t-lg">
+      <div
+        className={
+          fill
+            ? 'flex flex-col h-full min-h-0 min-w-0'
+            : 'border rounded-lg overflow-hidden min-w-0'
+        }
+      >
+        <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b shrink-0">
           <Code className="h-4 w-4 text-muted-foreground" />
           {editCount > 0 && (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -391,11 +410,15 @@ export function CodePreview({
         )}
 
         {showPreview ? (
-          <div className="flex flex-col min-h-[400px] max-h-[60vh] overflow-y-auto bg-card">
-            {previewBody}
-          </div>
+          <div className={bodyClass}>{previewBody}</div>
         ) : (
-          <div className="bg-muted/30 overflow-auto max-h-[60vh]">
+          <div
+            className={
+              fill
+                ? 'flex-1 min-h-0 overflow-auto bg-muted/30'
+                : 'bg-muted/30 overflow-auto max-h-[60vh]'
+            }
+          >
             <CodeBlockView
               content={currentCode}
               language={fileType.language}

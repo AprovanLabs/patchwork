@@ -75,7 +75,6 @@ export function EditModal({
   const [editInput, setEditInput] = useState('');
   const [bobbinChanges, setBobbinChanges] = useState<Change[]>([]);
   const [previewContainer, setPreviewContainer] = useState<HTMLDivElement | null>(null);
-  const [pillContainer, setPillContainer] = useState<HTMLDivElement | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -302,7 +301,7 @@ export function EditModal({
               onReplaceFile={session.replaceFile}
             />
           )}
-          <div className="flex-1 overflow-auto" ref={setPillContainer}>
+          <div className="flex-1 min-w-0 overflow-auto">
             {fileType.category === 'compilable' && showPreview ? (
               <div className="bg-card h-full relative" ref={setPreviewContainer}>
                 {previewError && renderError ? (
@@ -322,9 +321,10 @@ export function EditModal({
                 ) : (
                   <div className="p-4" key={hashCode(code)}>{renderPreview(code)}</div>
                 )}
+                {/* Scoped to the preview surface — the widget it edits, not
+                    the modal chrome around it. */}
                 {!renderLoading && !renderError && !previewLoading && <Bobbin
                   container={previewContainer}
-                  pillContainer={pillContainer}
                   defaultActive={false}
                   showInspector
                   onChanges={handleBobbinChanges}

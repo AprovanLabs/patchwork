@@ -372,7 +372,7 @@ export function resetStore(): void {
 // Shared helpers (backend-agnostic; the ChatPage surface)
 // ---------------------------------------------------------------------------
 
-async function readFile(path: string): Promise<string> {
+export async function readFile(path: string): Promise<string> {
   return (await backend()).read(path);
 }
 

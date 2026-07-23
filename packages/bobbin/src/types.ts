@@ -138,10 +138,12 @@ export interface BobbinChangeset {
 export interface BobbinProps {
   /** Custom design tokens to merge with defaults */
   tokens?: Partial<DesignTokens>;
-  /** Container to scope element selection (default: document.body) */
+  /**
+   * The surface Bobbin acts on: element selection is scoped to it (crossing
+   * into same-origin widget frames) and the pill anchors to its bottom-right.
+   * Defaults to document.body.
+   */
   container?: HTMLElement | null;
-  /** Container for pill positioning (if different from container) */
-  pillContainer?: HTMLElement | null;
   /** Initial active state */
   defaultActive?: boolean;
   /** Callback when changes occur */
