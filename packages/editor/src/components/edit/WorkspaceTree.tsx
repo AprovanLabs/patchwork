@@ -16,7 +16,7 @@ import {
   useFileTree,
   type UseFileTreeResult,
 } from '@pierre/trees/react';
-import { Pencil, Pin, Trash2 } from 'lucide-react';
+import { ImageUp, Pencil, Pin, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useCallbackRef } from './useCallbackRef';
 import type {
@@ -43,7 +43,14 @@ export interface WorkspaceTreeProps {
   pinnedPaths?: Map<string, boolean>;
   onTogglePin?: (path: string, isDir: boolean) => void;
   onDeletePath?: (path: string, isDir: boolean) => void;
+  /** Swap a media file's bytes in place (keeps the path + version history). */
+  onReplaceFile?: (path: string, file: File) => void;
+  /** Reload the path list from the source; shows a spinner while `refreshing`. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }
+
+const MEDIA_RE = /\.(png|jpe?g|gif|webp|avif|svg|bmp|ico|mp4|webm|mov|m4v|mp3|wav|ogg)$/i;
 
 // Alias the app's shadcn tokens onto the tree's override variables. The tokens
 // are full `oklch(…)` colors (Tailwind v4), so reference them directly and mint
@@ -80,6 +87,7 @@ function RowContextMenu({
   onOpenInEditor,
   onTogglePin,
   onDeletePath,
+  onReplaceFile,
 }: {
   item: ContextMenuItem;
   context: ContextMenuOpenContext;
@@ -88,9 +96,11 @@ function RowContextMenu({
   onOpenInEditor?: (path: string, isDir: boolean) => void;
   onTogglePin?: (path: string, isDir: boolean) => void;
   onDeletePath?: (path: string, isDir: boolean) => void;
+  onReplaceFile?: (path: string, file: File) => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isDir = item.kind === 'directory';
+  const isMedia = !isDir && MEDIA_RE.test(item.path);
 
   return (
     <div className="min-w-40 rounded-md border bg-popover text-popover-foreground shadow-md py-1 text-sm">
@@ -106,6 +116,22 @@ function RowContextMenu({
           <Pencil className="h-3.5 w-3.5" />
           {openInEditorTitle}
         </button>
+      )}
+      {onReplaceFile && isMedia && (
+        <label className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-muted cursor-pointer">
+          <ImageUp className="h-3.5 w-3.5" />
+          Replace…
+          <input
+            type="file"
+            accept="image/*,video/*,audio/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onReplaceFile(item.path, file);
+              context.close();
+            }}
+          />
+        </label>
       )}
       {onTogglePin && (
         <button
@@ -156,6 +182,9 @@ export function WorkspaceTree({
   pinnedPaths,
   onTogglePin,
   onDeletePath,
+  onReplaceFile,
+  onRefresh,
+  refreshing,
 }: WorkspaceTreeProps) {
   // Refs keep the once-built model's captured closures pointed at fresh values.
   const modelRef = useRef<PierreModel | null>(null);
@@ -171,6 +200,10 @@ export function WorkspaceTree({
     initialExpansion: 'closed',
     density: 'compact',
     icons: { set: 'standard', colored: true },
+    // The library owns the filter box in its own top bar — one less home-rolled
+    // control, and it drives expansion/highlighting for free.
+    search: true,
+    searchBlurBehavior: 'retain',
     composition: {
       contextMenu: { enabled: true, triggerMode: 'both', buttonVisibility: 'when-needed' },
     },
@@ -213,11 +246,30 @@ export function WorkspaceTree({
     suppressRef.current = false;
   }, [activePath, pathsKey, model]);
 
+  // The tree's own top bar (library header slot): title + refresh, so we don't
+  // stack a home-rolled header above the widget. Light-DOM React, so Tailwind
+  // applies even though it renders inside the shadow root.
+  const header = (
+    <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <span>{title}</span>
+      {onRefresh && (
+        <button
+          type="button"
+          onClick={onRefresh}
+          title="Refresh"
+          className="ml-auto p-1 rounded hover:bg-muted hover:text-foreground"
+        >
+          <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <div className={`flex flex-col min-h-0 text-foreground ${className ?? ''}`}>
-      <div className="p-2 border-b text-xs font-medium text-muted-foreground uppercase tracking-wide shrink-0">
-        {title}
-      </div>
+    // `relative z-10` lifts the whole column (and its absolutely-positioned
+    // context menu, which lives in the shadow root) above the preview surface
+    // painted after it — otherwise the menu is clipped behind the widget.
+    <div className={`relative z-10 flex flex-col min-h-0 text-foreground ${className ?? ''}`}>
       {pinnedPaths && pinnedPaths.size > 0 && (
         <div className="px-2 py-1 border-b flex flex-wrap gap-1 shrink-0">
           {Array.from(pinnedPaths).map(([p, isDir]) => (
@@ -250,6 +302,7 @@ export function WorkspaceTree({
       )}
       <PierreTree
         model={model}
+        header={header}
         style={TREE_THEME_STYLE}
         className="flex-1 min-h-0"
         renderContextMenu={(item, context) => (
@@ -261,6 +314,7 @@ export function WorkspaceTree({
             onOpenInEditor={onOpenInEditor}
             onTogglePin={onTogglePin}
             onDeletePath={onDeletePath}
+            onReplaceFile={onReplaceFile}
           />
         )}
       />

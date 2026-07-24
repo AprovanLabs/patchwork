@@ -23,7 +23,6 @@ import {
   ChevronDown,
   Minus,
   PanelLeft,
-  RefreshCw,
   RotateCcw,
   X,
 } from "lucide-react";
@@ -66,7 +65,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getAccessTokenSync } from "@/lib/auth";
 import { GATEWAY_BASE } from "@/lib/gateway";
@@ -530,7 +528,6 @@ export default function ChatPage() {
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([]);
   const [workspaceActivePath, setWorkspaceActivePath] = useState("");
-  const [workspaceFilter, setWorkspaceFilter] = useState("");
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(
@@ -1012,12 +1009,6 @@ export default function ChatPage() {
     [refreshWorkspace],
   );
 
-  const filteredWorkspaceFiles = useMemo(() => {
-    const query = workspaceFilter.trim().toLowerCase();
-    if (!query) return workspaceFiles;
-    return workspaceFiles.filter((path) => path.toLowerCase().includes(query));
-  }, [workspaceFiles, workspaceFilter]);
-
   const patchworkCtx = useMemo(
     () => ({ compiler, namespaces }),
     [compiler, namespaces],
@@ -1188,37 +1179,15 @@ export default function ChatPage() {
             <div
               className={`${
                 sidebarOpen ? "flex" : "hidden"
-              } md:flex flex-col min-h-0 border-r bg-background md:bg-muted/20 absolute inset-y-0 left-0 z-40 w-72 max-w-[85vw] shadow-lg md:static md:w-72 md:max-w-none md:shadow-none`}
+              } md:flex flex-col min-h-0 border-r bg-background md:bg-muted/20 absolute inset-y-0 left-0 z-40 w-72 max-w-[85vw] shadow-lg md:relative md:z-20 md:w-72 md:max-w-none md:shadow-none`}
             >
-              <div className="px-3 py-2 border-b flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <span>Workspace</span>
-                <button
-                  onClick={() => void refreshWorkspace()}
-                  className="ml-auto p-1 rounded hover:bg-muted"
-                  title="Refresh workspace"
-                >
-                  <RefreshCw
-                    className={`h-3 w-3 ${
-                      workspaceLoading ? "animate-spin" : ""
-                    }`}
-                  />
-                </button>
-              </div>
-              <div className="p-2 border-b">
-                <Input
-                  value={workspaceFilter}
-                  onChange={(e) => setWorkspaceFilter(e.target.value)}
-                  placeholder="Filter files..."
-                  className="h-8"
-                />
-              </div>
               {workspaceError ? (
                 <div className="p-3 text-xs text-destructive">
                   {workspaceError}
                 </div>
               ) : (
                 <WorkspaceTree
-                  paths={filteredWorkspaceFiles}
+                  paths={workspaceFiles}
                   activePath={workspaceActivePath}
                   onSelectFile={openWorkspacePreview}
                   onSelectDirectory={setWorkspaceActivePath}
@@ -1227,6 +1196,8 @@ export default function ChatPage() {
                   pinnedPaths={pinnedPaths}
                   onTogglePin={togglePin}
                   onDeletePath={deleteWorkspaceEntry}
+                  onRefresh={() => void refreshWorkspace()}
+                  refreshing={workspaceLoading}
                   title="Files"
                   className="flex-1 min-h-0"
                 />

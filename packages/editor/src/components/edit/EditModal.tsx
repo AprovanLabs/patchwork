@@ -25,6 +25,16 @@ import { useEditSession, type UseEditSessionOptions } from './useEditSession';
 import { WorkspaceTree } from './WorkspaceTree';
 import type { VirtualProject } from '@aprovan/patchwork-compiler';
 
+/** Read a picked media file as bare base64 (no data-URL prefix) for replaceFile. */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 // Simple hash for React key to force re-render on code changes
 function hashCode(str: string): number {
   let hash = 0;
@@ -295,7 +305,9 @@ export function EditModal({
 
         <div className="flex-1 min-h-0 border-b overflow-hidden flex">
           {!hideFileTree && showTree && (
-            <aside className="w-64 max-w-[45vw] sm:max-w-none shrink-0 border-r bg-muted/20 flex flex-col min-h-0">
+            // `relative z-10` so the tree's context menu (absolute, in the tree's
+            // shadow root) paints above the preview column that follows it.
+            <aside className="relative z-10 w-64 max-w-[45vw] sm:max-w-none shrink-0 border-r bg-muted/20 flex flex-col min-h-0">
               <WorkspaceTree
                 paths={treePaths}
                 activePath={effectiveTreePath}
@@ -304,6 +316,16 @@ export function EditModal({
                   session.setActiveFile(path);
                 }}
                 onSelectDirectory={(path) => setTreePath(path)}
+                onOpenInEditor={(path) => {
+                  setTreePath(path);
+                  session.setActiveFile(path);
+                }}
+                openInEditorTitle="Open"
+                onReplaceFile={(path, file) => {
+                  void fileToBase64(file).then((base64) =>
+                    session.replaceFile(path, base64, 'base64'),
+                  );
+                }}
                 className="flex-1 min-h-0"
               />
             </aside>

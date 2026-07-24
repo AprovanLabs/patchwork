@@ -8,15 +8,44 @@
 
 import { useAuth } from "@aprovan/ui/auth";
 import { LogIn, Loader2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
 } from "@/components/ui/card";
 
+/**
+ * A private published app (aprovan.com/apps/…) bounces here to sign in, since
+ * chat shares this origin + Cognito callback and writes the token key the app
+ * shell reads. `?authReturn=<same-origin path>` is where to land afterwards.
+ * Guarded to same-origin absolute paths so it can't be an open redirect.
+ */
+function readAuthReturn(): string | null {
+  const raw = new URLSearchParams(window.location.search).get("authReturn");
+  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : null;
+}
+
 export default function AuthGate({ children }: { children: ReactNode }) {
   const { status, signIn } = useAuth();
+
+  // When an app sent us here to authenticate, complete the round-trip: sign in
+  // if needed, then hand control back to the app rather than showing chat.
+  useEffect(() => {
+    const authReturn = readAuthReturn();
+    if (!authReturn) return;
+    if (status === "authenticated") window.location.replace(authReturn);
+    else if (status === "unauthenticated") void signIn(authReturn);
+  }, [status, signIn]);
+
+  // Mid-redirect to a returning app: don't flash chat's UI underneath.
+  if (readAuthReturn() && status !== "unconfigured") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   // Unconfigured → run unauthenticated. Authenticated → render the app.
   if (status === "unconfigured" || status === "authenticated") {
