@@ -10,6 +10,7 @@ import {
   Send,
   FolderTree,
   FileCode,
+  Wand2,
 } from 'lucide-react';
 import { useState, useCallback, useMemo, useRef, useEffect, type ReactNode } from 'react';
 import { MarkdownEditor } from '../MarkdownEditor';
@@ -418,11 +419,18 @@ export function EditModal({
         )}
 
         {bobbinChanges.length > 0 && (
-          <div className="px-4 py-2 bg-blue-50 text-blue-700 text-sm flex items-center gap-2 border-t shrink-0">
-            <span>{bobbinChanges.length} visual change{bobbinChanges.length !== 1 ? 's' : ''}</span>
+          <div className="px-4 py-2 border-t shrink-0 flex items-center gap-2 text-sm">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-1 font-medium"
+              title="These direct edits will be sent with your next prompt"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              <span className="tabular-nums">{bobbinChanges.length}</span>
+              visual change{bobbinChanges.length !== 1 ? 's' : ''} will be included
+            </span>
             <button
               onClick={() => setBobbinChanges([])}
-              className="text-xs underline hover:no-underline"
+              className="ml-auto text-xs text-muted-foreground hover:text-foreground"
             >
               Clear
             </button>

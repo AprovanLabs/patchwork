@@ -1,3 +1,8 @@
+export {
+  EDIT_SYSTEM_PROMPT,
+  buildEditMessages,
+  type EditMessage,
+} from "./lib/edit-prompt";
 export { CodeBlockExtension } from "./components/CodeBlockExtension";
 export { CodePreview } from "./components/CodePreview";
 export { WidgetPreview } from "./components/WidgetPreview";
@@ -27,6 +32,7 @@ export {
   type CompileResult,
   type CompileFn,
   type EditApiOptions,
+  type EditTransport,
   type WorkspaceTreeProps,
   type SaveConfirmDialogProps,
   type CodeBlockViewProps,

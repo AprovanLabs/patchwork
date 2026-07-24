@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { sendEditRequest } from "./api";
+import { sendEditRequest, type EditTransport } from "./api";
 import { useProjectState } from "./useProjectState";
 import type {
   EditHistoryEntry,
@@ -15,6 +15,8 @@ export interface UseEditSessionOptions {
   initialActiveFile?: string;
   compile?: CompileFn;
   apiEndpoint?: string;
+  /** Run edits through a host LLM instead of POSTing to `apiEndpoint`. */
+  editTransport?: EditTransport;
 }
 
 export function useEditSession(
@@ -23,6 +25,7 @@ export function useEditSession(
   const {
     compile,
     apiEndpoint,
+    editTransport,
   } = options;
 
   const state = useProjectState(options);
@@ -43,6 +46,7 @@ export function useEditSession(
         { code: currentCode, prompt },
         {
           endpoint: apiEndpoint,
+          transport: editTransport,
           onProgress: (note) => setStreamingNotes((prev) => [...prev, note]),
         },
       );
@@ -72,7 +76,7 @@ export function useEditSession(
 
       return { newCode: response.newCode, entries };
     },
-    [compile, apiEndpoint],
+    [compile, apiEndpoint, editTransport],
   );
 
   const submitEdit = useCallback(

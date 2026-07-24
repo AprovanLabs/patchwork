@@ -1,5 +1,4 @@
 import { useChat } from "@ai-sdk/react";
-import { Bobbin } from '@aprovan/bobbin';
 import { createCompiler, type Compiler , type VirtualProject } from "@aprovan/patchwork-compiler";
 import {
   extractCodeBlocks,
@@ -11,6 +10,8 @@ import {
   MarkdownEditor,
   EditModal,
   WorkspaceTree,
+  buildEditMessages,
+  type EditTransport,
   type ServiceInfo,
 } from "@aprovan/patchwork-editor";
 import { DefaultChatTransport } from "ai";
@@ -549,11 +550,6 @@ export default function ChatPage() {
   const [connectedProviders, setConnectedProviders] = useState<string[] | null>(
     null,
   );
-  // The rendered widget's surface — Bobbin scopes selection and anchors its
-  // pill to it rather than to the page.
-  const [previewSurface, setPreviewSurface] = useState<HTMLDivElement | null>(
-    null,
-  );
   const [editSession, setEditSession] = useState<{
     project: VirtualProject;
     initialTreePath?: string;
@@ -1021,6 +1017,39 @@ export default function ChatPage() {
   chatProviderRef.current = chatProvider;
   const chatModelRef = useRef(chatModel);
   chatModelRef.current = chatModel;
+
+  // Widget edits run through the same gateway LLM as chat (there is no
+  // `/api/edit` server): the editor hands us {code, prompt}, we ask the model
+  // for search/replace blocks, and the editor applies them. The active
+  // provider/model are read at call time via refs.
+  const editTransport = useCallback<EditTransport>(async (req) => {
+    const provider = chatProviderRef.current;
+    const model = chatModelRef.current;
+    const res = await gatewayFetch(
+      `${GATEWAY_BASE}/tools/${provider}/createChatCompletion`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          args: {
+            messages: buildEditMessages(req.code, req.prompt),
+            ...(model ? { model } : {}),
+          },
+        }),
+      },
+    );
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `Edit failed (${res.status})`);
+    }
+    const body = (await res.json()) as {
+      data?: { choices?: Array<{ message?: { content?: string } }> };
+    };
+    const content = body.data?.choices?.[0]?.message?.content;
+    if (typeof content !== "string") throw new Error("Edit returned no content");
+    return content;
+  }, []);
+
   // Prompt composition inputs, read at send time: per-image runtime prompts
   // (from each image's manifest), the live namespace list, and compact tool
   // signatures so generated calls match the real SDK contract.
@@ -1305,7 +1334,6 @@ export default function ChatPage() {
                       <div
                         key={activeTabPath}
                         className="flex-1 min-h-0 flex flex-col bg-card relative"
-                        ref={setPreviewSurface}
                       >
                         {tab.stale && !tab.loading && (
                           <div className="shrink-0 px-3 py-1.5 text-xs bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 flex items-center gap-2 text-orange-700 dark:text-orange-400">
@@ -1353,19 +1381,6 @@ export default function ChatPage() {
                               vfs={workspaceWidgetVfs}
                               customPreview={workflowCustomPreview}
                             />
-                            {/* The edit pill belongs to the widget surface it
-                                acts on, not the page — and it yields to
-                                anything modal over that surface (the edit
-                                modal, the mobile file drawer). */}
-                            {!editSession && !sidebarOpen && (
-                              <Bobbin
-                                container={previewSurface}
-                                defaultActive={false}
-                                showInspector
-                                onChanges={() => undefined}
-                                exclude={[".bobbin-pill", "[data-bobbin]"]}
-                              />
-                            )}
                           </>
                         )}
                       </div>
@@ -1506,7 +1521,7 @@ export default function ChatPage() {
             originalProject={editSession.project}
             initialActiveFile={editSession.initialActiveFile}
             initialTreePath={editSession.initialTreePath}
-            apiEndpoint="/api/edit"
+            editTransport={editTransport}
             initialState={{ showPreview: true, showTree: true }}
             compile={async (code) => {
               if (!compiler) return { success: true };

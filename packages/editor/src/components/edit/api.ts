@@ -1,8 +1,21 @@
 import { applyDiffs, hasDiffBlocks, parseEditResponse } from "../../lib/diff";
 import type { EditRequest, EditResponse } from "./types";
 
+/**
+ * A host-supplied edit backend: given the request, return the model's raw
+ * reply (search/replace blocks + optional summary). Lets a serverless host
+ * route edits through its own LLM (e.g. the gateway) instead of a `/api/edit`
+ * route. `onProgress` may be called with streamed note text.
+ */
+export type EditTransport = (
+  request: EditRequest,
+  onProgress?: (note: string) => void,
+) => Promise<string>;
+
 export interface EditApiOptions {
   endpoint?: string;
+  /** Preferred over `endpoint`: run the edit through a host LLM. */
+  transport?: EditTransport;
   onProgress?: (note: string) => void;
   /** Automatically remove stray diff markers from output (default: true) */
   sanitize?: boolean;
@@ -12,19 +25,11 @@ export async function sendEditRequest(
   request: EditRequest,
   options: EditApiOptions = {},
 ): Promise<EditResponse> {
-  const { endpoint = "/api/edit", onProgress, sanitize = true } = options;
+  const { endpoint = "/api/edit", transport, onProgress, sanitize = true } = options;
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  });
-
-  if (!response.ok) {
-    throw new Error("Edit request failed");
-  }
-
-  const text = await streamResponse(response, onProgress);
+  const text = transport
+    ? await transport(request, onProgress)
+    : await fetchEditText(endpoint, request, onProgress);
 
   if (!hasDiffBlocks(text)) {
     // No diffs — return the original code unchanged with the response as summary
@@ -59,6 +64,23 @@ export async function sendEditRequest(
     summary,
     progressNotes: parsed.progressNotes,
   };
+}
+
+/** Default transport: POST the request to `endpoint` and read the reply. */
+async function fetchEditText(
+  endpoint: string,
+  request: EditRequest,
+  onProgress?: (note: string) => void,
+): Promise<string> {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    throw new Error("Edit request failed");
+  }
+  return streamResponse(response, onProgress);
 }
 
 async function streamResponse(
